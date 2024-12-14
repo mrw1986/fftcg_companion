@@ -1,30 +1,48 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:fftcg_companion/main.dart';
+import 'package:provider/provider.dart';
+import 'package:fftcg_companion/app.dart';
+import 'package:fftcg_companion/providers/auth_provider.dart';
+import 'package:fftcg_companion/providers/theme_provider.dart';
+import 'package:fftcg_companion/providers/cache_provider.dart';
+import 'package:fftcg_companion/widgets/common/loading_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('App Widget Tests', () {
+    testWidgets('App shows LoadingScreen initially',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => FFTCGAuthProvider()),
+            ChangeNotifierProvider(create: (_) => ThemeProvider()),
+            ChangeNotifierProvider(create: (_) => CacheProvider()),
+          ],
+          child: const App(),
+        ),
+      );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      expect(find.byType(LoadingScreen), findsOneWidget);
+    });
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  group('Provider Tests', () {
+    test('ThemeProvider toggles theme correctly', () {
+      final themeProvider = ThemeProvider();
+      final initialTheme = themeProvider.currentTheme;
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      themeProvider.toggleTheme();
+
+      expect(themeProvider.currentTheme, isNot(equals(initialTheme)));
+    });
+
+    test('CacheProvider manages data correctly', () {
+      final cacheProvider = CacheProvider();
+
+      cacheProvider.updateCache('testKey', 'testValue');
+      expect(cacheProvider.cachedData['testKey'], equals('testValue'));
+
+      cacheProvider.clearCache();
+      expect(cacheProvider.cachedData.isEmpty, isTrue);
+    });
   });
 }
