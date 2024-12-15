@@ -16,7 +16,6 @@ build/
 .atom/
 .idea/
 .vscode/
-codebase.xml
 
 # Firebase specific
 .firebase/
@@ -77,3 +76,4 @@ coverage/
 # Environment files
 .env*
 *.env
+codebase.xml
