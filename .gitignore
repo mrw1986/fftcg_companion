@@ -16,6 +16,7 @@ build/
 .atom/
 .idea/
 .vscode/
+codebase.xml
 
 # Firebase specific
 .firebase/
