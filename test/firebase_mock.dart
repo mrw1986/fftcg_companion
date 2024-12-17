@@ -1,14 +1,18 @@
 import 'package:firebase_core_platform_interface/firebase_core_platform_interface.dart';
-import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
 
-class MockFirebasePlatform extends Mock
-    with MockPlatformInterfaceMixin
-    implements FirebasePlatform {
+class MockFirebasePlatform extends FirebasePlatform {
   @override
   FirebaseAppPlatform app([String name = defaultFirebaseAppName]) {
-    return MockFirebaseApp();
+    return MockFirebaseApp(
+      name,
+      const FirebaseOptions(
+        apiKey: 'test-api-key',
+        appId: 'test-app-id',
+        messagingSenderId: 'test-sender-id',
+        projectId: 'test-project',
+      ),
+    );
   }
 
   @override
@@ -16,24 +20,34 @@ class MockFirebasePlatform extends Mock
     String? name,
     FirebaseOptions? options,
   }) async {
-    return MockFirebaseApp();
+    return MockFirebaseApp(
+      name ?? defaultFirebaseAppName,
+      options ??
+          const FirebaseOptions(
+            apiKey: 'test-api-key',
+            appId: 'test-app-id',
+            messagingSenderId: 'test-sender-id',
+            projectId: 'test-project',
+          ),
+    );
   }
+
+  @override
+  List<FirebaseAppPlatform> get apps => <FirebaseAppPlatform>[];
 }
 
-class MockFirebaseApp extends Mock
-    with MockPlatformInterfaceMixin
-    implements FirebaseAppPlatform {
-  @override
-  String get name => 'test-app';
-
-  @override
-  FirebaseOptions get options => FirebaseOptions(
-        apiKey: 'test-api-key',
-        appId: 'test-app-id',
-        messagingSenderId: 'test-sender-id',
-        projectId: 'test-project',
-      );
+class MockFirebaseApp extends FirebaseAppPlatform {
+  MockFirebaseApp(super.name, super.options);
 
   @override
   bool get isAutomaticDataCollectionEnabled => false;
+
+  @override
+  Future<void> delete() async {}
+
+  @override
+  Future<void> setAutomaticDataCollectionEnabled(bool enabled) async {}
+
+  @override
+  Future<void> setAutomaticResourceManagementEnabled(bool enabled) async {}
 }

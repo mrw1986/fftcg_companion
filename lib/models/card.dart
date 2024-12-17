@@ -36,21 +36,22 @@ class Card {
 
   factory Card.fromFirestore(Map<String, dynamic> data) {
     return Card(
-      id: data['id'] as String,
-      name: data['name'] as String,
-      cleanName: data['cleanName'] as String,
-      elements: List<String>.from(data['elements']),
-      type: data['type'] as String,
-      cost: data['cost'] as int,
-      power: data['power'] as String,
-      rarity: data['rarity'] as String,
-      setId: data['setId'] as String,
-      setNumber: data['setNumber'] as String,
-      text: data['text'] as String,
-      flavorText: data['flavorText'] as String?,
-      imageUrls:
-          CardImageUrls.fromMap(data['imageUrls'] as Map<String, dynamic>),
-      lastUpdated: (data['lastUpdated'] as Timestamp).toDate(),
+      id: data['id']?.toString() ?? '',
+      name: data['name']?.toString() ?? '',
+      cleanName: data['cleanName']?.toString() ?? '',
+      elements: List<String>.from(data['elements'] ?? []),
+      type: data['type']?.toString() ?? '',
+      cost: (data['cost'] as num?)?.toInt() ?? 0,
+      power: data['power']?.toString() ?? '0',
+      rarity: data['rarity']?.toString() ?? '',
+      setId: data['setId']?.toString() ?? '',
+      setNumber: data['setNumber']?.toString() ?? '',
+      text: data['text']?.toString() ?? '',
+      flavorText: data['flavorText']?.toString(),
+      imageUrls: CardImageUrls.fromMap(
+          data['imageUrls'] as Map<String, dynamic>? ?? {}),
+      lastUpdated:
+          (data['lastUpdated'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 }
@@ -68,9 +69,9 @@ class CardImageUrls {
 
   factory CardImageUrls.fromMap(Map<String, dynamic> data) {
     return CardImageUrls(
-      small: data['small'] as String,
-      normal: data['normal'] as String,
-      large: data['large'] as String,
+      small: data['small']?.toString() ?? '',
+      normal: data['normal']?.toString() ?? '',
+      large: data['large']?.toString() ?? '',
     );
   }
 }

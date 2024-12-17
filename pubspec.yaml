@@ -4,12 +4,14 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.2.3 <4.0.0'
+  sdk: ^3.2.0
   flutter: ">=3.16.0 <4.0.0"
 
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_test:
     sdk: flutter
   
   # Firebase
@@ -70,27 +72,24 @@ dependencies:
   # Icons
   cupertino_icons: ^1.0.8
   font_awesome_flutter: ^10.8.0
-  envied: ^1.0.0
+
+  # Environment Variables
+  envied: ^1.0.0 
 
 dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  
   # Linting & Analysis
   flutter_lints: ^5.0.0
   
   # Testing
   mockito: ^5.4.4
-  firebase_core: ^3.8.1
   test: ^1.25.8
-  firebase_core_platform_interface: ^5.3.1
-  plugin_platform_interface: ^2.1.8
   integration_test:
     sdk: flutter
   
   # Build & Generate
   build_runner: ^2.4.13
   json_serializable: ^6.9.0
+  envied_generator: ^1.0.0
   
   # Icons & Assets
   flutter_launcher_icons: ^0.14.2

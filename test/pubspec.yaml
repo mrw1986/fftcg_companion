@@ -1,0 +1,17 @@
+name: fftcg_companion_tests
+publish_to: 'none'
+version: 1.0.1
+
+environment:
+  sdk: ^3.2.3
+  flutter: ">=3.16.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  firebase_core_platform_interface: ^5.0.0
+  plugin_platform_interface: ^2.1.8
+  fftcg_companion:
+    path: ../ # Reference to main package

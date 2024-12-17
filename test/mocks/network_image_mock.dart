@@ -1,8 +1,7 @@
-// test/mocks/network_image_mock.dart
 import 'dart:async';
 import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/painting.dart';
 
 class MockNetworkImageProvider extends ImageProvider<MockNetworkImageProvider> {
   final String url;
@@ -19,15 +18,19 @@ class MockNetworkImageProvider extends ImageProvider<MockNetworkImageProvider> {
     MockNetworkImageProvider key,
     ImageDecoderCallback decode,
   ) {
-    return OneFrameImageStreamCompleter(_createMockImageInfo());
+    return OneFrameImageStreamCompleter(_loadAsync());
   }
 
-  Future<ImageInfo> _createMockImageInfo() async {
+  Future<ImageInfo> _loadAsync() async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    canvas.drawRect(const Rect.fromLTWH(0, 0, 100, 100), Paint());
+    final paint = Paint()..color = Colors.blue;
+    canvas.drawRect(const Rect.fromLTWH(0, 0, 100, 100), paint);
     final picture = recorder.endRecording();
     final image = await picture.toImage(100, 100);
     return ImageInfo(image: image, scale: 1.0);
   }
+
+  @override
+  String toString() => 'MockNetworkImageProvider("$url")';
 }
