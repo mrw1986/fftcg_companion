@@ -7,16 +7,27 @@ environment:
   sdk: '>=3.2.3 <4.0.0'
   flutter: ">=3.16.0 <4.0.0"
 
+
 dependencies:
   flutter:
     sdk: flutter
   
   # Firebase
   firebase_core: ^3.8.1
-  firebase_auth: ^5.3.4
   cloud_firestore: ^5.5.1
   firebase_storage: ^12.3.7
-  firebase_app_check: ^0.3.1
+  firebase_app_check: ^0.3.1+7
+  firebase_auth: ^5.3.4
+  firebase_crashlytics: ^4.2.0
+  firebase_analytics: ^11.3.6
+  
+  # Firebase UI
+  firebase_ui_auth: ^1.16.0
+  firebase_ui_firestore: ^1.7.0
+  firebase_ui_storage: ^2.1.0
+  firebase_ui_oauth: ^1.6.0
+  firebase_ui_oauth_google: ^1.4.0
+  firebase_ui_localizations: ^1.13.0
   
   # State Management
   provider: ^6.1.2
@@ -26,6 +37,7 @@ dependencies:
   path_provider: ^2.1.5
   shared_preferences: ^2.3.3
   flutter_cache_manager: ^3.4.1
+  cached_network_image: ^3.4.1
   
   # UI Components
   google_fonts: ^6.2.1
@@ -37,23 +49,17 @@ dependencies:
   flutter_svg: ^2.0.16
   fl_chart: ^0.69.2
   
-  # Authentication
-  google_sign_in: ^6.2.2
-  
   # Camera & ML Kit
-  camera: ^0.11.0
-  camera_android: ^0.10.9
-  camera_avfoundation: ^0.9.17
-  camera_platform_interface: ^2.8.0
+  camera: ^0.11.0+2
   google_mlkit_commons: ^0.9.0
   google_mlkit_text_recognition: ^0.14.0
   image_picker: ^1.1.2
-  image: ^4.4.0
+  image: ^4.5.0
   
   # Utilities
   xxh3: ^1.2.0
   logger: ^2.5.0
-  intl: ^0.20.1
+  intl: ^0.19.0
   connectivity_plus: ^6.1.1
   url_launcher: ^6.3.1
   package_info_plus: ^8.1.2
@@ -62,6 +68,7 @@ dependencies:
   # Icons
   cupertino_icons: ^1.0.8
   font_awesome_flutter: ^10.8.0
+  envied: ^1.0.0
 
 dev_dependencies:
   flutter_test:

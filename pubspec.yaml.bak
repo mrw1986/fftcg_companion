@@ -1,0 +1,88 @@
+name: fftcg_companion
+description: A companion app for the Final Fantasy Trading Card Game
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.3 <4.0.0'
+  flutter: ">=3.16.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Firebase
+  firebase_core: ^2.24.2
+  firebase_auth: ^4.15.3
+  cloud_firestore: ^4.13.6
+  firebase_storage: ^11.5.6
+  firebase_app_check: ^0.2.1+8
+  envied: ^0.5.2
+  
+  # Firebase UI
+  firebase_ui_auth: ^1.12.0
+  firebase_ui_oauth_google: ^1.2.16
+  
+  # State Management
+  provider: ^6.1.2
+  
+  # Local Storage & Caching
+  sqflite: ^2.4.1
+  path_provider: ^2.1.5
+  shared_preferences: ^2.3.3
+  flutter_cache_manager: ^3.4.1
+  
+  # UI Components
+  google_fonts: ^6.2.1
+  flutter_colorpicker: ^1.1.0
+  shimmer: ^3.0.0
+  auto_size_text: ^3.0.0
+  flutter_staggered_grid_view: ^0.7.0
+  infinite_scroll_pagination: ^4.1.0
+  flutter_svg: ^2.0.16
+  fl_chart: ^0.69.2
+  
+  # Camera & ML Kit
+  camera: ^0.11.0
+  image_picker: ^1.1.2
+  image: ^4.4.0
+  
+  # Utilities
+  xxh3: ^1.2.0
+  logger: ^2.5.0
+  intl: ^0.19.0
+  connectivity_plus: ^6.1.1
+  url_launcher: ^6.3.1
+  package_info_plus: ^8.1.2
+  device_info_plus: ^11.2.0
+  
+  # Icons
+  cupertino_icons: ^1.0.8
+  font_awesome_flutter: ^10.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  # Linting & Analysis
+  flutter_lints: ^5.0.0
+  
+  # Testing
+  mockito: ^5.4.4
+  fake_async: ^1.3.1
+  firebase_core_platform_interface: ^5.0.0
+  firebase_auth_platform_interface: ^7.0.9
+  integration_test:
+    sdk: flutter
+  
+  # Build & Generate
+  build_runner: ^2.4.13
+  json_serializable: ^6.9.0
+  envied_generator: ^0.5.2
+  
+  # Icons & Assets
+  flutter_launcher_icons: ^0.14.2
+  flutter_native_splash: ^2.4.3
+
+flutter:
+  uses-material-design: true

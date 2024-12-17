@@ -76,4 +76,8 @@ coverage/
 # Environment files
 .env*
 *.env
+env.g.dart
 codebase.xml
+Project Summary (New).md
+README.md
+repomix.config.json

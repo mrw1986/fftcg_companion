@@ -1,32 +1,31 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart'; // Add this for kDebugMode
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:firebase_ui_auth/firebase_ui_auth.dart';
+import 'package:firebase_ui_oauth_google/firebase_ui_oauth_google.dart';
+import 'package:firebase_app_check/firebase_app_check.dart'; // Add this import
+import 'package:fftcg_companion/app.dart';
 import 'firebase_options.dart';
-import 'app.dart';
-import 'providers/auth_provider.dart';
-import 'providers/theme_provider.dart';
-import 'providers/cache_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+  // Initialize Firebase Core
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize App Check
+  await FirebaseAppCheck.instance.activate(
+    androidProvider:
+        kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+    appleProvider: AppleProvider.deviceCheck,
   );
 
-  if (kDebugMode) {
-    // Debug mode specific code
-  }
+  // Configure FirebaseUI Auth (keep your existing configuration)
+  FirebaseUIAuth.configureProviders([
+    EmailAuthProvider(),
+    GoogleProvider(clientId: '161248420888-2nb1r59tjvmmekrqsid4tlj199ie4dm6.apps.googleusercontent.com'),
+  ]);
 
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => FFTCGAuthProvider()),
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => CacheProvider()),
-      ],
-      child: const App(),
-    ),
-  );
+  runApp(const App());
 }

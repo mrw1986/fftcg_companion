@@ -1,17 +1,21 @@
+// lib/config/routes.dart
 import 'package:flutter/material.dart';
-import '../features/auth/screens/email_sign_in_screen.dart';
-import '../features/profile/screens/profile_screen.dart';
-import '../features/deck_builder/screens/deck_builder_screen.dart';
+import 'package:firebase_ui_auth/firebase_ui_auth.dart';
+import '../screens/screens.dart';
 
-class AppRoutes {
-  static const String home = '/';
-  static const String emailSignIn = '/email-signin';
-  static const String profile = '/profile';
-  static const String deckBuilder = '/deck-builder';
-
-  static Map<String, WidgetBuilder> routes = {
-    emailSignIn: (context) => const EmailSignInScreen(),
-    profile: (context) => const ProfileScreen(),
-    deckBuilder: (context) => const DeckBuilderScreen(),
-  };
-}
+final Map<String, WidgetBuilder> appRoutes = {
+  '/': (context) => const HomeScreen(),
+  '/auth': (context) => SignInScreen(
+        actions: [
+          AuthStateChangeAction<SignedIn>((context, state) {
+            Navigator.pushReplacementNamed(context, '/');
+          }),
+        ],
+      ),
+  '/card_detail': (context) => const CardDetailScreen(),
+  '/deck_editor': (context) => const DeckBuilderScreen(),
+  '/scanner': (context) => const CardScannerScreen(),
+  '/settings': (context) => const SettingsScreen(),
+  '/import_export': (context) => const ImportExportScreen(),
+  '/statistics': (context) => const StatisticsScreen(),
+};
