@@ -1,22 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Require App Check for all operations
-    function isValidAppCheck() {
-      return request.auth.token.app_check == true;
-    }
-
-    // Cards collection - public read, admin write
-    match /cards/{document=**} {
-      allow read: if isValidAppCheck();
-      allow write: if false;
+    // Cards collection - allow public read
+    match /cards/{cardId} {
+      allow read: true;
+      allow write: false;
     }
 
     // User-specific data
-    match /users/{userId} {
-      allow read, write: if isValidAppCheck() && 
-                           request.auth != null && 
-                           request.auth.uid == userId;
+    match /users/{userId}/{document=**} {
+      allow read, write: request.auth != null && request.auth.uid == userId;
     }
   }
 }

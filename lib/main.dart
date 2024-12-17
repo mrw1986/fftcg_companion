@@ -11,20 +11,23 @@ import 'firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase Core
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-  // Initialize App Check
   await FirebaseAppCheck.instance.activate(
     androidProvider:
         kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
     appleProvider: AppleProvider.deviceCheck,
+    // Add this line for debug builds
   );
 
-  // Configure FirebaseUI Auth (keep your existing configuration)
+  // Configure FirebaseUI Auth
   FirebaseUIAuth.configureProviders([
     EmailAuthProvider(),
-    GoogleProvider(clientId: '161248420888-2nb1r59tjvmmekrqsid4tlj199ie4dm6.apps.googleusercontent.com'),
+    GoogleProvider(
+        clientId:
+            '161248420888-o7tbfuahgloes35huibpcbceb9m3pgc7.apps.googleusercontent.com'),
   ]);
 
   runApp(const App());
