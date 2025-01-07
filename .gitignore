@@ -43,3 +43,23 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Hive
+*.hive
+*.lock
+
+# Generated files
+*.g.dart
+*.freezed.dart
+*.gr.dart
+
+# Firebase config
+google-services.json
+GoogleService-Info.plist
+firebase_app_id_file.json
+
+# Environment files
+.env*
+
+# Local development
+.fvm/
