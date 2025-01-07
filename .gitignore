@@ -63,3 +63,6 @@ firebase_app_id_file.json
 
 # Local development
 .fvm/
+
+# Codebase
+app_codebase.xml
