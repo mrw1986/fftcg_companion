@@ -47,12 +47,20 @@ GoRouter router(ref) {
             routes: [
               GoRoute(
                 path: 'theme',
-                builder: (context, state) => const ThemeSettingsPage(),
+                pageBuilder: (context, state) => MaterialPage<void>(
+                  key: state.pageKey,
+                  child: const ThemeSettingsPage(),
+                ),
               ),
             ],
           ),
         ],
       ),
     ],
+    errorBuilder: (context, state) => Scaffold(
+      body: Center(
+        child: Text('Error: ${state.error}'),
+      ),
+    ),
   );
 }
