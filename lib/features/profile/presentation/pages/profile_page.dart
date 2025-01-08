@@ -36,6 +36,12 @@ class ProfilePage extends StatelessWidget {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('View Logs'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/profile/logs'),
+          ),
+          ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('About'),
             trailing: const Icon(Icons.chevron_right),

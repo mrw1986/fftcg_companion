@@ -6,6 +6,7 @@ import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 final viewModeProvider =
     StateProvider<bool>((ref) => true); // true = grid, false = list
@@ -40,6 +41,15 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         _scrollController.position.maxScrollExtent * 0.8) {
       ref.read(cardsNotifierProvider.notifier).loadMore();
     }
+  }
+
+  int _calculateColumnCount(BuildContext context) {
+    double width = MediaQuery.of(context).size.width;
+    if (width > 1200) return 6;
+    if (width > 900) return 5;
+    if (width > 600) return 4;
+    if (width > 400) return 3;
+    return 2;
   }
 
   @override
@@ -94,7 +104,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                 builder: (context) => const FilterDialog(),
               );
               if (result != null) {
-                // Apply filters
                 ref.read(cardsNotifierProvider.notifier).applyFilters(result);
               }
             },
@@ -117,10 +126,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                 ? GridView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(8),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.7,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: _calculateColumnCount(context),
+                      childAspectRatio: 223 / 311, // Standard FFTCG card ratio
                       crossAxisSpacing: 8,
                       mainAxisSpacing: 8,
                     ),
@@ -163,34 +171,24 @@ class CardGridItem extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          context.push(
-            '/cards/${card.productId}', 
-            extra: card,
-          );
+          context.push('/cards/${card.productId}', extra: card);
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: Image.network(
-                card.lowResUrl,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                          : null,
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(
+              child: Hero(
+                tag: 'card_${card.productId}',
+                child: CachedNetworkImage(
+                  imageUrl: card.highResUrl,
+                  fit: BoxFit.contain,
+                  placeholder: (context, url) => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                  errorWidget: (context, url, error) => const Center(
                     child: Icon(Icons.broken_image),
-                  );
-                },
+                  ),
+                ),
               ),
             ),
             Padding(
@@ -229,34 +227,21 @@ class CardListItem extends StatelessWidget {
       leading: SizedBox(
         width: 40,
         height: 56,
-        child: Image.network(
-          card.lowResUrl,
+        child: CachedNetworkImage(
+          imageUrl: card.lowResUrl,
           fit: BoxFit.cover,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Center(
-              child: CircularProgressIndicator(
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
-                    : null,
-              ),
-            );
-          },
-          errorBuilder: (context, error, stackTrace) {
-            return const Center(
-              child: Icon(Icons.broken_image),
-            );
-          },
+          placeholder: (context, url) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+          errorWidget: (context, url, error) => const Center(
+            child: Icon(Icons.broken_image),
+          ),
         ),
       ),
       title: Text(card.name),
       subtitle: Text(card.primaryCardNumber),
       onTap: () {
-        context.push(
-          '/cards/${card.productId}',
-          extra: card,
-        );
+        context.push('/cards/${card.productId}', extra: card);
       },
     );
   }
