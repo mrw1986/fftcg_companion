@@ -1,4 +1,5 @@
 // lib/core/routing/app_router.dart
+import 'package:fftcg_companion/features/cards/presentation/pages/card_details_page.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -8,7 +9,8 @@ import 'package:fftcg_companion/features/collection/presentation/pages/collectio
 import 'package:fftcg_companion/features/decks/presentation/pages/decks_page.dart';
 import 'package:fftcg_companion/features/scanner/presentation/pages/scanner_page.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_page.dart';
-import 'package:fftcg_companion/features/profile/presentation/pages/theme_settings_page.dart'; // Add this import
+import 'package:fftcg_companion/features/profile/presentation/pages/theme_settings_page.dart';
+import 'package:fftcg_companion/features/models.dart' as models;
 
 part 'app_router.g.dart';
 
@@ -28,6 +30,15 @@ GoRouter router(ref) {
           GoRoute(
             path: '/cards',
             builder: (context, state) => const CardsPage(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (context, state) {
+                  final card = state.extra as models.Card;
+                  return CardDetailsPage(card: card);
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/collection',

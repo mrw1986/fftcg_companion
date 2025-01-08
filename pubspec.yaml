@@ -46,6 +46,7 @@ dependencies:
 
   # Utils
   freezed_annotation: ^2.4.4
+  freezed: ^2.5.7
   json_annotation: ^4.9.0
   intl: ^0.20.1
   collection: ^1.19.0
@@ -67,7 +68,6 @@ dev_dependencies:
   # Code Generation
   build_runner: ^2.4.14
   custom_lint: ^0.7.0
-  freezed: ^2.5.7
   json_serializable: ^6.7.1
   riverpod_generator: ^2.3.9
   riverpod_lint: ^2.6.0
