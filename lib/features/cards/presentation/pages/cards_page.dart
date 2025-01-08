@@ -2,14 +2,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/view_size_provider.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart';
 import 'package:go_router/go_router.dart';
-import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
 
-final viewModeProvider =
-    StateProvider<bool>((ref) => true); // true = grid, false = list
+final searchControllerProvider = StateProvider.autoDispose<TextEditingController>(
+  (ref) => TextEditingController(),
+);
 
 class CardsPage extends ConsumerStatefulWidget {
   const CardsPage({super.key});
@@ -20,7 +23,6 @@ class CardsPage extends ConsumerStatefulWidget {
 
 class _CardsPageState extends ConsumerState<CardsPage> {
   final _scrollController = ScrollController();
-  final _searchController = TextEditingController();
   bool _isSearching = false;
 
   @override
@@ -32,7 +34,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   @override
   void dispose() {
     _scrollController.dispose();
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -43,28 +44,20 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     }
   }
 
-  int _calculateColumnCount(BuildContext context) {
-    double width = MediaQuery.of(context).size.width;
-    if (width > 1200) return 6;
-    if (width > 900) return 5;
-    if (width > 600) return 4;
-    if (width > 400) return 3;
-    return 2;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final viewMode = ref.watch(viewModeProvider);
+    final viewSize = ref.watch(viewSizeControllerProvider);
+    final searchController = ref.watch(searchControllerProvider);
     final cards = ref.watch(cardsNotifierProvider);
-    final searchResults = _isSearching && _searchController.text.isNotEmpty
-        ? ref.watch(cardSearchProvider(_searchController.text))
+    final searchResults = _isSearching && searchController.text.isNotEmpty
+        ? ref.watch(cardSearchProvider(searchController.text))
         : null;
 
     return Scaffold(
       appBar: AppBar(
         title: _isSearching
             ? TextField(
-                controller: _searchController,
+                controller: searchController,
                 autofocus: true,
                 decoration: InputDecoration(
                   hintText: 'Search cards...',
@@ -72,14 +65,12 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.clear),
                     onPressed: () {
-                      _searchController.clear();
+                      searchController.clear();
                       setState(() => _isSearching = false);
                     },
                   ),
                 ),
-                onChanged: (value) {
-                  setState(() {}); // Trigger rebuild to update search results
-                },
+                onChanged: (_) => setState(() {}),
               )
             : const Text('Cards'),
         actions: [
@@ -87,14 +78,29 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             icon: Icon(_isSearching ? Icons.cancel : Icons.search),
             onPressed: () {
               setState(() => _isSearching = !_isSearching);
-              if (!_isSearching) _searchController.clear();
+              if (!_isSearching) searchController.clear();
             },
           ),
-          IconButton(
-            icon: Icon(viewMode ? Icons.grid_view : Icons.view_list),
-            onPressed: () {
-              ref.read(viewModeProvider.notifier).state = !viewMode;
+          PopupMenuButton<ViewSize>(
+            icon: const Icon(Icons.view_module),
+            initialValue: viewSize,
+            onSelected: (ViewSize size) {
+              ref.read(viewSizeControllerProvider.notifier).setViewSize(size);
             },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: ViewSize.small,
+                child: Text('Small Grid'),
+              ),
+              const PopupMenuItem(
+                value: ViewSize.normal,
+                child: Text('Normal Grid'),
+              ),
+              const PopupMenuItem(
+                value: ViewSize.large,
+                child: Text('Large Grid'),
+              ),
+            ],
           ),
           IconButton(
             icon: const Icon(Icons.filter_list),
@@ -122,28 +128,28 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               );
             }
 
-            return viewMode
-                ? GridView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(8),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: _calculateColumnCount(context),
-                      childAspectRatio: 223 / 311, // Standard FFTCG card ratio
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                    ),
-                    itemCount: displayedCards.length,
-                    itemBuilder: (context, index) {
-                      return CardGridItem(card: displayedCards[index]);
-                    },
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    itemCount: displayedCards.length,
-                    itemBuilder: (context, index) {
-                      return CardListItem(card: displayedCards[index]);
-                    },
-                  );
+            return GridView.builder(
+              controller: _scrollController,
+              padding: EdgeInsets.all(viewSize.gridPadding),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: viewSize.getColumnCount(
+                  MediaQuery.of(context).size.width,
+                ),
+                childAspectRatio: 223 / 311,
+                crossAxisSpacing: viewSize.gridSpacing,
+                mainAxisSpacing: viewSize.gridSpacing,
+              ),
+              itemCount: displayedCards.length,
+              itemBuilder: (context, index) {
+                return CardGridItem(
+                  card: displayedCards[index],
+                  viewSize: viewSize,
+                ).animate().fadeIn(
+                      duration: const Duration(milliseconds: 200),
+                      delay: Duration(milliseconds: 50 * (index % 10)),
+                    );
+              },
+            );
           },
           loading: () => const Center(
             child: CircularProgressIndicator(),
@@ -160,8 +166,13 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 
 class CardGridItem extends StatelessWidget {
   final models.Card card;
+  final ViewSize viewSize;
 
-  const CardGridItem({super.key, required this.card});
+  const CardGridItem({
+    super.key,
+    required this.card,
+    required this.viewSize,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -212,37 +223,6 @@ class CardGridItem extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class CardListItem extends StatelessWidget {
-  final models.Card card;
-
-  const CardListItem({super.key, required this.card});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: SizedBox(
-        width: 40,
-        height: 56,
-        child: CachedNetworkImage(
-          imageUrl: card.lowResUrl,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => const Center(
-            child: CircularProgressIndicator(),
-          ),
-          errorWidget: (context, url, error) => const Center(
-            child: Icon(Icons.broken_image),
-          ),
-        ),
-      ),
-      title: Text(card.name),
-      subtitle: Text(card.primaryCardNumber),
-      onTap: () {
-        context.push('/cards/${card.productId}', extra: card);
-      },
     );
   }
 }

@@ -1,5 +1,9 @@
+// lib/core/storage/hive_adapters.dart
 import 'package:hive/hive.dart';
-import 'package:fftcg_companion/features/models.dart' as models;
+import 'package:fftcg_companion/features/cards/domain/models/card.dart'
+    as models;
+import 'package:fftcg_companion/features/prices/domain/models/price.dart';
+import 'dart:convert';
 
 class CardAdapter extends TypeAdapter<models.Card> {
   @override
@@ -8,36 +12,14 @@ class CardAdapter extends TypeAdapter<models.Card> {
   @override
   models.Card read(BinaryReader reader) {
     final map = reader.readMap();
-    // Convert all maps recursively to ensure proper type casting
-    final convertedMap = _convertMap(map);
-    return models.Card.fromJson(convertedMap);
+    return models.Card.fromJson(map.cast<String, dynamic>());
   }
 
   @override
   void write(BinaryWriter writer, models.Card obj) {
-    writer.writeMap(obj.toJson());
-  }
-
-  Map<String, dynamic> _convertMap(Map map) {
-    return map.map((key, value) {
-      if (value is Map) {
-        return MapEntry(key.toString(), _convertMap(value));
-      } else if (value is List) {
-        return MapEntry(key.toString(), _convertList(value));
-      }
-      return MapEntry(key.toString(), value);
-    });
-  }
-
-  List _convertList(List list) {
-    return list.map((item) {
-      if (item is Map) {
-        return _convertMap(item);
-      } else if (item is List) {
-        return _convertList(item);
-      }
-      return item;
-    }).toList();
+    // Use jsonEncode/jsonDecode to ensure proper serialization
+    final json = jsonEncode(obj.toJson());
+    writer.writeMap(jsonDecode(json) as Map);
   }
 }
 
@@ -58,71 +40,70 @@ class ExtendedDataAdapter extends TypeAdapter<models.ExtendedData> {
   }
 }
 
-class PriceAdapter extends TypeAdapter<models.Price> {
+class PriceAdapter extends TypeAdapter<Price> {
   @override
   final int typeId = 2;
 
   @override
-  models.Price read(BinaryReader reader) {
+  Price read(BinaryReader reader) {
     final map = reader.readMap();
     final convertedMap = Map<String, dynamic>.from(map);
-    return models.Price.fromJson(convertedMap);
+    return Price.fromJson(convertedMap);
   }
 
   @override
-  void write(BinaryWriter writer, models.Price obj) {
+  void write(BinaryWriter writer, Price obj) {
     writer.writeMap(obj.toJson());
   }
 }
 
-class PriceDataAdapter extends TypeAdapter<models.PriceData> {
+class PriceDataAdapter extends TypeAdapter<PriceData> {
   @override
   final int typeId = 3;
 
   @override
-  models.PriceData read(BinaryReader reader) {
+  PriceData read(BinaryReader reader) {
     final map = reader.readMap();
     final convertedMap = Map<String, dynamic>.from(map);
-    return models.PriceData.fromJson(convertedMap);
+    return PriceData.fromJson(convertedMap);
   }
 
   @override
-  void write(BinaryWriter writer, models.PriceData obj) {
+  void write(BinaryWriter writer, PriceData obj) {
     writer.writeMap(obj.toJson());
   }
 }
 
-class HistoricalPriceAdapter extends TypeAdapter<models.HistoricalPrice> {
+class HistoricalPriceAdapter extends TypeAdapter<HistoricalPrice> {
   @override
   final int typeId = 4;
 
   @override
-  models.HistoricalPrice read(BinaryReader reader) {
+  HistoricalPrice read(BinaryReader reader) {
     final map = reader.readMap();
     final convertedMap = Map<String, dynamic>.from(map);
-    return models.HistoricalPrice.fromJson(convertedMap);
+    return HistoricalPrice.fromJson(convertedMap);
   }
 
   @override
-  void write(BinaryWriter writer, models.HistoricalPrice obj) {
+  void write(BinaryWriter writer, HistoricalPrice obj) {
     writer.writeMap(obj.toJson());
   }
 }
 
-class HistoricalPriceDataAdapter
-    extends TypeAdapter<models.HistoricalPriceData> {
+class HistoricalPriceDataAdapter extends TypeAdapter<HistoricalPriceData> {
   @override
   final int typeId = 5;
 
   @override
-  models.HistoricalPriceData read(BinaryReader reader) {
+  HistoricalPriceData read(BinaryReader reader) {
     final map = reader.readMap();
     final convertedMap = Map<String, dynamic>.from(map);
-    return models.HistoricalPriceData.fromJson(convertedMap);
+    return HistoricalPriceData.fromJson(convertedMap);
   }
 
   @override
-  void write(BinaryWriter writer, models.HistoricalPriceData obj) {
+  void write(BinaryWriter writer, HistoricalPriceData obj) {
     writer.writeMap(obj.toJson());
   }
 }
