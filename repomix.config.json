@@ -5,7 +5,7 @@
     "removeComments": false,
     "removeEmptyLines": false,
     "topFilesLength": 5,
-    "showLineNumbers": false,
+    "showLineNumbers": true,
     "copyToClipboard": false
   },
   "include": [],
