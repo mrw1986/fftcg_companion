@@ -8,14 +8,36 @@ class CardAdapter extends TypeAdapter<models.Card> {
   @override
   models.Card read(BinaryReader reader) {
     final map = reader.readMap();
-    // Convert the dynamic map to Map<String, dynamic>
-    final convertedMap = Map<String, dynamic>.from(map);
+    // Convert all maps recursively to ensure proper type casting
+    final convertedMap = _convertMap(map);
     return models.Card.fromJson(convertedMap);
   }
 
   @override
   void write(BinaryWriter writer, models.Card obj) {
     writer.writeMap(obj.toJson());
+  }
+
+  Map<String, dynamic> _convertMap(Map map) {
+    return map.map((key, value) {
+      if (value is Map) {
+        return MapEntry(key.toString(), _convertMap(value));
+      } else if (value is List) {
+        return MapEntry(key.toString(), _convertList(value));
+      }
+      return MapEntry(key.toString(), value);
+    });
+  }
+
+  List _convertList(List list) {
+    return list.map((item) {
+      if (item is Map) {
+        return _convertMap(item);
+      } else if (item is List) {
+        return _convertList(item);
+      }
+      return item;
+    }).toList();
   }
 }
 

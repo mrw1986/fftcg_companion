@@ -6,6 +6,7 @@ import 'package:fftcg_companion/core/services/firestore_service.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card.dart'
     as models;
 import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
 
 part 'card_repository.g.dart';
 
@@ -23,10 +24,20 @@ class CardRepository extends _$CardRepository {
   Future<void> _initBox() async {
     if (_cardBox != null) return;
 
-    if (!Hive.isBoxOpen('cards')) {
+    try {
+      if (!Hive.isBoxOpen('cards')) {
+        await Hive.deleteBoxFromDisk(
+            'cards'); // Clear potentially corrupted data
+        await Hive.openBox<models.Card>('cards');
+      }
+      _cardBox = Hive.box<models.Card>('cards');
+    } catch (error, stack) {
+      talker.error('Error initializing card box', error, stack);
+      // Try recreating the box
+      await Hive.deleteBoxFromDisk('cards');
       await Hive.openBox<models.Card>('cards');
+      _cardBox = Hive.box<models.Card>('cards');
     }
-    _cardBox = Hive.box<models.Card>('cards');
   }
 
   Future<List<models.Card>> getCards({

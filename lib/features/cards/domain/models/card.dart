@@ -1,6 +1,7 @@
 // lib/features/cards/domain/models/card.dart
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:hive/hive.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
 
 part 'card.freezed.dart';
 part 'card.g.dart';
@@ -27,7 +28,28 @@ class Card with _$Card {
     @HiveField(15) String? artistName,
   }) = _Card;
 
-  factory Card.fromJson(Map<String, dynamic> json) => _$CardFromJson(json);
+  factory Card.fromJson(Map<String, dynamic> json) {
+    try {
+      // Ensure extendedData is properly converted
+      final extendedData = (json['extendedData'] as Map<String, dynamic>?)?.map(
+            (key, value) => MapEntry(
+              key,
+              value is Map<String, dynamic>
+                  ? ExtendedData.fromJson(value)
+                  : ExtendedData.fromJson(value as Map<String, dynamic>),
+            ),
+          ) ??
+          {};
+
+      return _$CardFromJson({
+        ...json,
+        'extendedData': extendedData,
+      });
+    } catch (error, stack) {
+      talker.error('Error parsing Card: $error', error, stack);
+      rethrow;
+    }
+  }
 }
 
 @freezed

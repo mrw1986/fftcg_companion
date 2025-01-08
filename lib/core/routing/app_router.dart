@@ -11,6 +11,8 @@ import 'package:fftcg_companion/features/scanner/presentation/pages/scanner_page
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_page.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/theme_settings_page.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
+import 'package:talker_flutter/talker_flutter.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
 
 part 'app_router.g.dart';
 
@@ -21,6 +23,7 @@ GoRouter router(ref) {
   return GoRouter(
     navigatorKey: key,
     initialLocation: '/cards',
+    errorBuilder: (context, state) => ErrorScreen(error: state.error),
     routes: [
       ShellRoute(
         builder: (context, state, child) => ScaffoldWithBottomNavBar(
@@ -63,15 +66,65 @@ GoRouter router(ref) {
                   child: const ThemeSettingsPage(),
                 ),
               ),
+              GoRoute(
+                path: 'logs',
+                builder: (context, state) => TalkerScreen(
+                  talker: talker,
+                  theme: TalkerScreenTheme(
+                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                    textColor: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
             ],
           ),
         ],
       ),
     ],
-    errorBuilder: (context, state) => Scaffold(
-      body: Center(
-        child: Text('Error: ${state.error}'),
-      ),
-    ),
   );
+}
+
+class ErrorScreen extends StatelessWidget {
+  final Exception? error;
+
+  const ErrorScreen({super.key, this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Error'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              color: Colors.red,
+              size: 60,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Something went wrong',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            if (error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                error.toString(),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => context.go('/cards'),
+              child: const Text('Return to Home'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
