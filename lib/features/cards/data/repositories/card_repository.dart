@@ -107,14 +107,23 @@ class CardRepository extends _$CardRepository {
   Future<Card?> getCard(String id, {bool forceRefresh = false}) async {
     await _initBox();
 
+    talker.debug('Getting card with ID: $id, forceRefresh: $forceRefresh');
+
     if (!forceRefresh) {
       final cached = _cardBox?.get(id);
-      if (cached != null) return cached;
+      if (cached != null) {
+        talker.debug('Found cached card: ${cached.toJson()}');
+        return cached;
+      }
     }
 
+    talker.debug('Fetching card from Firestore');
     final card = await _firestoreService.getCard(id);
+    talker.debug('Firestore response: ${card?.toJson()}');
+
     if (card != null) {
       await _cardBox?.put(id, card);
+      talker.debug('Card stored in Hive box');
     }
 
     return card;

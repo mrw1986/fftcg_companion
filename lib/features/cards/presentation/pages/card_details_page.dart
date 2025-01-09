@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
+import 'package:fftcg_companion/core/utils/logger.dart';
 
 class CardDetailsPage extends StatelessWidget {
   final models.Card card;
@@ -23,150 +24,225 @@ class CardDetailsPage extends StatelessWidget {
     );
   }
 
+  Widget _buildEnhancedBackButton(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Material(
+          color: Colors.transparent,
+          child: IconButton(
+            iconSize: 26,
+            padding: const EdgeInsets.all(12),
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.black54,
+              shadowColor: Colors.black26,
+              elevation: 4,
+            ),
+            icon: const Icon(
+              Icons.arrow_back,
+              color: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildWideLayout(BuildContext context) {
-    return Row(
+    return Stack(
       children: [
-        Expanded(
-          flex: 2,
-          child: Center(
-            child: Hero(
-              tag: 'card_${card.productId}',
-              child: AspectRatio(
-                aspectRatio: 223 / 311,
-                child: CachedNetworkImage(
-                  imageUrl: card.highResUrl,
-                  fit: BoxFit.contain,
-                  placeholder: (context, url) => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                  errorWidget: (context, url, error) => const Center(
-                    child: Icon(Icons.broken_image),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Center(
+                child: Hero(
+                  tag: 'card_${card.productId}',
+                  child: AspectRatio(
+                    aspectRatio: 223 / 311,
+                    child: CachedNetworkImage(
+                      imageUrl: card.fullResUrl,
+                      fit: BoxFit.contain,
+                      placeholder: (context, url) => const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                      errorWidget: (context, url, error) => const Center(
+                        child: Icon(Icons.broken_image),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
-        Expanded(
-          flex: 3,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  card.name,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
-                const SizedBox(height: 16),
-                _buildInfoSection(context),
-                const SizedBox(height: 16),
-                _buildExtendedDataSection(context),
-              ],
+            Expanded(
+              flex: 3,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      card.name,
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
+                    const SizedBox(height: 16),
+                    _buildExtendedDataSection(context),
+                  ],
+                ),
+              ),
             ),
-          ),
+          ],
         ),
+        _buildEnhancedBackButton(context),
       ],
     );
   }
 
   Widget _buildNormalLayout(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          expandedHeight: MediaQuery.of(context).size.width * (311 / 223),
-          pinned: true,
-          flexibleSpace: FlexibleSpaceBar(
-            title: Text(card.name)
-                .animate()
-                .fadeIn(delay: 300.ms, duration: 500.ms),
-            background: Hero(
-              tag: 'card_${card.productId}',
-              child: CachedNetworkImage(
-                imageUrl: card.highResUrl,
-                fit: BoxFit.contain,
-                placeholder: (context, url) => const Center(
-                  child: CircularProgressIndicator(),
-                ),
-                errorWidget: (context, url, error) => const Center(
-                  child: Icon(Icons.broken_image),
+    return Stack(
+      children: [
+        CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              expandedHeight: MediaQuery.of(context).size.width * (311 / 223),
+              pinned: true,
+              automaticallyImplyLeading: false,
+              flexibleSpace: FlexibleSpaceBar(
+                title: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    card.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      shadows: [
+                        Shadow(
+                          offset: Offset(0, 1),
+                          blurRadius: 3.0,
+                          color: Colors.black87,
+                        ),
+                      ],
+                    ),
+                  ),
+                ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
+                background: Hero(
+                  tag: 'card_${card.productId}',
+                  child: CachedNetworkImage(
+                    imageUrl: card.fullResUrl,
+                    fit: BoxFit.contain,
+                    placeholder: (context, url) => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                    errorWidget: (context, url, error) => const Center(
+                      child: Icon(Icons.broken_image),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildExtendedDataSection(context),
+                  ],
+                ).animate().fadeIn(delay: 200.ms).slideX(),
+              ),
+            ),
+          ],
         ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildInfoSection(context),
-                const SizedBox(height: 16),
-                _buildExtendedDataSection(context),
-              ],
-            ).animate().fadeIn(delay: 200.ms).slideX(),
-          ),
-        ),
+        _buildEnhancedBackButton(context),
       ],
     );
   }
 
-  Widget _buildInfoSection(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Card Information',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const Divider(),
-            _buildInfoRow('Card Number', card.primaryCardNumber),
-            _buildInfoRow('Group ID', card.groupId.toString()),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildExtendedDataSection(BuildContext context) {
+    // Add debug logging using Talker
+    talker.debug('Building extended data section for card ${card.productId}');
+    talker.debug('Extended data: ${card.extendedData}');
+    talker
+        .verbose('Full card data: $card'); // Using verbose for full data dumps
+
+    final textTheme = Theme.of(context).textTheme;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Card Details',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const Divider(),
-            ...card.extendedData.entries.map(
-              (entry) => _buildInfoRow(
-                entry.value.displayName,
-                entry.value.value,
+            _buildInfoRow('Card Number', card.primaryCardNumber, textTheme),
+            const Divider(height: 24),
+            // Instead of using kDebugMode, we can add this to app settings later
+            // For now, we can remove the debug widgets since Talker provides better logging
+            if (card.extendedData['Element']?.value != null)
+              _buildInfoRow(
+                  'Element', card.extendedData['Element']!.value, textTheme),
+            if (card.extendedData['CardType']?.value != null)
+              _buildInfoRow(
+                  'Type', card.extendedData['CardType']!.value, textTheme),
+            if (card.extendedData['Cost']?.value != null)
+              _buildInfoRow(
+                  'Cost', card.extendedData['Cost']!.value, textTheme),
+            if (card.extendedData['Job']?.value != null)
+              _buildInfoRow('Job', card.extendedData['Job']!.value, textTheme),
+            if (card.extendedData['Category']?.value != null)
+              _buildInfoRow(
+                  'Category', card.extendedData['Category']!.value, textTheme),
+            if (card.extendedData['Rarity']?.value != null)
+              _buildInfoRow(
+                  'Rarity', card.extendedData['Rarity']!.value, textTheme),
+            if (card.extendedData['Description']?.value != null) ...[
+              const Divider(height: 24),
+              Text(
+                'Description',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                card.extendedData['Description']!.value,
+                style: textTheme.bodyLarge,
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value, TextTheme textTheme) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
-          Text(value),
+          Expanded(
+            child: Text(
+              value,
+              style: textTheme.bodyLarge,
+            ),
+          ),
         ],
       ),
     );

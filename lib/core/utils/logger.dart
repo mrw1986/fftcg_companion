@@ -17,6 +17,20 @@ extension TalkerLoggerExtension on Talker {
   }
 
   void logSuccess(String message) {
-    info('✅ $message'); // Changed from good() to info() with emoji
+    info('✅ $message'); // This is the correct way according to docs
+  }
+}
+
+extension TalkerDebugExtension on Talker {
+  void debugOperation(String operation, String details) {
+    debug('[$operation] $details');
+  }
+
+  void logState(String component, String state) {
+    debug('$component state: $state');
+  }
+
+  void logDataConversion(String type, dynamic data) {
+    verbose('Converting $type: $data');
   }
 }

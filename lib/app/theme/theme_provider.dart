@@ -1,3 +1,4 @@
+import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -16,9 +17,15 @@ class ThemeModeController extends _$ThemeModeController {
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
-    final box = Hive.box('settings');
-    await box.put(_themeModeKey, _themeModeToString(mode));
-    state = mode;
+    try {
+      final box = Hive.box('settings');
+      await box.put(_themeModeKey, _themeModeToString(mode));
+      talker.debug('Theme mode updated to: ${mode.toString()}');
+      state = mode;
+    } catch (e, stack) {
+      talker.error('Error setting theme mode', e, stack);
+      rethrow;
+    }
   }
 
   String _themeModeToString(ThemeMode mode) {

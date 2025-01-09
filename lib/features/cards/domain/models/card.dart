@@ -1,12 +1,12 @@
 // lib/features/cards/domain/models/card.dart
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:hive/hive.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
 
 part 'card.freezed.dart';
 part 'card.g.dart';
 
 @freezed
-@HiveType(typeId: 0)
 class Card with _$Card {
   const factory Card({
     @HiveField(0) required int productId,
@@ -23,7 +23,20 @@ class Card with _$Card {
     @HiveField(11) @Default('N/A') String fullResUrl,
   }) = _Card;
 
-  factory Card.fromJson(Map<String, dynamic> json) => _$CardFromJson(json);
+  factory Card.fromJson(Map<String, dynamic> json) {
+    talker.debug('Converting card from JSON: $json');
+
+    final extendedDataMap = json['extendedData'] as Map<String, dynamic>? ?? {};
+    final convertedExtendedData = extendedDataMap.map((key, value) {
+      talker.debug('Converting extended data: $key -> $value');
+      return MapEntry(
+          key, ExtendedData.fromJson(value as Map<String, dynamic>));
+    });
+
+    json['extendedData'] = convertedExtendedData;
+
+    return _$CardFromJson(json);
+  }
 }
 
 @freezed

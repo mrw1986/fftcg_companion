@@ -25,9 +25,11 @@ class CardsNotifier extends _$CardsNotifier {
       final cards = await repository.getCards(limit: batchSize);
       _loadedCards.clear();
       _loadedCards.addAll(cards);
-      
-      // Start prefetching the next batch
+
+      talker.debug('Loaded initial batch of ${cards.length} cards');
+
       if (cards.isNotEmpty) {
+        talker.debug('Starting prefetch for next batch');
         _prefetchNextBatch(cards.last.productId.toString());
       }
 

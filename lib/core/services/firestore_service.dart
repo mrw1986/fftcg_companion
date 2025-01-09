@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
+import 'package:fftcg_companion/core/utils/logger.dart';
 
 part 'firestore_service.g.dart';
 
@@ -109,17 +110,36 @@ class FirestoreService {
   }
 
   Future<models.Card?> getCard(String id) async {
-    final doc = await cardsCollection.doc(id).get();
-    if (!doc.exists) return null;
+    try {
+      talker.debug('Fetching card document: $id');
+      final doc = await cardsCollection.doc(id).get();
+      if (!doc.exists) {
+        talker.info('Card document does not exist');
+        return null;
+      }
 
-    final extendedDataSnapshot =
-        await doc.reference.collection('extendedData').get();
+      talker.debug('Fetching extended data subcollection');
+      final extendedDataSnapshot =
+          await doc.reference.collection('extendedData').get();
 
-    final data = doc.data() as Map<String, dynamic>;
-    data['extendedData'] = Map.fromEntries(
-        extendedDataSnapshot.docs.map((d) => MapEntry(d.id, d.data())));
+      talker.debug('Extended data docs: ${extendedDataSnapshot.docs.length}');
 
-    return _convertToCard(doc);
+      final data = doc.data() as Map<String, dynamic>;
+
+      final extendedData = <String, dynamic>{};
+      for (var extDoc in extendedDataSnapshot.docs) {
+        talker.debug('Extended data doc: ${extDoc.id} -> ${extDoc.data()}');
+        extendedData[extDoc.id] = extDoc.data();
+      }
+
+      data['extendedData'] = extendedData;
+      talker.debug('Final card data before conversion: $data');
+
+      return models.Card.fromJson(data);
+    } catch (e, stack) {
+      talker.error('Error fetching card', e, stack);
+      rethrow;
+    }
   }
 
   Future<List<models.Card>> searchCards(String query) async {
