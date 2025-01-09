@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
-import 'package:fftcg_companion/core/utils/logger.dart';
 
 class CardDetailsPage extends StatelessWidget {
   final models.Card card;
@@ -59,19 +58,37 @@ class CardDetailsPage extends StatelessWidget {
               child: Center(
                 child: Hero(
                   tag: 'card_${card.productId}',
-                  child: AspectRatio(
-                    aspectRatio: 223 / 311,
-                    child: CachedNetworkImage(
-                      imageUrl: card.fullResUrl,
-                      fit: BoxFit.contain,
-                      placeholder: (context, url) => const Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                      errorWidget: (context, url, error) => const Center(
-                        child: Icon(Icons.broken_image),
-                      ),
-                    ),
-                  ),
+                  child: card.isNonCard
+                      ? AspectRatio(
+                          aspectRatio: 223 / 311,
+                          child: CachedNetworkImage(
+                            imageUrl: card.fullResUrl,
+                            fit: BoxFit.contain,
+                            placeholder: (context, url) => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                            errorWidget: (context, url, error) => const Center(
+                              child: Icon(Icons.broken_image),
+                            ),
+                          ),
+                        )
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: AspectRatio(
+                            aspectRatio: 223 / 311,
+                            child: CachedNetworkImage(
+                              imageUrl: card.fullResUrl,
+                              fit: BoxFit.contain,
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                              errorWidget: (context, url, error) =>
+                                  const Center(
+                                child: Icon(Icons.broken_image),
+                              ),
+                            ),
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -135,16 +152,30 @@ class CardDetailsPage extends StatelessWidget {
                 ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
                 background: Hero(
                   tag: 'card_${card.productId}',
-                  child: CachedNetworkImage(
-                    imageUrl: card.fullResUrl,
-                    fit: BoxFit.contain,
-                    placeholder: (context, url) => const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                    errorWidget: (context, url, error) => const Center(
-                      child: Icon(Icons.broken_image),
-                    ),
-                  ),
+                  child: card.isNonCard
+                      ? CachedNetworkImage(
+                          imageUrl: card.fullResUrl,
+                          fit: BoxFit.contain,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                          errorWidget: (context, url, error) => const Center(
+                            child: Icon(Icons.broken_image),
+                          ),
+                        )
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: CachedNetworkImage(
+                            imageUrl: card.fullResUrl,
+                            fit: BoxFit.contain,
+                            placeholder: (context, url) => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                            errorWidget: (context, url, error) => const Center(
+                              child: Icon(Icons.broken_image),
+                            ),
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -167,13 +198,8 @@ class CardDetailsPage extends StatelessWidget {
   }
 
   Widget _buildExtendedDataSection(BuildContext context) {
-    // Add debug logging using Talker
-    talker.debug('Building extended data section for card ${card.productId}');
-    talker.debug('Extended data: ${card.extendedData}');
-    talker
-        .verbose('Full card data: $card'); // Using verbose for full data dumps
-
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
       child: Padding(
@@ -183,8 +209,6 @@ class CardDetailsPage extends StatelessWidget {
           children: [
             _buildInfoRow('Card Number', card.primaryCardNumber, textTheme),
             const Divider(height: 24),
-            // Instead of using kDebugMode, we can add this to app settings later
-            // For now, we can remove the debug widgets since Talker provides better logging
             if (card.extendedData['Element']?.value != null)
               _buildInfoRow(
                   'Element', card.extendedData['Element']!.value, textTheme),
@@ -208,12 +232,15 @@ class CardDetailsPage extends StatelessWidget {
                 'Description',
                 style: textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 card.extendedData['Description']!.value,
-                style: textTheme.bodyLarge,
+                style: textTheme.bodyLarge?.copyWith(
+                  color: colorScheme.onSurface,
+                ),
               ),
             ],
           ],

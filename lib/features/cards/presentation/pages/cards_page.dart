@@ -278,15 +278,16 @@ class CardListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Calculate dimensions based on view size
     final double height = switch (viewSize) {
-      ViewSize.small => 60.0,
-      ViewSize.normal => 80.0,
-      ViewSize.large => 100.0,
+      ViewSize.small => 80.0,
+      ViewSize.normal => 100.0,
+      ViewSize.large => 120.0,
     };
 
-    final double imageWidth = height * (223 / 311); // Maintain aspect ratio
-    final textTheme = Theme.of(context).textTheme;
+    final double imageWidth = height * (223 / 311);
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colorScheme = theme.colorScheme;
 
     return Material(
       child: InkWell(
@@ -300,23 +301,39 @@ class CardListItem extends StatelessWidget {
                 // Card Image
                 Hero(
                   tag: 'card_${card.productId}',
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: SizedBox(
-                      width: imageWidth,
-                      height: height,
-                      child: CachedNetworkImage(
-                        imageUrl: card.lowResUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(),
+                  child: card.isNonCard
+                      ? SizedBox(
+                          width: imageWidth,
+                          height: height,
+                          child: CachedNetworkImage(
+                            imageUrl: card.lowResUrl,
+                            fit: BoxFit.contain,
+                            placeholder: (context, url) => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                            errorWidget: (context, url, error) => const Center(
+                              child: Icon(Icons.broken_image),
+                            ),
+                          ),
+                        )
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: SizedBox(
+                            width: imageWidth,
+                            height: height,
+                            child: CachedNetworkImage(
+                              imageUrl: card.lowResUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                              errorWidget: (context, url, error) =>
+                                  const Center(
+                                child: Icon(Icons.broken_image),
+                              ),
+                            ),
+                          ),
                         ),
-                        errorWidget: (context, url, error) => const Center(
-                          child: Icon(Icons.broken_image),
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
                 const SizedBox(width: 16),
                 // Card Details
@@ -327,56 +344,97 @@ class CardListItem extends StatelessWidget {
                     children: [
                       Text(
                         card.name,
-                        maxLines: viewSize == ViewSize.large ? 2 : 1,
+                        maxLines: viewSize == ViewSize.small ? 1 : 2,
                         overflow: TextOverflow.ellipsis,
                         style: switch (viewSize) {
-                          ViewSize.small => textTheme.bodyMedium,
-                          ViewSize.normal => textTheme.titleMedium,
-                          ViewSize.large => textTheme.titleLarge,
-                        },
+                          ViewSize.small => textTheme.titleMedium,
+                          ViewSize.normal => textTheme.titleLarge,
+                          ViewSize.large => textTheme.headlineSmall,
+                        }
+                            ?.copyWith(
+                          color: colorScheme.onSurface,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         card.primaryCardNumber,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.secondary,
-                        ),
+                        style: (switch (viewSize) {
+                          ViewSize.small => textTheme.titleSmall,
+                          ViewSize.normal => textTheme.titleMedium,
+                          ViewSize.large => textTheme.titleMedium,
+                        }
+                            ?.copyWith(
+                          color: Color.alphaBlend(
+                            colorScheme.primary
+                                .withAlpha(204), // 0.8 * 255 = 204
+                            Colors.transparent,
+                          ),
+                          fontWeight: FontWeight.w500,
+                        )),
                       ),
-                      if (viewSize == ViewSize.large) ...[
-                        const SizedBox(height: 4),
+                      if (viewSize == ViewSize.large &&
+                          (card.extendedData['Element']?.value != null ||
+                              card.extendedData['Type']?.value != null)) ...[
+                        const SizedBox(height: 8),
                         Row(
                           children: [
                             if (card.extendedData['Element']?.value != null)
-                              _buildElementChip(
-                                  context, card.extendedData['Element']!.value),
-                            const SizedBox(width: 8),
+                              _buildChip(
+                                context,
+                                card.extendedData['Element']!.value,
+                                colorScheme.primaryContainer,
+                                colorScheme.onPrimaryContainer,
+                              ),
+                            if (card.extendedData['Element']?.value != null &&
+                                card.extendedData['Type']?.value != null)
+                              const SizedBox(width: 8),
                             if (card.extendedData['Type']?.value != null)
-                              _buildTypeChip(
-                                  context, card.extendedData['Type']!.value),
+                              _buildChip(
+                                context,
+                                card.extendedData['Type']!.value,
+                                colorScheme.secondaryContainer,
+                                colorScheme.onSecondaryContainer,
+                              ),
                           ],
                         ),
                       ],
                     ],
                   ),
                 ),
-                // Cost Display (if available)
-                if (card.extendedData['Cost']?.value != null)
+                // Cost Display
+                if (card.extendedData['Cost']?.value != null) ...[
+                  const SizedBox(width: 8),
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: switch (viewSize) {
+                      ViewSize.small => 32,
+                      ViewSize.normal => 40,
+                      ViewSize.large => 48,
+                    },
+                    height: switch (viewSize) {
+                      ViewSize.small => 32,
+                      ViewSize.normal => 40,
+                      ViewSize.large => 48,
+                    },
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      color: colorScheme.primary,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Center(
                       child: Text(
                         card.extendedData['Cost']!.value,
-                        style: textTheme.titleMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        style: switch (viewSize) {
+                          ViewSize.small => textTheme.titleSmall,
+                          ViewSize.normal => textTheme.titleMedium,
+                          ViewSize.large => textTheme.titleLarge,
+                        }
+                            ?.copyWith(
+                          color: colorScheme.onPrimary,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ),
+                ],
               ],
             ),
           ),
@@ -385,33 +443,23 @@ class CardListItem extends StatelessWidget {
     );
   }
 
-  Widget _buildElementChip(BuildContext context, String element) {
+  Widget _buildChip(
+    BuildContext context,
+    String label,
+    Color backgroundColor,
+    Color textColor,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer,
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        element,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-      ),
-    );
-  }
-
-  Widget _buildTypeChip(BuildContext context, String type) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        type,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSecondaryContainer,
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: textColor,
+              fontWeight: FontWeight.bold,
             ),
       ),
     );
