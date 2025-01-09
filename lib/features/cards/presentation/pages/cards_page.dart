@@ -2,15 +2,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
-import 'package:fftcg_companion/features/cards/presentation/providers/view_size_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
 
-final searchControllerProvider = StateProvider.autoDispose<TextEditingController>(
+final searchControllerProvider =
+    StateProvider.autoDispose<TextEditingController>(
   (ref) => TextEditingController(),
 );
 
@@ -46,7 +46,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final viewSize = ref.watch(viewSizeControllerProvider);
+    final viewPrefs = ref.watch(viewPreferencesProvider);
     final searchController = ref.watch(searchControllerProvider);
     final cards = ref.watch(cardsNotifierProvider);
     final searchResults = _isSearching && searchController.text.isNotEmpty
@@ -81,31 +81,48 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               if (!_isSearching) searchController.clear();
             },
           ),
+          // View Type Toggle
+          IconButton(
+            icon: Icon(
+              viewPrefs.type == ViewType.grid
+                  ? Icons.view_list
+                  : Icons.grid_view,
+            ),
+            onPressed: () =>
+                ref.read(viewPreferencesProvider.notifier).toggleViewType(),
+          ),
+          // View Size Menu
           PopupMenuButton<ViewSize>(
-            icon: const Icon(Icons.view_module),
-            initialValue: viewSize,
+            icon: const Icon(Icons.format_size),
+            initialValue: viewPrefs.type == ViewType.grid
+                ? viewPrefs.gridSize
+                : viewPrefs.listSize,
             onSelected: (ViewSize size) {
-              ref.read(viewSizeControllerProvider.notifier).setViewSize(size);
+              if (viewPrefs.type == ViewType.grid) {
+                ref.read(viewPreferencesProvider.notifier).setGridSize(size);
+              } else {
+                ref.read(viewPreferencesProvider.notifier).setListSize(size);
+              }
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: ViewSize.small,
-                child: Text('Small Grid'),
+                child: Text('Small'),
               ),
               const PopupMenuItem(
                 value: ViewSize.normal,
-                child: Text('Normal Grid'),
+                child: Text('Normal'),
               ),
               const PopupMenuItem(
                 value: ViewSize.large,
-                child: Text('Large Grid'),
+                child: Text('Large'),
               ),
             ],
           ),
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: () async {
-              final result = await showDialog<CardFilters>(
+              final result = await showDialog<models.CardFilters>(
                 context: context,
                 builder: (context) => const FilterDialog(),
               );
@@ -128,28 +145,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               );
             }
 
-            return GridView.builder(
-              controller: _scrollController,
-              padding: EdgeInsets.all(viewSize.gridPadding),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: viewSize.getColumnCount(
-                  MediaQuery.of(context).size.width,
-                ),
-                childAspectRatio: 223 / 311,
-                crossAxisSpacing: viewSize.gridSpacing,
-                mainAxisSpacing: viewSize.gridSpacing,
-              ),
-              itemCount: displayedCards.length,
-              itemBuilder: (context, index) {
-                return CardGridItem(
-                  card: displayedCards[index],
-                  viewSize: viewSize,
-                ).animate().fadeIn(
-                      duration: const Duration(milliseconds: 200),
-                      delay: Duration(milliseconds: 50 * (index % 10)),
-                    );
-              },
-            );
+            return viewPrefs.type == ViewType.grid
+                ? _buildGridView(displayedCards, viewPrefs.gridSize)
+                : _buildListView(displayedCards, viewPrefs.listSize);
           },
           loading: () => const Center(
             child: CircularProgressIndicator(),
@@ -160,6 +158,47 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildGridView(List<models.Card> cards, ViewSize viewSize) {
+    return GridView.builder(
+      controller: _scrollController,
+      padding: EdgeInsets.all(viewSize.gridPadding),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: viewSize.getColumnCount(
+          MediaQuery.of(context).size.width,
+        ),
+        childAspectRatio: 223 / 311,
+        crossAxisSpacing: viewSize.gridSpacing,
+        mainAxisSpacing: viewSize.gridSpacing,
+      ),
+      itemCount: cards.length,
+      itemBuilder: (context, index) {
+        return CardGridItem(
+          card: cards[index],
+          viewSize: viewSize,
+        ).animate().fadeIn(
+              duration: const Duration(milliseconds: 200),
+              delay: Duration(milliseconds: 50 * (index % 10)),
+            );
+      },
+    );
+  }
+
+  Widget _buildListView(List<models.Card> cards, ViewSize viewSize) {
+    return ListView.builder(
+      controller: _scrollController,
+      itemCount: cards.length,
+      itemBuilder: (context, index) {
+        return CardListItem(
+          card: cards[index],
+          viewSize: viewSize,
+        ).animate().fadeIn(
+              duration: const Duration(milliseconds: 200),
+              delay: Duration(milliseconds: 50 * (index % 10)),
+            );
+      },
     );
   }
 }
@@ -191,7 +230,7 @@ class CardGridItem extends StatelessWidget {
               child: Hero(
                 tag: 'card_${card.productId}',
                 child: CachedNetworkImage(
-                  imageUrl: card.highResUrl,
+                  imageUrl: card.fullResUrl,
                   fit: BoxFit.contain,
                   placeholder: (context, url) => const Center(
                     child: CircularProgressIndicator(),
@@ -227,6 +266,52 @@ class CardGridItem extends StatelessWidget {
   }
 }
 
+class CardListItem extends StatelessWidget {
+  final models.Card card;
+  final ViewSize viewSize;
+
+  const CardListItem({
+    super.key,
+    required this.card,
+    required this.viewSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Hero(
+          tag: 'card_${card.productId}',
+          child: SizedBox(
+            width: viewSize.listItemHeight * (223 / 311),
+            height: viewSize.listItemHeight,
+            child: CachedNetworkImage(
+              imageUrl: card.highResUrl,
+              fit: BoxFit.contain,
+              placeholder: (context, url) => const Center(
+                child: CircularProgressIndicator(),
+              ),
+              errorWidget: (context, url, error) => const Center(
+                child: Icon(Icons.broken_image),
+              ),
+            ),
+          ),
+        ),
+        title: Text(
+          card.name,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(card.primaryCardNumber),
+        onTap: () {
+          context.push('/cards/${card.productId}', extra: card);
+        },
+      ),
+    );
+  }
+}
+
 class ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
@@ -244,7 +329,6 @@ class ErrorView extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(message),
-          const SizedBox(height: 16),
           ElevatedButton(
             onPressed: onRetry,
             child: const Text('Retry'),

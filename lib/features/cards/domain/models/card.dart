@@ -20,6 +20,7 @@ class Card with _$Card {
     @HiveField(8) @Default([]) List<String> cardNumbers,
     @HiveField(9) @Default('N/A') String primaryCardNumber,
     @HiveField(10) @Default({}) Map<String, ExtendedData> extendedData,
+    @HiveField(11) @Default('N/A') String fullResUrl,
   }) = _Card;
 
   factory Card.fromJson(Map<String, dynamic> json) => _$CardFromJson(json);
