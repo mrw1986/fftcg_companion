@@ -229,16 +229,30 @@ class CardGridItem extends StatelessWidget {
             Expanded(
               child: Hero(
                 tag: 'card_${card.productId}',
-                child: CachedNetworkImage(
-                  imageUrl: card.fullResUrl,
-                  fit: BoxFit.contain,
-                  placeholder: (context, url) => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                  errorWidget: (context, url, error) => const Center(
-                    child: Icon(Icons.broken_image),
-                  ),
-                ),
+                child: card.isNonCard
+                    ? CachedNetworkImage(
+                        imageUrl: card.fullResUrl,
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                        errorWidget: (context, url, error) => const Center(
+                          child: Icon(Icons.broken_image),
+                        ),
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: CachedNetworkImage(
+                          imageUrl: card.fullResUrl,
+                          fit: BoxFit.contain,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                          errorWidget: (context, url, error) => const Center(
+                            child: Icon(Icons.broken_image),
+                          ),
+                        ),
+                      ),
               ),
             ),
             Padding(
@@ -299,6 +313,7 @@ class CardListItem extends StatelessWidget {
             child: Row(
               children: [
                 // Card Image
+                // Card Image
                 Hero(
                   tag: 'card_${card.productId}',
                   child: card.isNonCard
@@ -358,7 +373,12 @@ class CardListItem extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         card.primaryCardNumber,
-                        style: textTheme.bodySmall?.copyWith(
+                        style: (switch (viewSize) {
+                          ViewSize.small => textTheme.bodySmall,
+                          ViewSize.normal => textTheme.bodyMedium,
+                          ViewSize.large => textTheme.bodyLarge,
+                        })
+                            ?.copyWith(
                           color: colorScheme.onSurface,
                         ),
                       ),
