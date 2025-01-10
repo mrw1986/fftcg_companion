@@ -358,19 +358,9 @@ class CardListItem extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         card.primaryCardNumber,
-                        style: (switch (viewSize) {
-                          ViewSize.small => textTheme.titleSmall,
-                          ViewSize.normal => textTheme.titleMedium,
-                          ViewSize.large => textTheme.titleMedium,
-                        }
-                            ?.copyWith(
-                          color: Color.alphaBlend(
-                            colorScheme.primary
-                                .withAlpha(204), // 0.8 * 255 = 204
-                            Colors.transparent,
-                          ),
-                          fontWeight: FontWeight.w500,
-                        )),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurface,
+                        ),
                       ),
                       if (viewSize == ViewSize.large &&
                           (card.extendedData['Element']?.value != null ||
