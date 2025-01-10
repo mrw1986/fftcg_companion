@@ -1,9 +1,9 @@
-# delete_generated_files.ps1
-
 Write-Host "Searching for generated files..." -ForegroundColor Yellow
 
-# Find all .g.dart files recursively
-$files = Get-ChildItem -Path . -Filter "*.g.dart" -Recurse
+# Find all .g.dart and .freezed.dart files recursively 
+$gFiles = Get-ChildItem -Path . -Filter "*.g.dart" -Recurse
+$freezedFiles = Get-ChildItem -Path . -Filter "*.freezed.dart" -Recurse
+$files = $gFiles + $freezedFiles
 
 if ($files.Count -eq 0) {
     Write-Host "No generated files found." -ForegroundColor Green

@@ -1,41 +1,37 @@
 // lib/core/storage/hive_adapters.dart
 import 'package:hive/hive.dart';
-import 'package:fftcg_companion/features/cards/domain/models/card.dart'
-    as models;
+import 'package:fftcg_companion/features/cards/domain/models/card.dart';
 import 'package:fftcg_companion/features/prices/domain/models/price.dart';
-import 'dart:convert';
 
-class CardAdapter extends TypeAdapter<models.Card> {
+class CardAdapter extends TypeAdapter<Card> {
   @override
   final int typeId = 0;
 
   @override
-  models.Card read(BinaryReader reader) {
+  Card read(BinaryReader reader) {
     final map = reader.readMap();
-    return models.Card.fromJson(map.cast<String, dynamic>());
+    return Card.fromJson(Map<String, dynamic>.from(map));
   }
 
   @override
-  void write(BinaryWriter writer, models.Card obj) {
-    // Use jsonEncode/jsonDecode to ensure proper serialization
-    final json = jsonEncode(obj.toJson());
-    writer.writeMap(jsonDecode(json) as Map);
+  void write(BinaryWriter writer, Card obj) {
+    writer.writeMap(Map<String, dynamic>.from(obj.toJson()));
   }
 }
 
-class ExtendedDataAdapter extends TypeAdapter<models.ExtendedData> {
+class ExtendedDataAdapter extends TypeAdapter<ExtendedData> {
   @override
   final int typeId = 1;
 
   @override
-  models.ExtendedData read(BinaryReader reader) {
+  ExtendedData read(BinaryReader reader) {
     final map = reader.readMap();
     final convertedMap = Map<String, dynamic>.from(map);
-    return models.ExtendedData.fromJson(convertedMap);
+    return ExtendedData.fromJson(convertedMap);
   }
 
   @override
-  void write(BinaryWriter writer, models.ExtendedData obj) {
+  void write(BinaryWriter writer, ExtendedData obj) {
     writer.writeMap(obj.toJson());
   }
 }
