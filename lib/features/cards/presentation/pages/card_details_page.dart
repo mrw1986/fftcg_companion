@@ -56,41 +56,27 @@ class CardDetailsPage extends StatelessWidget {
             Expanded(
               flex: 2,
               child: Center(
-                child: Hero(
-                  tag: 'card_${card.productId}',
-                  child: card.isNonCard
-                      ? AspectRatio(
-                          aspectRatio: 223 / 311,
-                          child: CachedNetworkImage(
-                            imageUrl: card.fullResUrl,
-                            fit: BoxFit.contain,
-                            placeholder: (context, url) => const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                            errorWidget: (context, url, error) => const Center(
-                              child: Icon(Icons.broken_image),
-                            ),
-                          ),
-                        )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: AspectRatio(
-                            aspectRatio: 223 / 311,
-                            child: CachedNetworkImage(
-                              imageUrl: card.fullResUrl,
-                              fit: BoxFit.contain,
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                              errorWidget: (context, url, error) =>
-                                  const Center(
-                                child: Icon(Icons.broken_image),
-                              ),
-                            ),
-                          ),
-                        ),
+                  child: Hero(
+                tag: 'card_${card.productId}',
+                child: Material(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  borderRadius: BorderRadius.circular(3),
+                  clipBehavior: Clip.antiAlias,
+                  child: AspectRatio(
+                    aspectRatio: 223 / 311,
+                    child: CachedNetworkImage(
+                      imageUrl: card.fullResUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                      errorWidget: (context, url, error) => const Center(
+                        child: Icon(Icons.broken_image),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              )),
             ),
             Expanded(
               flex: 3,
@@ -126,58 +112,51 @@ class CardDetailsPage extends StatelessWidget {
               pinned: true,
               automaticallyImplyLeading: false,
               flexibleSpace: FlexibleSpaceBar(
-                title: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    card.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      shadows: [
-                        Shadow(
-                          offset: Offset(0, 1),
-                          blurRadius: 3.0,
-                          color: Colors.black87,
-                        ),
-                      ],
+                  title: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
                     ),
-                  ),
-                ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
-                background: Hero(
-                  tag: 'card_${card.productId}',
-                  child: card.isNonCard
-                      ? CachedNetworkImage(
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      card.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(0, 1),
+                            blurRadius: 3.0,
+                            color: Colors.black87,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
+                  background: Hero(
+                    tag: 'card_${card.productId}',
+                    child: Material(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      borderRadius: BorderRadius.circular(3),
+                      clipBehavior: Clip.antiAlias,
+                      child: AspectRatio(
+                        aspectRatio: 223 / 311,
+                        child: CachedNetworkImage(
                           imageUrl: card.fullResUrl,
-                          fit: BoxFit.contain,
+                          fit: BoxFit.cover,
                           placeholder: (context, url) => const Center(
                             child: CircularProgressIndicator(),
                           ),
                           errorWidget: (context, url, error) => const Center(
                             child: Icon(Icons.broken_image),
                           ),
-                        )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: CachedNetworkImage(
-                            imageUrl: card.fullResUrl,
-                            fit: BoxFit.contain,
-                            placeholder: (context, url) => const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                            errorWidget: (context, url, error) => const Center(
-                              child: Icon(Icons.broken_image),
-                            ),
-                          ),
                         ),
-                ),
-              ),
+                      ),
+                    ),
+                  )),
             ),
             SliverToBoxAdapter(
               child: Padding(

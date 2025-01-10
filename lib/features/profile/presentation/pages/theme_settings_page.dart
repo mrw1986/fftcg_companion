@@ -72,52 +72,59 @@ class ThemeSettingsPage extends ConsumerWidget {
   }
 
   Future<void> _showColorPickerDialog(
-  BuildContext context,
-  WidgetRef ref,
-  Color currentColor,
-) async {
-  Color selectedColor = currentColor;
+    BuildContext context,
+    WidgetRef ref,
+    Color currentColor,
+  ) async {
+    Color selectedColor = currentColor;
 
-  final result = await showDialog<Color>(  // Changed return type to Color
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: const Text('Pick a color'),
-        content: SingleChildScrollView(
-          child: ColorPicker(
-            color: currentColor,
-            onColorChanged: (color) => selectedColor = color,
-            enableShadesSelection: false,
-            pickersEnabled: const {
-              ColorPickerType.primary: true,
-              ColorPickerType.accent: true,
-              ColorPickerType.wheel: true,
-            },
+    final result = await showDialog<Color>(
+      // Changed return type to Color
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Pick a color'),
+          content: SingleChildScrollView(
+            child: ColorPicker(
+              color: currentColor,
+              onColorChanged: (color) => selectedColor = color,
+              enableShadesSelection: false,
+              pickersEnabled: const {
+                ColorPickerType.primary: true,
+                ColorPickerType.accent: true,
+                ColorPickerType.wheel: true,
+              },
+            ),
           ),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(), // Remove false
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(selectedColor), // Return color instead of true
-            child: const Text('Select'),
-          ),
-        ],
-      );
-    },
-  );
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(), // Remove false
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context)
+                  .pop(selectedColor), // Return color instead of true
+              child: const Text('Select'),
+            ),
+          ],
+        );
+      },
+    );
 
-  if (result != null) {  // Check for null instead of true
-    await ref.read(themeColorControllerProvider.notifier).setThemeColor(result);
-    if (context.mounted) {  // Add mounted check
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Theme color updated'),
-          duration: Duration(seconds: 1),
-        ),
-      );
+    if (result != null) {
+      // Check for null instead of true
+      await ref
+          .read(themeColorControllerProvider.notifier)
+          .setThemeColor(result);
+      if (context.mounted) {
+        // Add mounted check
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Theme color updated'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
     }
   }
-}}
+}

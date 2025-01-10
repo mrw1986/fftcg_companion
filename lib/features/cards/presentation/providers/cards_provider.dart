@@ -56,16 +56,16 @@ class CardsNotifier extends _$CardsNotifier {
     try {
       _isLoadingMore = true;
       final repository = ref.read(cardRepositoryProvider.notifier);
-      
+
       // Try to get cards from cache first
       final lastCardId = _loadedCards.last.productId.toString();
       final nextBatchIds = List.generate(
         batchSize,
         (i) => (int.parse(lastCardId) + i + 1).toString(),
       );
-      
+
       var newCards = await repository.getCardsFromCache(nextBatchIds);
-      
+
       // If cache miss, fetch from Firestore
       if (newCards.isEmpty) {
         newCards = await repository.getCards(
@@ -77,7 +77,7 @@ class CardsNotifier extends _$CardsNotifier {
       if (newCards.isNotEmpty) {
         _loadedCards.addAll(newCards);
         state = AsyncValue.data([..._loadedCards]);
-        
+
         // Prefetch next batch
         _prefetchNextBatch(newCards.last.productId.toString());
       }
@@ -100,7 +100,7 @@ class CardsNotifier extends _$CardsNotifier {
     state = const AsyncValue.loading();
     _loadedCards.clear();
     ref.read(cardRepositoryProvider.notifier).clearPrefetchCache();
-    
+
     try {
       final repository = ref.read(cardRepositoryProvider.notifier);
       final filteredCards = await repository.getFilteredCards(filters);
@@ -116,7 +116,7 @@ class CardsNotifier extends _$CardsNotifier {
 @riverpod
 Future<List<models.Card>> cardSearch(ref, String query) async {
   if (query.isEmpty) return [];
-  
+
   try {
     return await ref.read(cardRepositoryProvider.notifier).searchCards(query);
   } catch (error, stack) {

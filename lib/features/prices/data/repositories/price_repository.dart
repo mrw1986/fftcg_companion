@@ -32,7 +32,7 @@ class PriceRepository extends _$PriceRepository {
 
     return price;
   }
- 
+
   Future<List<HistoricalPrice>> getCachedHistoricalPrices(String cardId) async {
     return _historicalBox.values
         .where((price) => price.productId.toString() == cardId)

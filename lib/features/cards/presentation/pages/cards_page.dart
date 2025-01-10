@@ -169,7 +169,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         crossAxisCount: viewSize.getColumnCount(
           MediaQuery.of(context).size.width,
         ),
-        childAspectRatio: 223 / 311,
+        childAspectRatio: 0.715, // This is roughly 223/311
         crossAxisSpacing: viewSize.gridSpacing,
         mainAxisSpacing: viewSize.gridSpacing,
       ),
@@ -215,65 +215,67 @@ class CardGridItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Material(
-      elevation: 1,
-      borderRadius: BorderRadius.circular(8),
-      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
           context.push('/cards/${card.productId}', extra: card);
         },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Hero(
-                tag: 'card_${card.productId}',
-                child: card.isNonCard
-                    ? CachedNetworkImage(
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Hero(
+                  tag: 'card_${card.productId}',
+                  child: ClipRRect(
+                    borderRadius:
+                        BorderRadius.circular(3), // Matches CardListItem
+                    child: Container(
+                      color: theme
+                          .scaffoldBackgroundColor, // Ensures background color matches
+                      child: CachedNetworkImage(
                         imageUrl: card.fullResUrl,
-                        fit: BoxFit.contain,
-                        placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                        errorWidget: (context, url, error) => const Center(
-                          child: Icon(Icons.broken_image),
-                        ),
-                      )
-                    : ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: card.fullResUrl,
-                          fit: BoxFit.contain,
-                          placeholder: (context, url) => const Center(
+                        fit: BoxFit.cover, // Covers the container properly
+                        placeholder: (context, url) => Container(
+                          color: theme.scaffoldBackgroundColor,
+                          child: const Center(
                             child: CircularProgressIndicator(),
                           ),
-                          errorWidget: (context, url, error) => const Center(
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: theme.scaffoldBackgroundColor,
+                          child: const Center(
                             child: Icon(Icons.broken_image),
                           ),
                         ),
                       ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    card.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall,
+                    ),
                   ),
-                  Text(
-                    card.primaryCardNumber,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      card.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    Text(
+                      card.primaryCardNumber,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -313,42 +315,27 @@ class CardListItem extends StatelessWidget {
             child: Row(
               children: [
                 // Card Image
-                // Card Image
                 Hero(
                   tag: 'card_${card.productId}',
-                  child: card.isNonCard
-                      ? SizedBox(
-                          width: imageWidth,
-                          height: height,
-                          child: CachedNetworkImage(
-                            imageUrl: card.lowResUrl,
-                            fit: BoxFit.contain,
-                            placeholder: (context, url) => const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                            errorWidget: (context, url, error) => const Center(
-                              child: Icon(Icons.broken_image),
-                            ),
-                          ),
-                        )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: SizedBox(
-                            width: imageWidth,
-                            height: height,
-                            child: CachedNetworkImage(
-                              imageUrl: card.lowResUrl,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                              errorWidget: (context, url, error) =>
-                                  const Center(
-                                child: Icon(Icons.broken_image),
-                              ),
-                            ),
-                          ),
+                  child: Container(
+                    width: imageWidth,
+                    height: height,
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3), // Smaller radius
+                      child: CachedNetworkImage(
+                        imageUrl: card.lowResUrl,
+                        fit: BoxFit
+                            .contain, // Ensures the full card is displayed
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(),
                         ),
+                        errorWidget: (context, url, error) => const Center(
+                          child: Icon(Icons.broken_image),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 16),
                 // Card Details

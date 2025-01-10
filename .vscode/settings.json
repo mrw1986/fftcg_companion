@@ -1,6 +1,9 @@
 {
-    "java.compile.nullAnalysis.mode": "automatic",
-    "java.configuration.updateBuildConfiguration": "automatic",
-    "terminals.autokill": true,
-    "terminals.autorun": true
+  "java.compile.nullAnalysis.mode": "automatic",
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "terminals.autokill": true,
+  "terminals.autorun": true,
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+  "editor.defaultFormatter": "Dart-Code.flutter"
 }
