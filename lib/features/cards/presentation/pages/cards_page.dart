@@ -1,4 +1,3 @@
-// lib/features/cards/presentation/pages/cards_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
@@ -81,7 +80,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               if (!_isSearching) searchController.clear();
             },
           ),
-          // View Type Toggle
           IconButton(
             icon: Icon(
               viewPrefs.type == ViewType.grid
@@ -91,7 +89,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             onPressed: () =>
                 ref.read(viewPreferencesProvider.notifier).toggleViewType(),
           ),
-          // View Size Menu
           PopupMenuButton<ViewSize>(
             icon: const Icon(Icons.format_size),
             initialValue: viewPrefs.type == ViewType.grid
@@ -145,9 +142,14 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               );
             }
 
-            return viewPrefs.type == ViewType.grid
-                ? _buildGridView(displayedCards, viewPrefs.gridSize)
-                : _buildListView(displayedCards, viewPrefs.listSize);
+            return CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                viewPrefs.type == ViewType.grid
+                    ? _buildSliverGrid(displayedCards, viewPrefs.gridSize)
+                    : _buildSliverList(displayedCards, viewPrefs.listSize),
+              ],
+            );
           },
           loading: () => const Center(
             child: CircularProgressIndicator(),
@@ -161,44 +163,52 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     );
   }
 
-  Widget _buildGridView(List<models.Card> cards, ViewSize viewSize) {
-    return GridView.builder(
-      controller: _scrollController,
-      padding: EdgeInsets.all(viewSize.gridPadding),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: viewSize.getColumnCount(
-          MediaQuery.of(context).size.width,
+  Widget _buildSliverGrid(List<models.Card> cards, ViewSize viewSize) {
+    final double spacing = 8.0;
+
+    return SliverPadding(
+      padding: EdgeInsets.all(spacing),
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: switch (viewSize) {
+            ViewSize.small => 160.0,
+            ViewSize.normal => 200.0,
+            ViewSize.large => 300.0,
+          },
+          mainAxisSpacing: spacing,
+          crossAxisSpacing: spacing,
+          // Standard card aspect ratio (63mm × 88mm)
+          childAspectRatio: 63 / 88,
         ),
-        childAspectRatio: 0.715, // This is roughly 223/311
-        crossAxisSpacing: viewSize.gridSpacing,
-        mainAxisSpacing: viewSize.gridSpacing,
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => CardGridItem(
+            card: cards[index],
+            viewSize: viewSize,
+          ).animate().fadeIn(
+                duration: const Duration(milliseconds: 200),
+                delay: Duration(milliseconds: 50 * (index % 10)),
+              ),
+          childCount: cards.length,
+        ),
       ),
-      itemCount: cards.length,
-      itemBuilder: (context, index) {
-        return CardGridItem(
-          card: cards[index],
-          viewSize: viewSize,
-        ).animate().fadeIn(
-              duration: const Duration(milliseconds: 200),
-              delay: Duration(milliseconds: 50 * (index % 10)),
-            );
-      },
     );
   }
 
-  Widget _buildListView(List<models.Card> cards, ViewSize viewSize) {
-    return ListView.builder(
-      controller: _scrollController,
-      itemCount: cards.length,
-      itemBuilder: (context, index) {
-        return CardListItem(
-          card: cards[index],
-          viewSize: viewSize,
-        ).animate().fadeIn(
-              duration: const Duration(milliseconds: 200),
-              delay: Duration(milliseconds: 50 * (index % 10)),
-            );
-      },
+  Widget _buildSliverList(List<models.Card> cards, ViewSize viewSize) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => CardListItem(
+            card: cards[index],
+            viewSize: viewSize,
+          ).animate().fadeIn(
+                duration: const Duration(milliseconds: 200),
+                delay: Duration(milliseconds: 50 * (index % 10)),
+              ),
+          childCount: cards.length,
+        ),
+      ),
     );
   }
 }
@@ -215,66 +225,108 @@ class CardGridItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final TextStyle titleStyle = switch (viewSize) {
+      ViewSize.small => const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ViewSize.normal => const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+        ),
+      ViewSize.large => const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+    };
+
+    final TextStyle subtitleStyle = switch (viewSize) {
+      ViewSize.small => const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+        ),
+      ViewSize.normal => const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+        ),
+      ViewSize.large => const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+        ),
+    };
 
     return Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: () {
           context.push('/cards/${card.productId}', extra: card);
         },
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Hero(
-                  tag: 'card_${card.productId}',
-                  child: ClipRRect(
-                    borderRadius:
-                        BorderRadius.circular(3), // Matches CardListItem
+        child: Hero(
+          tag: 'card_${card.productId}',
+          child: Material(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Card Image
+                CachedNetworkImage(
+                  imageUrl: card.fullResUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                  errorWidget: (context, url, error) => const Center(
+                    child: Icon(Icons.broken_image),
+                  ),
+                ),
+                // Overlay Footer
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Material(
+                    color: Colors.transparent,
                     child: Container(
-                      color: theme
-                          .scaffoldBackgroundColor, // Ensures background color matches
-                      child: CachedNetworkImage(
-                        imageUrl: card.fullResUrl,
-                        fit: BoxFit.cover, // Covers the container properly
-                        placeholder: (context, url) => Container(
-                          color: theme.scaffoldBackgroundColor,
-                          child: const Center(
-                            child: CircularProgressIndicator(),
-                          ),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment(0, -0.5),
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black54,
+                            Colors.black,
+                          ],
+                          stops: [0.0, 0.5, 1.0],
                         ),
-                        errorWidget: (context, url, error) => Container(
-                          color: theme.scaffoldBackgroundColor,
-                          child: const Center(
-                            child: Icon(Icons.broken_image),
+                      ),
+                      padding: const EdgeInsets.fromLTRB(8, 16, 8, 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            card.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: titleStyle,
                           ),
-                        ),
+                          Text(
+                            card.primaryCardNumber,
+                            style: subtitleStyle,
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      card.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall,
-                    ),
-                    Text(
-                      card.primaryCardNumber,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
