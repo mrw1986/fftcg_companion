@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final viewPrefs = ref.watch(viewPreferencesProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
@@ -18,7 +22,15 @@ class ProfilePage extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go('/profile/theme'),
           ),
-          // Add more profile settings here
+          SwitchListTile(
+            secondary: const Icon(Icons.label_outlined),
+            title: const Text('Show Card Labels'),
+            subtitle: const Text('Display card names and numbers on grid view'),
+            value: viewPrefs.showLabels,
+            onChanged: (_) {
+              ref.read(viewPreferencesProvider.notifier).toggleLabels();
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.person_outline),
             title: const Text('Account Settings'),

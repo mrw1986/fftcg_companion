@@ -72,14 +72,17 @@ class ViewPreferences extends _$ViewPreferences {
   static const _viewTypeKey = 'view_type';
   static const _gridSizeKey = 'grid_size';
   static const _listSizeKey = 'list_size';
+  static const _showLabelsKey = 'show_labels';
 
   @override
-  ({ViewType type, ViewSize gridSize, ViewSize listSize}) build() {
+  ({ViewType type, ViewSize gridSize, ViewSize listSize, bool showLabels})
+      build() {
     final box = Hive.box('settings');
     return (
       type: _loadViewType(box),
       gridSize: _loadSize(box, _gridSizeKey),
       listSize: _loadSize(box, _listSizeKey),
+      showLabels: box.get(_showLabelsKey, defaultValue: true),
     );
   }
 
@@ -107,6 +110,7 @@ class ViewPreferences extends _$ViewPreferences {
       type: newType,
       gridSize: state.gridSize,
       listSize: state.listSize,
+      showLabels: state.showLabels,
     );
   }
 
@@ -117,6 +121,7 @@ class ViewPreferences extends _$ViewPreferences {
       type: state.type,
       gridSize: size,
       listSize: state.listSize,
+      showLabels: state.showLabels,
     );
   }
 
@@ -127,6 +132,18 @@ class ViewPreferences extends _$ViewPreferences {
       type: state.type,
       gridSize: state.gridSize,
       listSize: size,
+      showLabels: state.showLabels,
+    );
+  }
+
+  Future<void> toggleLabels() async {
+    final box = Hive.box('settings');
+    await box.put(_showLabelsKey, !state.showLabels);
+    state = (
+      type: state.type,
+      gridSize: state.gridSize,
+      listSize: state.listSize,
+      showLabels: !state.showLabels,
     );
   }
 }

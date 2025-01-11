@@ -1,3 +1,4 @@
+// lib/features/cards/presentation/pages/cards_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
@@ -146,7 +147,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               controller: _scrollController,
               slivers: [
                 viewPrefs.type == ViewType.grid
-                    ? _buildSliverGrid(displayedCards, viewPrefs.gridSize)
+                    ? _buildSliverGrid(displayedCards, viewPrefs)
                     : _buildSliverList(displayedCards, viewPrefs.listSize),
               ],
             );
@@ -163,27 +164,35 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     );
   }
 
-  Widget _buildSliverGrid(List<models.Card> cards, ViewSize viewSize) {
+  Widget _buildSliverGrid(
+    List<models.Card> cards,
+    ({
+      ViewType type,
+      ViewSize gridSize,
+      ViewSize listSize,
+      bool showLabels
+    }) viewPrefs,
+  ) {
     final double spacing = 8.0;
 
     return SliverPadding(
       padding: EdgeInsets.all(spacing),
       sliver: SliverGrid(
         gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: switch (viewSize) {
+          maxCrossAxisExtent: switch (viewPrefs.gridSize) {
             ViewSize.small => 160.0,
             ViewSize.normal => 200.0,
             ViewSize.large => 300.0,
           },
           mainAxisSpacing: spacing,
           crossAxisSpacing: spacing,
-          // Standard card aspect ratio (63mm × 88mm)
           childAspectRatio: 63 / 88,
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) => CardGridItem(
             card: cards[index],
-            viewSize: viewSize,
+            viewSize: viewPrefs.gridSize,
+            showLabels: viewPrefs.showLabels,
           ).animate().fadeIn(
                 duration: const Duration(milliseconds: 200),
                 delay: Duration(milliseconds: 50 * (index % 10)),
@@ -216,11 +225,13 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 class CardGridItem extends StatelessWidget {
   final models.Card card;
   final ViewSize viewSize;
+  final bool showLabels;
 
   const CardGridItem({
     super.key,
     required this.card,
     required this.viewSize,
+    required this.showLabels,
   });
 
   @override
@@ -274,7 +285,6 @@ class CardGridItem extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Card Image
                 CachedNetworkImage(
                   imageUrl: card.fullResUrl,
                   fit: BoxFit.cover,
@@ -285,46 +295,46 @@ class CardGridItem extends StatelessWidget {
                     child: Icon(Icons.broken_image),
                   ),
                 ),
-                // Overlay Footer
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment(0, -0.5),
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black54,
-                            Colors.black,
-                          ],
-                          stops: [0.0, 0.5, 1.0],
+                if (showLabels)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment(0, -0.5),
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black54,
+                              Colors.black,
+                            ],
+                            stops: [0.0, 0.5, 1.0],
+                          ),
                         ),
-                      ),
-                      padding: const EdgeInsets.fromLTRB(8, 16, 8, 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            card.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: titleStyle,
-                          ),
-                          Text(
-                            card.primaryCardNumber,
-                            style: subtitleStyle,
-                          ),
-                        ],
+                        padding: const EdgeInsets.fromLTRB(8, 16, 8, 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              card.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: titleStyle,
+                            ),
+                            Text(
+                              card.primaryCardNumber,
+                              style: subtitleStyle,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
