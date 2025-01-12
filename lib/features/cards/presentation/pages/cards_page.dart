@@ -278,6 +278,8 @@ class CardGridItem extends StatelessWidget {
         child: Hero(
           tag: 'card_${card.productId}',
           child: Material(
+            color: Theme.of(context)
+                .scaffoldBackgroundColor, // This matches the background color
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(4),
             ),
