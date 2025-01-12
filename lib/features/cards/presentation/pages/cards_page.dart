@@ -269,25 +269,32 @@ class CardGridItem extends StatelessWidget {
         ),
     };
 
-    return Material(
-      color: Colors.transparent,
+    final (double cardRadius, double imageRadius) = switch (viewSize) {
+      ViewSize.small => (5.0, 4.0),
+      ViewSize.normal => (7.0, 5.5),
+      ViewSize.large => (9.0, 7.0),
+    };
+
+    return Card(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(cardRadius),
+      ),
       child: InkWell(
         onTap: () {
           context.push('/cards/${card.productId}', extra: card);
         },
         child: Hero(
           tag: 'card_${card.productId}',
-          child: Material(
-            color: Theme.of(context)
-                .scaffoldBackgroundColor, // This matches the background color
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CachedNetworkImage(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(imageRadius),
+                child: CachedNetworkImage(
                   imageUrl: card.fullResUrl,
                   fit: BoxFit.cover,
                   placeholder: (context, url) => const Center(
@@ -297,48 +304,45 @@ class CardGridItem extends StatelessWidget {
                     child: Icon(Icons.broken_image),
                   ),
                 ),
-                if (showLabels)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment(0, -0.5),
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black54,
-                              Colors.black,
-                            ],
-                            stops: [0.0, 0.5, 1.0],
-                          ),
-                        ),
-                        padding: const EdgeInsets.fromLTRB(8, 16, 8, 4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              card.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: titleStyle,
-                            ),
-                            Text(
-                              card.primaryCardNumber,
-                              style: subtitleStyle,
-                            ),
-                          ],
-                        ),
+              ),
+              if (showLabels)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment(0, -0.5),
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black54,
+                          Colors.black,
+                        ],
+                        stops: [0.0, 0.5, 1.0],
                       ),
                     ),
+                    padding: const EdgeInsets.fromLTRB(8, 16, 8, 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          card.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: titleStyle,
+                        ),
+                        Text(
+                          card.primaryCardNumber,
+                          style: subtitleStyle,
+                        ),
+                      ],
+                    ),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),
