@@ -190,6 +190,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) => CardGridItem(
+            key: ValueKey(cards[index].productId),
             card: cards[index],
             viewSize: viewPrefs.gridSize,
             showLabels: viewPrefs.showLabels,
@@ -198,6 +199,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                 delay: Duration(milliseconds: 50 * (index % 10)),
               ),
           childCount: cards.length,
+          addAutomaticKeepAlives: true,
+          addRepaintBoundaries: true,
         ),
       ),
     );
@@ -209,6 +212,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) => CardListItem(
+            key: ValueKey(cards[index].productId),
             card: cards[index],
             viewSize: viewSize,
           ).animate().fadeIn(
@@ -216,13 +220,15 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                 delay: Duration(milliseconds: 50 * (index % 10)),
               ),
           childCount: cards.length,
+          addAutomaticKeepAlives: true,
+          addRepaintBoundaries: true,
         ),
       ),
     );
   }
 }
 
-class CardGridItem extends StatelessWidget {
+class CardGridItem extends StatefulWidget {
   final models.Card card;
   final ViewSize viewSize;
   final bool showLabels;
@@ -235,8 +241,19 @@ class CardGridItem extends StatelessWidget {
   });
 
   @override
+  State<CardGridItem> createState() => _CardGridItemState();
+}
+
+class _CardGridItemState extends State<CardGridItem>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
-    final TextStyle titleStyle = switch (viewSize) {
+    super.build(context);
+
+    final TextStyle titleStyle = switch (widget.viewSize) {
       ViewSize.small => const TextStyle(
           color: Colors.white,
           fontSize: 12,
@@ -254,7 +271,7 @@ class CardGridItem extends StatelessWidget {
         ),
     };
 
-    final TextStyle subtitleStyle = switch (viewSize) {
+    final TextStyle subtitleStyle = switch (widget.viewSize) {
       ViewSize.small => const TextStyle(
           color: Colors.white,
           fontSize: 10,
@@ -269,7 +286,7 @@ class CardGridItem extends StatelessWidget {
         ),
     };
 
-    final (double cardRadius, double imageRadius) = switch (viewSize) {
+    final (double cardRadius, double imageRadius) = switch (widget.viewSize) {
       ViewSize.small => (5.0, 4.0),
       ViewSize.normal => (7.0, 5.5),
       ViewSize.large => (9.0, 7.0),
@@ -285,18 +302,21 @@ class CardGridItem extends StatelessWidget {
       ),
       child: InkWell(
         onTap: () {
-          context.push('/cards/${card.productId}', extra: card);
+          context.push('/cards/${widget.card.productId}', extra: widget.card);
         },
         child: Hero(
-          tag: 'card_${card.productId}',
+          tag: 'card_${widget.card.productId}',
           child: Stack(
             fit: StackFit.expand,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(imageRadius),
                 child: CachedNetworkImage(
-                  imageUrl: card.fullResUrl,
+                  imageUrl: widget.card.fullResUrl,
                   fit: BoxFit.cover,
+                  memCacheWidth: 1024,
+                  memCacheHeight: 1024,
+                  cacheKey: 'card_${widget.card.productId}',
                   placeholder: (context, url) => const Center(
                     child: CircularProgressIndicator(),
                   ),
@@ -305,7 +325,7 @@ class CardGridItem extends StatelessWidget {
                   ),
                 ),
               ),
-              if (showLabels)
+              if (widget.showLabels)
                 Positioned(
                   left: 0,
                   right: 0,
@@ -329,13 +349,13 @@ class CardGridItem extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          card.name,
+                          widget.card.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: titleStyle,
                         ),
                         Text(
-                          card.primaryCardNumber,
+                          widget.card.primaryCardNumber,
                           style: subtitleStyle,
                         ),
                       ],
@@ -350,7 +370,7 @@ class CardGridItem extends StatelessWidget {
   }
 }
 
-class CardListItem extends StatelessWidget {
+class CardListItem extends StatefulWidget {
   final models.Card card;
   final ViewSize viewSize;
 
@@ -361,8 +381,19 @@ class CardListItem extends StatelessWidget {
   });
 
   @override
+  State<CardListItem> createState() => _CardListItemState();
+}
+
+class _CardListItemState extends State<CardListItem>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
-    final double height = switch (viewSize) {
+    super.build(context);
+
+    final double height = switch (widget.viewSize) {
       ViewSize.small => 80.0,
       ViewSize.normal => 100.0,
       ViewSize.large => 120.0,
@@ -375,26 +406,28 @@ class CardListItem extends StatelessWidget {
 
     return Material(
       child: InkWell(
-        onTap: () => context.push('/cards/${card.productId}', extra: card),
+        onTap: () =>
+            context.push('/cards/${widget.card.productId}', extra: widget.card),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: SizedBox(
             height: height,
             child: Row(
               children: [
-                // Card Image
                 Hero(
-                  tag: 'card_${card.productId}',
+                  tag: 'card_${widget.card.productId}',
                   child: Container(
                     width: imageWidth,
                     height: height,
                     color: Theme.of(context).scaffoldBackgroundColor,
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(3), // Smaller radius
+                      borderRadius: BorderRadius.circular(3),
                       child: CachedNetworkImage(
-                        imageUrl: card.lowResUrl,
-                        fit: BoxFit
-                            .contain, // Ensures the full card is displayed
+                        imageUrl: widget.card.lowResUrl,
+                        fit: BoxFit.contain,
+                        memCacheWidth: 1024,
+                        memCacheHeight: 1024,
+                        cacheKey: 'card_list_${widget.card.productId}',
                         placeholder: (context, url) => const Center(
                           child: CircularProgressIndicator(),
                         ),
@@ -406,17 +439,16 @@ class CardListItem extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Card Details
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        card.name,
-                        maxLines: viewSize == ViewSize.small ? 1 : 2,
+                        widget.card.name,
+                        maxLines: widget.viewSize == ViewSize.small ? 1 : 2,
                         overflow: TextOverflow.ellipsis,
-                        style: switch (viewSize) {
+                        style: switch (widget.viewSize) {
                           ViewSize.small => textTheme.titleMedium,
                           ViewSize.normal => textTheme.titleLarge,
                           ViewSize.large => textTheme.headlineSmall,
@@ -427,8 +459,8 @@ class CardListItem extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        card.primaryCardNumber,
-                        style: (switch (viewSize) {
+                        widget.card.primaryCardNumber,
+                        style: (switch (widget.viewSize) {
                           ViewSize.small => textTheme.bodySmall,
                           ViewSize.normal => textTheme.bodyMedium,
                           ViewSize.large => textTheme.bodyLarge,
@@ -437,26 +469,29 @@ class CardListItem extends StatelessWidget {
                           color: colorScheme.onSurface,
                         ),
                       ),
-                      if (viewSize == ViewSize.large &&
-                          (card.extendedData['Element']?.value != null ||
-                              card.extendedData['Type']?.value != null)) ...[
+                      if (widget.viewSize == ViewSize.large &&
+                          (widget.card.extendedData['Element']?.value != null ||
+                              widget.card.extendedData['Type']?.value !=
+                                  null)) ...[
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            if (card.extendedData['Element']?.value != null)
+                            if (widget.card.extendedData['Element']?.value !=
+                                null)
                               _buildChip(
                                 context,
-                                card.extendedData['Element']!.value,
+                                widget.card.extendedData['Element']!.value,
                                 colorScheme.primaryContainer,
                                 colorScheme.onPrimaryContainer,
                               ),
-                            if (card.extendedData['Element']?.value != null &&
-                                card.extendedData['Type']?.value != null)
+                            if (widget.card.extendedData['Element']?.value !=
+                                    null &&
+                                widget.card.extendedData['Type']?.value != null)
                               const SizedBox(width: 8),
-                            if (card.extendedData['Type']?.value != null)
+                            if (widget.card.extendedData['Type']?.value != null)
                               _buildChip(
                                 context,
-                                card.extendedData['Type']!.value,
+                                widget.card.extendedData['Type']!.value,
                                 colorScheme.secondaryContainer,
                                 colorScheme.onSecondaryContainer,
                               ),
@@ -466,16 +501,15 @@ class CardListItem extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Cost Display
-                if (card.extendedData['Cost']?.value != null) ...[
+                if (widget.card.extendedData['Cost']?.value != null) ...[
                   const SizedBox(width: 8),
                   Container(
-                    width: switch (viewSize) {
+                    width: switch (widget.viewSize) {
                       ViewSize.small => 32,
                       ViewSize.normal => 40,
                       ViewSize.large => 48,
                     },
-                    height: switch (viewSize) {
+                    height: switch (widget.viewSize) {
                       ViewSize.small => 32,
                       ViewSize.normal => 40,
                       ViewSize.large => 48,
@@ -486,8 +520,8 @@ class CardListItem extends StatelessWidget {
                     ),
                     child: Center(
                       child: Text(
-                        card.extendedData['Cost']!.value,
-                        style: switch (viewSize) {
+                        widget.card.extendedData['Cost']!.value,
+                        style: switch (widget.viewSize) {
                           ViewSize.small => textTheme.titleSmall,
                           ViewSize.normal => textTheme.titleMedium,
                           ViewSize.large => textTheme.titleLarge,
