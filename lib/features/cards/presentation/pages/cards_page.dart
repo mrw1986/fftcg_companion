@@ -72,7 +72,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                 ),
                 onChanged: (_) => setState(() {}),
               )
-            : const Text('Cards'),
+            : const Text('Card Database'),
         actions: [
           IconButton(
             icon: Icon(_isSearching ? Icons.cancel : Icons.search),
