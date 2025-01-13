@@ -56,79 +56,124 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     return Scaffold(
       appBar: AppBar(
         title: _isSearching
-            ? TextField(
-                controller: searchController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Search cards...',
-                  border: InputBorder.none,
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      searchController.clear();
-                      setState(() => _isSearching = false);
-                    },
-                  ),
-                ),
-                onChanged: (_) => setState(() {}),
+            ? LayoutBuilder(
+                builder: (context, constraints) {
+                  final mediaQuery = MediaQuery.of(context);
+                  final screenWidth = mediaQuery.size.width;
+                  final isSmallScreen =
+                      screenWidth <= mediaQuery.size.shortestSide;
+
+                  return Row(
+                    children: [
+                      if (isSmallScreen)
+                        Expanded(
+                          child: TextField(
+                            controller: searchController,
+                            autofocus: true,
+                            decoration: InputDecoration(
+                              hintText: 'Search cards...',
+                              border: InputBorder.none,
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () => searchController.clear(),
+                              ),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        )
+                      else
+                        Flexible(
+                          child: SizedBox(
+                            width: screenWidth * 0.4,
+                            child: TextField(
+                              controller: searchController,
+                              autofocus: true,
+                              decoration: InputDecoration(
+                                hintText: 'Search cards...',
+                                border: InputBorder.none,
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () => searchController.clear(),
+                                ),
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               )
             : const Text('Card Database'),
         actions: [
-          IconButton(
-            icon: Icon(_isSearching ? Icons.cancel : Icons.search),
-            onPressed: () {
-              setState(() => _isSearching = !_isSearching);
-              if (!_isSearching) searchController.clear();
-            },
-          ),
-          IconButton(
-            icon: Icon(
-              viewPrefs.type == ViewType.grid
-                  ? Icons.view_list
-                  : Icons.grid_view,
+          if (_isSearching)
+            IconButton(
+              icon: const Icon(Icons.cancel),
+              padding: EdgeInsets.zero,
+              onPressed: () {
+                setState(() => _isSearching = !_isSearching);
+                if (!_isSearching) searchController.clear();
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                setState(() => _isSearching = !_isSearching);
+              },
             ),
-            onPressed: () =>
-                ref.read(viewPreferencesProvider.notifier).toggleViewType(),
-          ),
-          PopupMenuButton<ViewSize>(
-            icon: const Icon(Icons.format_size),
-            initialValue: viewPrefs.type == ViewType.grid
-                ? viewPrefs.gridSize
-                : viewPrefs.listSize,
-            onSelected: (ViewSize size) {
-              if (viewPrefs.type == ViewType.grid) {
-                ref.read(viewPreferencesProvider.notifier).setGridSize(size);
-              } else {
-                ref.read(viewPreferencesProvider.notifier).setListSize(size);
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: ViewSize.small,
-                child: Text('Small'),
+          if (!_isSearching ||
+              MediaQuery.of(context).size.width >
+                  MediaQuery.of(context).size.shortestSide) ...[
+            IconButton(
+              icon: Icon(
+                viewPrefs.type == ViewType.grid
+                    ? Icons.view_list
+                    : Icons.grid_view,
               ),
-              const PopupMenuItem(
-                value: ViewSize.normal,
-                child: Text('Normal'),
-              ),
-              const PopupMenuItem(
-                value: ViewSize.large,
-                child: Text('Large'),
-              ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: () async {
-              final result = await showDialog<models.CardFilters>(
-                context: context,
-                builder: (context) => const FilterDialog(),
-              );
-              if (result != null) {
-                ref.read(cardsNotifierProvider.notifier).applyFilters(result);
-              }
-            },
-          ),
+              onPressed: () =>
+                  ref.read(viewPreferencesProvider.notifier).toggleViewType(),
+            ),
+            PopupMenuButton<ViewSize>(
+              icon: const Icon(Icons.format_size),
+              initialValue: viewPrefs.type == ViewType.grid
+                  ? viewPrefs.gridSize
+                  : viewPrefs.listSize,
+              onSelected: (ViewSize size) {
+                if (viewPrefs.type == ViewType.grid) {
+                  ref.read(viewPreferencesProvider.notifier).setGridSize(size);
+                } else {
+                  ref.read(viewPreferencesProvider.notifier).setListSize(size);
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: ViewSize.small,
+                  child: Text('Small'),
+                ),
+                const PopupMenuItem(
+                  value: ViewSize.normal,
+                  child: Text('Normal'),
+                ),
+                const PopupMenuItem(
+                  value: ViewSize.large,
+                  child: Text('Large'),
+                ),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.filter_list),
+              onPressed: () async {
+                final result = await showDialog<models.CardFilters>(
+                  context: context,
+                  builder: (context) => const FilterDialog(),
+                );
+                if (result != null) {
+                  ref.read(cardsNotifierProvider.notifier).applyFilters(result);
+                }
+              },
+            ),
+          ],
         ],
       ),
       body: RefreshIndicator(
@@ -174,16 +219,20 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     }) viewPrefs,
   ) {
     final double spacing = 8.0;
+    final mediaQuery = MediaQuery.of(context);
+    final screenWidth = mediaQuery.size.width;
+    final isSmallScreen = screenWidth <= mediaQuery.size.shortestSide;
 
-    // Calculate number of desired columns based on view size
     final int desiredColumns = switch (viewPrefs.gridSize) {
-      ViewSize.small => 4, // 4 columns for small
-      ViewSize.normal => 3, // 3 columns for normal
-      ViewSize.large => 2, // 2 columns for large
+      ViewSize.small => isSmallScreen ? 4 : 6,
+      ViewSize.normal => isSmallScreen ? 3 : 5,
+      ViewSize.large => isSmallScreen ? 2 : 4,
     };
 
+    final double dynamicPadding = isSmallScreen ? 8.0 : 16.0;
+
     return SliverPadding(
-      padding: EdgeInsets.all(spacing),
+      padding: EdgeInsets.all(dynamicPadding),
       sliver: SliverGrid(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: desiredColumns,
@@ -210,14 +259,25 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   }
 
   Widget _buildSliverList(List<models.Card> cards, ViewSize viewSize) {
+    final mediaQuery = MediaQuery.of(context);
+    final screenWidth = mediaQuery.size.width;
+    final isSmallScreen = screenWidth <= mediaQuery.size.shortestSide;
+
+    final double horizontalPadding = isSmallScreen ? 8.0 : 16.0;
+    final double verticalPadding = isSmallScreen ? 4.0 : 8.0;
+
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: verticalPadding,
+      ),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) => CardListItem(
             key: ValueKey(cards[index].productId),
             card: cards[index],
             viewSize: viewSize,
+            isSmallScreen: isSmallScreen,
           ).animate().fadeIn(
                 duration: const Duration(milliseconds: 200),
                 delay: Duration(milliseconds: 50 * (index % 10)),
@@ -367,11 +427,13 @@ class _CardGridItemState extends State<CardGridItem>
 class CardListItem extends StatefulWidget {
   final models.Card card;
   final ViewSize viewSize;
+  final bool isSmallScreen;
 
   const CardListItem({
     super.key,
     required this.card,
     required this.viewSize,
+    required this.isSmallScreen,
   });
 
   @override
@@ -388,9 +450,9 @@ class _CardListItemState extends State<CardListItem>
     super.build(context);
 
     final double height = switch (widget.viewSize) {
-      ViewSize.small => 80.0,
-      ViewSize.normal => 100.0,
-      ViewSize.large => 120.0,
+      ViewSize.small => widget.isSmallScreen ? 70.0 : 80.0,
+      ViewSize.normal => widget.isSmallScreen ? 90.0 : 100.0,
+      ViewSize.large => widget.isSmallScreen ? 110.0 : 120.0,
     };
 
     final double imageWidth = height * (223 / 311);
@@ -403,7 +465,10 @@ class _CardListItemState extends State<CardListItem>
         onTap: () =>
             context.push('/cards/${widget.card.productId}', extra: widget.card),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.isSmallScreen ? 8.0 : 16.0,
+            vertical: widget.isSmallScreen ? 4.0 : 8.0,
+          ),
           child: SizedBox(
             height: height,
             child: Row(
@@ -425,7 +490,7 @@ class _CardListItemState extends State<CardListItem>
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: widget.isSmallScreen ? 8 : 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,11 +500,17 @@ class _CardListItemState extends State<CardListItem>
                         widget.card.name,
                         maxLines: widget.viewSize == ViewSize.small ? 1 : 2,
                         overflow: TextOverflow.ellipsis,
-                        style: switch (widget.viewSize) {
-                          ViewSize.small => textTheme.titleMedium,
-                          ViewSize.normal => textTheme.titleLarge,
-                          ViewSize.large => textTheme.headlineSmall,
-                        }
+                        style: (switch (widget.viewSize) {
+                          ViewSize.small => widget.isSmallScreen
+                              ? textTheme.titleSmall
+                              : textTheme.titleMedium,
+                          ViewSize.normal => widget.isSmallScreen
+                              ? textTheme.titleMedium
+                              : textTheme.titleLarge,
+                          ViewSize.large => widget.isSmallScreen
+                              ? textTheme.titleLarge
+                              : textTheme.headlineSmall,
+                        })
                             ?.copyWith(
                           color: colorScheme.onSurface,
                         ),
