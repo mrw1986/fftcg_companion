@@ -1,4 +1,5 @@
 // lib/features/cards/presentation/pages/cards_page.dart
+import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
@@ -6,7 +7,6 @@ import 'package:fftcg_companion/features/cards/presentation/providers/view_prefe
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 final searchControllerProvider =
@@ -175,15 +175,18 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   ) {
     final double spacing = 8.0;
 
+    // Calculate number of desired columns based on view size
+    final int desiredColumns = switch (viewPrefs.gridSize) {
+      ViewSize.small => 4, // 4 columns for small
+      ViewSize.normal => 3, // 3 columns for normal
+      ViewSize.large => 2, // 2 columns for large
+    };
+
     return SliverPadding(
       padding: EdgeInsets.all(spacing),
       sliver: SliverGrid(
-        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: switch (viewPrefs.gridSize) {
-            ViewSize.small => 160.0,
-            ViewSize.normal => 200.0,
-            ViewSize.large => 300.0,
-          },
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: desiredColumns,
           mainAxisSpacing: spacing,
           crossAxisSpacing: spacing,
           childAspectRatio: 63 / 88,
@@ -311,18 +314,9 @@ class _CardGridItemState extends State<CardGridItem>
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(imageRadius),
-                child: CachedNetworkImage(
+                child: CachedCardImage(
                   imageUrl: widget.card.fullResUrl,
                   fit: BoxFit.cover,
-                  memCacheWidth: 1024,
-                  memCacheHeight: 1024,
-                  cacheKey: 'card_${widget.card.productId}',
-                  placeholder: (context, url) => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                  errorWidget: (context, url, error) => const Center(
-                    child: Icon(Icons.broken_image),
-                  ),
                 ),
               ),
               if (widget.showLabels)
@@ -422,18 +416,11 @@ class _CardListItemState extends State<CardListItem>
                     color: Theme.of(context).scaffoldBackgroundColor,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(3),
-                      child: CachedNetworkImage(
+                      child: CachedCardImage(
                         imageUrl: widget.card.lowResUrl,
                         fit: BoxFit.contain,
-                        memCacheWidth: 1024,
-                        memCacheHeight: 1024,
-                        cacheKey: 'card_list_${widget.card.productId}',
-                        placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                        errorWidget: (context, url, error) => const Center(
-                          child: Icon(Icons.broken_image),
-                        ),
+                        width: imageWidth,
+                        height: height,
                       ),
                     ),
                   ),
