@@ -143,28 +143,51 @@ class FirestoreService {
   }
 
   Future<List<models.Card>> searchCards(String query) async {
-    final normalizedQuery = query.toLowerCase().trim();
+    try {
+      final normalizedQuery = query.toLowerCase().trim();
+      talker.debug('Performing Firestore search for: $normalizedQuery');
 
-    final nameResults = await cardsCollection
-        .where('cleanName', isGreaterThanOrEqualTo: normalizedQuery)
-        .where('cleanName', isLessThan: '${normalizedQuery}z')
-        .limit(20)
-        .get();
+      // Create queries
+      final queries = <Future<QuerySnapshot>>[];
 
-    final numberResults = await cardsCollection
-        .where('cardNumbers', arrayContains: normalizedQuery)
-        .limit(20)
-        .get();
+      // Query 1: Search by cleanName using prefix
+      queries.add(cardsCollection
+          .orderBy('cleanName')
+          .startAt([normalizedQuery]).endAt(['$normalizedQuery\uf8ff']).get());
 
-    final resultMap = <String, models.Card>{};
+      // Query 2: Search by card numbers using array-contains
+      queries.add(cardsCollection
+          .where('cardNumbers', arrayContains: normalizedQuery.toUpperCase())
+          .get());
 
-    for (final doc in [...nameResults.docs, ...numberResults.docs]) {
-      if (!resultMap.containsKey(doc.id)) {
+      // Execute all queries concurrently
+      final results = await Future.wait(queries);
+
+      // Combine results and remove duplicates
+      final resultMap = <String, models.Card>{};
+
+      // Add results from cleanName query
+      final nameResults = results[0];
+      talker.debug('Name search results: ${nameResults.docs.length}');
+      for (final doc in nameResults.docs) {
         resultMap[doc.id] = _convertToCard(doc);
       }
-    }
 
-    return resultMap.values.toList();
+      // Add results from cardNumbers query
+      final numberResults = results[1];
+      talker.debug('Card number search results: ${numberResults.docs.length}');
+      for (final doc in numberResults.docs) {
+        if (!resultMap.containsKey(doc.id)) {
+          resultMap[doc.id] = _convertToCard(doc);
+        }
+      }
+
+      talker.debug('Total unique Firestore results: ${resultMap.length}');
+      return resultMap.values.toList();
+    } catch (e, stack) {
+      talker.error('Error searching cards in Firestore', e, stack);
+      rethrow;
+    }
   }
 
   // Price Methods

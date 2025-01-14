@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper Functions
+    function isAuthorizedUser() {
+      return request.auth != null && 
+             (request.auth.token.email == 'mrw1986@gmail.com' ||
+              request.auth.token.email == 'preliatorzero@gmail.com' ||
+              request.auth.token.email == 'fftcgcompanion@gmail.com');
+    }
+
+    function isCloudFunction() {
+      return request.auth != null &&
+             request.auth.token.firebase.sign_in_provider == 'google.com' &&
+             request.auth.token.email.matches('.*@firebase.google.com$');
+    }
+
+    // Cards Collection - Public read access
+    match /cards/{cardId} {
+      allow read: if true;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+      
+      // Subcollections (metadata, etc.)
+      match /{subcollection}/{document=**} {
+        allow read: if true;
+        allow write: if isCloudFunction() || isAuthorizedUser();
+      }
+    }
+
+    // Prices Collection - Authenticated read access
+    match /prices/{priceId} {
+      allow read: if request.auth != null;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+    }
+
+    // Historical Prices Collection
+    match /historicalPrices/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+    }
+
+    // User Documents
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // User's collections
+      match /cards/{cardId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      match /decks/{deckId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      match /stats/{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /favorites/{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Public Reference Collections
+    match /sets/{setId} {
+      allow read: if request.auth != null;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+    }
+
+    match /elements/{elementId} {
+      allow read: if request.auth != null;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+    }
+
+    match /cardTypes/{typeId} {
+      allow read: if request.auth != null;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+    }
+
+    // Sync Metadata
+    match /syncMetadata/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+    }
+
+    // Price Updates
+    match /priceUpdates/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+    }
+
+    // Default deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

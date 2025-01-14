@@ -181,4 +181,28 @@ class CardRepository extends _$CardRepository {
       return true;
     }).toList();
   }
+
+  Future<List<Card>> searchCards(String query) async {
+    if (query.isEmpty) return [];
+
+    try {
+      talker.debug('Starting card search for: $query');
+
+      // Search directly in Firestore
+      final firestoreResults = await _firestoreService.searchCards(query);
+      talker.debug('Found ${firestoreResults.length} results in Firestore');
+
+      // Cache the results for future use
+      if (firestoreResults.isNotEmpty) {
+        await _cardBox?.putAll({
+          for (var card in firestoreResults) card.productId.toString(): card
+        });
+      }
+
+      return firestoreResults;
+    } catch (e, stack) {
+      talker.error('Error searching cards', e, stack);
+      rethrow;
+    }
+  }
 }
