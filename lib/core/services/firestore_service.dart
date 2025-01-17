@@ -201,6 +201,7 @@ class FirestoreService {
         query = query.where('extendedData.Cost.value',
             isGreaterThanOrEqualTo: filters.minCost.toString());
       }
+
       if (filters.maxCost != null) {
         query = query.where('extendedData.Cost.value',
             isLessThanOrEqualTo: filters.maxCost.toString());
@@ -248,13 +249,12 @@ class FirestoreService {
     DocumentSnapshot? startAfter,
   }) async {
     try {
-      // Generate cache key
+      // Check cache first
+      final box = await Hive.openBox(_queryCacheBox);
       final cacheKey =
           'sorted_${sortField}_${descending}_${limit}_${startAfter?.id}';
-      final box = await Hive.openBox(_queryCacheBox);
-
-      // Check cache first
       final cached = box.get(cacheKey);
+
       if (cached != null) {
         final timestamp = DateTime.parse(cached['timestamp']);
         if (DateTime.now().difference(timestamp) < _cacheDuration) {
@@ -268,20 +268,32 @@ class FirestoreService {
 
       Query query = cardsCollection;
 
-      // Map sort field to actual Firestore field path
-      String fieldPath = switch (sortField) {
-        'name' => 'cleanName',
-        'number' => 'primaryCardNumber',
-        'cost' => 'extendedData.Cost.value',
-        'power' => 'extendedData.Power.value',
-        _ => 'primaryCardNumber', // default sort
+      // Map sort field to actual Firestore field path and field type
+      final sortConfig = switch (sortField) {
+        'name' => ('cleanName', null, false), // (field, subfield, isNumeric)
+        'number' => ('primaryCardNumber', null, false),
+        'cost' => ('extendedData.Cost.value', 'cleanName', true),
+        'power' => ('extendedData.Power.value', 'cleanName', true),
+        _ => ('primaryCardNumber', null, false), // default sort
       };
 
-      query = query.orderBy(fieldPath, descending: descending);
+      final (primaryField, secondaryField, isNumeric) = sortConfig;
 
-      // Add secondary sort by name for consistent ordering
-      if (fieldPath != 'cleanName') {
-        query = query.orderBy('cleanName', descending: false);
+      // Build the query based on field type
+      if (isNumeric) {
+        // For numeric fields (cost, power), first ensure the field exists
+        query = query.where(primaryField, isNull: false);
+
+        // Add the numeric sorting
+        query = query.orderBy(primaryField, descending: descending);
+
+        // Add secondary sort by name for consistent ordering
+        if (secondaryField != null) {
+          query = query.orderBy(secondaryField, descending: false);
+        }
+      } else {
+        // For text fields, just order by the field
+        query = query.orderBy(primaryField, descending: descending);
       }
 
       if (startAfter != null) {
@@ -472,17 +484,38 @@ class FirestoreService {
   Future<Set<String>> getUniqueFieldValues(
       String collection, String field) async {
     try {
-      final snapshot = await _firestore.collection(collection).get();
+      // Check cache first
+      final box = await Hive.openBox(_queryCacheBox);
+      final cacheKey = '${collection}_${field}_values';
+      final cached = box.get(cacheKey);
+
+      if (cached != null) {
+        final timestamp = DateTime.parse(cached['timestamp']);
+        if (DateTime.now().difference(timestamp) < _cacheDuration) {
+          talker.debug('Returning cached values for $field');
+          return Set<String>.from(cached['values']);
+        }
+      }
+
+      // If not cached or cache expired, fetch from Firestore
+      final snapshot = await _firestore
+          .collection(collection)
+          .where('extendedData.$field', isNull: false)
+          .get();
 
       final values = <String>{};
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        if (data['extendedData'] != null &&
-            data['extendedData'][field] != null &&
-            data['extendedData'][field]['value'] != null) {
+        if (data['extendedData']?[field]?['value'] != null) {
           values.add(data['extendedData'][field]['value'].toString());
         }
       }
+
+      // Cache the results
+      await box.put(cacheKey, {
+        'values': values.toList(),
+        'timestamp': DateTime.now().toIso8601String(),
+      });
 
       talker.debug('Found ${values.length} unique values for field: $field');
       return values;
@@ -521,9 +554,21 @@ class FirestoreService {
 
   Future<(int, int)> _getCostRange() async {
     try {
+      // Check cache first
+      final box = await Hive.openBox(_queryCacheBox);
+      final cacheKey = 'cost_range';
+      final cached = box.get(cacheKey);
+
+      if (cached != null) {
+        final timestamp = DateTime.parse(cached['timestamp']);
+        if (DateTime.now().difference(timestamp) < _cacheDuration) {
+          return (cached['min'] as int, cached['max'] as int);
+        }
+      }
+
       final snapshot = await _firestore
           .collection('cards')
-          .orderBy('extendedData.Cost.value')
+          .where('extendedData.Cost.value', isNull: false)
           .get();
 
       int minCost = 999;
@@ -531,14 +576,23 @@ class FirestoreService {
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        if (data['extendedData']?['Cost']?['value'] != null) {
-          final costValue =
-              int.tryParse(data['extendedData']['Cost']['value'].toString()) ??
-                  0;
+        final costValue = int.tryParse(
+                data['extendedData']?['Cost']?['value']?.toString() ?? '') ??
+            0;
+
+        if (costValue > 0) {
+          // Only consider valid costs
           minCost = costValue < minCost ? costValue : minCost;
           maxCost = costValue > maxCost ? costValue : maxCost;
         }
       }
+
+      // Cache the results
+      await box.put(cacheKey, {
+        'min': minCost,
+        'max': maxCost,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
 
       talker.debug('Cost range: $minCost - $maxCost');
       return (minCost, maxCost);
@@ -550,9 +604,21 @@ class FirestoreService {
 
   Future<(int, int)> _getPowerRange() async {
     try {
+      // Check cache first
+      final box = await Hive.openBox(_queryCacheBox);
+      final cacheKey = 'power_range';
+      final cached = box.get(cacheKey);
+
+      if (cached != null) {
+        final timestamp = DateTime.parse(cached['timestamp']);
+        if (DateTime.now().difference(timestamp) < _cacheDuration) {
+          return (cached['min'] as int, cached['max'] as int);
+        }
+      }
+
       final snapshot = await _firestore
           .collection('cards')
-          .orderBy('extendedData.Power.value')
+          .where('extendedData.Power.value', isNull: false)
           .get();
 
       int minPower = 999999;
@@ -560,14 +626,23 @@ class FirestoreService {
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        if (data['extendedData']?['Power']?['value'] != null) {
-          final powerValue =
-              int.tryParse(data['extendedData']['Power']['value'].toString()) ??
-                  0;
+        final powerValue = int.tryParse(
+                data['extendedData']?['Power']?['value']?.toString() ?? '') ??
+            0;
+
+        if (powerValue > 0) {
+          // Only consider valid power values
           minPower = powerValue < minPower ? powerValue : minPower;
           maxPower = powerValue > maxPower ? powerValue : maxPower;
         }
       }
+
+      // Cache the results
+      await box.put(cacheKey, {
+        'min': minPower,
+        'max': maxPower,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
 
       talker.debug('Power range: $minPower - $maxPower');
       return (minPower, maxPower);
@@ -602,5 +677,15 @@ class FirestoreService {
     }
 
     await Future.wait(batches.map((b) => b.commit()));
+  }
+
+  Future<void> preloadFilterOptions() async {
+    try {
+      talker.debug('Preloading filter options...');
+      await getFilterOptions();
+      talker.debug('Filter options preloaded successfully');
+    } catch (e, stack) {
+      talker.error('Error preloading filter options', e, stack);
+    }
   }
 }

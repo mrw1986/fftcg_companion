@@ -125,28 +125,94 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           if (!_isSearching ||
               MediaQuery.of(context).size.width >
                   MediaQuery.of(context).size.shortestSide) ...[
-            PopupMenuButton<String>(
+            PopupMenuButton<(String, bool)>(
               icon: const Icon(Icons.sort),
               tooltip: 'Sort by',
               onSelected: (value) {
-                ref.read(cardsNotifierProvider.notifier).sort(value);
+                ref
+                    .read(cardsNotifierProvider.notifier)
+                    .sort(value.$1, descending: value.$2);
               },
               itemBuilder: (context) => [
                 const PopupMenuItem(
-                  value: 'number',
-                  child: Text('Sort by Number'),
+                  value: ('number', false),
+                  child: Row(
+                    children: [
+                      Text('Number'),
+                      Spacer(),
+                      Icon(Icons.arrow_upward, size: 16),
+                    ],
+                  ),
                 ),
                 const PopupMenuItem(
-                  value: 'name',
-                  child: Text('Sort by Name'),
+                  value: ('number', true),
+                  child: Row(
+                    children: [
+                      Text('Number'),
+                      Spacer(),
+                      Icon(Icons.arrow_downward, size: 16),
+                    ],
+                  ),
                 ),
                 const PopupMenuItem(
-                  value: 'cost',
-                  child: Text('Sort by Cost'),
+                  value: ('name', false),
+                  child: Row(
+                    children: [
+                      Text('Name'),
+                      Spacer(),
+                      Icon(Icons.arrow_upward, size: 16),
+                    ],
+                  ),
                 ),
                 const PopupMenuItem(
-                  value: 'power',
-                  child: Text('Sort by Power'),
+                  value: ('name', true),
+                  child: Row(
+                    children: [
+                      Text('Name'),
+                      Spacer(),
+                      Icon(Icons.arrow_downward, size: 16),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: ('cost', false),
+                  child: Row(
+                    children: [
+                      Text('Cost'),
+                      Spacer(),
+                      Icon(Icons.arrow_upward, size: 16),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: ('cost', true),
+                  child: Row(
+                    children: [
+                      Text('Cost'),
+                      Spacer(),
+                      Icon(Icons.arrow_downward, size: 16),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: ('power', false),
+                  child: Row(
+                    children: [
+                      Text('Power'),
+                      Spacer(),
+                      Icon(Icons.arrow_upward, size: 16),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: ('power', true),
+                  child: Row(
+                    children: [
+                      Text('Power'),
+                      Spacer(),
+                      Icon(Icons.arrow_downward, size: 16),
+                    ],
+                  ),
                 ),
               ],
             ),

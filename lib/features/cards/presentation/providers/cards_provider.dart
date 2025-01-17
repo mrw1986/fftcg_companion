@@ -14,6 +14,8 @@ class CardsNotifier extends _$CardsNotifier {
   final _loadedCards = <models.Card>[];
   bool _isLoadingMore = false;
   DocumentSnapshot? _lastDocument;
+  String? _currentSortField;
+  bool _currentSortDescending = false;
 
   @override
   Future<List<models.Card>> build() async {
@@ -115,6 +117,14 @@ class CardsNotifier extends _$CardsNotifier {
   }
 
   Future<void> sort(String sortField, {bool descending = false}) async {
+    // If sorting by the same field, just toggle direction
+    if (sortField == _currentSortField) {
+      descending = !_currentSortDescending;
+    }
+
+    _currentSortField = sortField;
+    _currentSortDescending = descending;
+
     state = const AsyncValue.loading();
     _loadedCards.clear();
     _lastDocument = null;
@@ -136,9 +146,9 @@ class CardsNotifier extends _$CardsNotifier {
     }
   }
 
-  Future<void> loadMoreSorted(String sortField,
-      {bool descending = false}) async {
-    if (_isLoadingMore || !state.hasValue) return;
+// Also update loadMoreSorted to use the current sort settings
+  Future<void> loadMoreSorted() async {
+    if (_isLoadingMore || !state.hasValue || _currentSortField == null) return;
     if (_loadedCards.isEmpty) return;
 
     try {
@@ -146,8 +156,8 @@ class CardsNotifier extends _$CardsNotifier {
       final repository = ref.read(cardRepositoryProvider.notifier);
 
       final result = await repository.getSortedCards(
-        sortField: sortField,
-        descending: descending,
+        sortField: _currentSortField!,
+        descending: _currentSortDescending,
         startAfter: _lastDocument,
         limit: batchSize,
       );

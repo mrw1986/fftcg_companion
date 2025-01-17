@@ -13,6 +13,8 @@ import 'package:fftcg_companion/firebase_options.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fftcg_companion/core/services/firestore_service.dart';
 
 void main() async {
   await runZonedGuarded(() async {
@@ -22,6 +24,44 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // Initialize Hive first
+    final appDir = await getApplicationDocumentsDirectory();
+    await Hive.initFlutter(appDir.path);
+
+    // Register adapters
+    _registerHiveAdapters();
+
+    // Clear existing boxes to prevent corruption
+    await _clearExistingBoxes();
+
+    // Open boxes
+    try {
+      await Future.wait([
+        Hive.openBox('settings'),
+        Hive.openBox<models.Card>('cards'),
+        Hive.openBox<models.Price>('prices'),
+        Hive.openBox<models.HistoricalPrice>('historical_prices'),
+        Hive.openBox('cache_metadata'),
+        Hive.openBox('query_cache'),
+      ]);
+    } catch (e, stack) {
+      talker.error('Error opening Hive boxes', e, stack);
+      // If opening boxes fails, delete and recreate them
+      await _clearExistingBoxes();
+      await Future.wait([
+        Hive.openBox('settings'),
+        Hive.openBox<models.Card>('cards'),
+        Hive.openBox<models.Price>('prices'),
+        Hive.openBox<models.HistoricalPrice>('historical_prices'),
+        Hive.openBox('cache_metadata'),
+        Hive.openBox('query_cache'),
+      ]);
+    }
+
+    // Now create FirestoreService
+    final firestoreService = FirestoreService(FirebaseFirestore.instance);
+    await firestoreService.preloadFilterOptions();
 
     // Configure Talker
     talker.configure(
@@ -43,37 +83,6 @@ void main() async {
       return true;
     };
 
-    final appDir = await getApplicationDocumentsDirectory();
-    await Hive.initFlutter(appDir.path);
-
-    // Register adapters
-    _registerHiveAdapters();
-
-    // Clear existing boxes to prevent corruption
-    await _clearExistingBoxes();
-
-    // Open boxes
-    try {
-      await Future.wait([
-        Hive.openBox('settings'),
-        Hive.openBox<models.Card>('cards'),
-        Hive.openBox<models.Price>('prices'),
-        Hive.openBox<models.HistoricalPrice>('historical_prices'),
-        Hive.openBox('cache_metadata'),
-      ]);
-    } catch (e, stack) {
-      talker.error('Error opening Hive boxes', e, stack);
-      // If opening boxes fails, delete and recreate them
-      await _clearExistingBoxes();
-      await Future.wait([
-        Hive.openBox('settings'),
-        Hive.openBox<models.Card>('cards'),
-        Hive.openBox<models.Price>('prices'),
-        Hive.openBox<models.HistoricalPrice>('historical_prices'),
-        Hive.openBox('cache_metadata'),
-      ]);
-    }
-
     runApp(
       ProviderScope(
         observers: [
@@ -81,11 +90,11 @@ void main() async {
             talker: talker,
             settings: const TalkerRiverpodLoggerSettings(
               enabled: true,
-              printProviderAdded: true, // Changed from printCreations
-              printProviderUpdated: true, // Changed from printChanges
-              printProviderDisposed: true, // Changed from printDisposals
-              printProviderFailed: true, // Added this
-              printStateFullData: true, // This one was correct
+              printProviderAdded: true,
+              printProviderUpdated: true,
+              printProviderDisposed: true,
+              printProviderFailed: true,
+              printStateFullData: true,
             ),
           ),
         ],
@@ -127,6 +136,7 @@ Future<void> _clearExistingBoxes() async {
       Hive.deleteBoxFromDisk('historical_prices'),
       Hive.deleteBoxFromDisk('settings'),
       Hive.deleteBoxFromDisk('cache_metadata'),
+      Hive.deleteBoxFromDisk('query_cache'),
     ]);
   } catch (e, stack) {
     talker.error('Error clearing Hive boxes', e, stack);
