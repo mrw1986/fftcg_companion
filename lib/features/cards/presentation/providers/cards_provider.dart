@@ -1,4 +1,5 @@
 // lib/features/cards/presentation/providers/cards_provider.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
@@ -12,6 +13,7 @@ class CardsNotifier extends _$CardsNotifier {
   static const int batchSize = 50;
   final _loadedCards = <models.Card>[];
   bool _isLoadingMore = false;
+  DocumentSnapshot? _lastDocument;
 
   @override
   Future<List<models.Card>> build() async {
@@ -112,19 +114,53 @@ class CardsNotifier extends _$CardsNotifier {
     }
   }
 
-  Future<void> sort(String sortField) async {
+  Future<void> sort(String sortField, {bool descending = false}) async {
     state = const AsyncValue.loading();
     _loadedCards.clear();
+    _lastDocument = null;
     ref.read(cardRepositoryProvider.notifier).clearPrefetchCache();
 
     try {
       final repository = ref.read(cardRepositoryProvider.notifier);
-      final sortedCards = await repository.getSortedCards(sortField: sortField);
-      _loadedCards.addAll(sortedCards);
-      state = AsyncValue.data(sortedCards);
+      final result = await repository.getSortedCards(
+        sortField: sortField,
+        descending: descending,
+        limit: batchSize,
+      );
+
+      _loadedCards.addAll(result);
+      state = AsyncValue.data(result);
     } catch (error, stack) {
       talker.error('Error sorting cards', error, stack);
       state = AsyncValue.error(error, stack);
+    }
+  }
+
+  Future<void> loadMoreSorted(String sortField,
+      {bool descending = false}) async {
+    if (_isLoadingMore || !state.hasValue) return;
+    if (_loadedCards.isEmpty) return;
+
+    try {
+      _isLoadingMore = true;
+      final repository = ref.read(cardRepositoryProvider.notifier);
+
+      final result = await repository.getSortedCards(
+        sortField: sortField,
+        descending: descending,
+        startAfter: _lastDocument,
+        limit: batchSize,
+      );
+
+      if (result.isNotEmpty) {
+        _loadedCards.addAll(result);
+        state = AsyncValue.data([..._loadedCards]);
+      }
+    } catch (error, stack) {
+      talker.error('Error loading more sorted cards', error, stack);
+      state = AsyncValue.error(error, stack);
+    } finally {
+      _isLoadingMore = false;
     }
   }
 }

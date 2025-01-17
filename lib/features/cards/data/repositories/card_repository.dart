@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/core/services/firestore_service.dart';
 import 'package:fftcg_companion/features/models.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 part 'card_repository.g.dart';
 
@@ -198,11 +199,28 @@ class CardRepository extends _$CardRepository {
     try {
       talker.debug('Starting card search for: $query');
 
-      // Search directly in Firestore
-      final firestoreResults = await _firestoreService.searchCards(query);
-      talker.debug('Found ${firestoreResults.length} results in Firestore');
+      // Try to get from cache first
+      final box = _cardBox;
+      if (box != null) {
+        final cachedCards = box.values.where((card) {
+          final searchLower = query.toLowerCase();
+          return card.name.toLowerCase().contains(searchLower) ||
+              card.cleanName.toLowerCase().contains(searchLower) ||
+              card.cardNumbers
+                  .any((number) => number.toLowerCase().contains(searchLower));
+        }).toList();
 
-      // Cache the results for future use
+        if (cachedCards.isNotEmpty) {
+          return cachedCards;
+        }
+      }
+
+      // If not in cache, perform Firestore query
+      final firestoreResults = await _firestoreService.getFilteredCards(
+        CardFilters(searchText: query),
+      );
+
+      // Cache the results
       if (firestoreResults.isNotEmpty) {
         await _cardBox?.putAll({
           for (var card in firestoreResults) card.productId.toString(): card
@@ -238,12 +256,24 @@ class CardRepository extends _$CardRepository {
   Future<List<Card>> getSortedCards({
     required String sortField,
     bool descending = false,
+    DocumentSnapshot? startAfter,
+    int limit = 50,
   }) async {
     try {
-      return await _firestoreService.getSortedCards(
+      final result = await _firestoreService.getSortedCards(
         sortField: sortField,
         descending: descending,
+        startAfter: startAfter,
+        limit: limit,
       );
+
+      // Cache the results
+      if (result.items.isNotEmpty) {
+        await _cardBox?.putAll(
+            {for (var card in result.items) card.productId.toString(): card});
+      }
+
+      return result.items;
     } catch (e, stack) {
       talker.error('Error sorting cards', e, stack);
       rethrow;

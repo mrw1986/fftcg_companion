@@ -4,8 +4,42 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card_filter_options.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 part 'firestore_service.g.dart';
+
+class PaginatedResult<T> {
+  final List<T> items;
+  final DocumentSnapshot? lastDocument;
+  final bool hasMore;
+
+  const PaginatedResult({
+    required this.items,
+    this.lastDocument,
+    required this.hasMore,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'items': (items as List<dynamic>)
+            .map((e) => (e as dynamic).toJson())
+            .toList(),
+        'hasMore': hasMore,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+
+  static PaginatedResult<T> fromJson<T>(
+    Map<String, dynamic> json,
+    T Function(Map<String, dynamic>) fromJson,
+  ) {
+    return PaginatedResult<T>(
+      items: (json['items'] as List)
+          .map((e) => fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      hasMore: json['hasMore'] as bool,
+      lastDocument: null, // Can't restore from JSON
+    );
+  }
+}
 
 @riverpod
 FirestoreService firestoreService(ref) {
@@ -14,8 +48,33 @@ FirestoreService firestoreService(ref) {
 
 class FirestoreService {
   final FirebaseFirestore _firestore;
+  static const Duration _cacheDuration = Duration(minutes: 5);
+  static const String _queryCacheBox = 'query_cache';
 
-  FirestoreService(this._firestore);
+  FirestoreService(this._firestore) {
+    _initCache();
+  }
+
+  Future<void> _initCache() async {
+    if (!Hive.isBoxOpen(_queryCacheBox)) {
+      await Hive.openBox(_queryCacheBox);
+    }
+  }
+
+  Future<void> _cleanOldCache() async {
+    final box = await Hive.openBox(_queryCacheBox);
+    final now = DateTime.now();
+
+    final keysToDelete = box.keys.where((key) {
+      final cached = box.get(key);
+      if (cached == null || cached['timestamp'] == null) return true;
+
+      final timestamp = DateTime.parse(cached['timestamp']);
+      return now.difference(timestamp) > _cacheDuration;
+    }).toList();
+
+    await box.deleteAll(keysToDelete);
+  }
 
   // Collection References
   CollectionReference get cardsCollection => _firestore.collection('cards');
@@ -108,27 +167,8 @@ class FirestoreService {
 
       // Apply filters
       if (filters.elements.isNotEmpty) {
-        // Handle multiple elements - requires compound queries
-        List<Query> elementQueries = filters.elements.map((element) {
-          return cardsCollection.where('extendedData.Element.value',
-              isEqualTo: element);
-        }).toList();
-
-        // Get results from all element queries
-        List<QuerySnapshot> snapshots = await Future.wait(
-          elementQueries.map((q) => q.get()),
-        );
-
-        // Combine and deduplicate results
-        Map<String, DocumentSnapshot> uniqueResults = {};
-        for (var snapshot in snapshots) {
-          for (var doc in snapshot.docs) {
-            uniqueResults[doc.id] = doc;
-          }
-        }
-
-        // Convert to list of Cards
-        return uniqueResults.values.map(_convertToCard).toList();
+        query = query.where('extendedData.Element.value',
+            whereIn: filters.elements.toList());
       }
 
       if (filters.types.isNotEmpty) {
@@ -146,6 +186,11 @@ class FirestoreService {
             whereIn: filters.jobs.toList());
       }
 
+      if (filters.sets.isNotEmpty) {
+        query = query.where('extendedData.Set.value',
+            whereIn: filters.sets.toList());
+      }
+
       if (filters.rarities.isNotEmpty) {
         query = query.where('extendedData.Rarity.value',
             whereIn: filters.rarities.toList());
@@ -159,6 +204,25 @@ class FirestoreService {
       if (filters.maxCost != null) {
         query = query.where('extendedData.Cost.value',
             isLessThanOrEqualTo: filters.maxCost.toString());
+      }
+
+      // Handle power range
+      if (filters.minPower != null) {
+        query = query.where('extendedData.Power.value',
+            isGreaterThanOrEqualTo: filters.minPower.toString());
+      }
+      if (filters.maxPower != null) {
+        query = query.where('extendedData.Power.value',
+            isLessThanOrEqualTo: filters.maxPower.toString());
+      }
+
+      // Handle text search
+      if (filters.searchText?.isNotEmpty ?? false) {
+        query = query
+            .where('cleanName',
+                isGreaterThanOrEqualTo: filters.searchText!.toLowerCase())
+            .where('cleanName',
+                isLessThan: '${filters.searchText!.toLowerCase()}z');
       }
 
       // Apply default sorting
@@ -177,13 +241,31 @@ class FirestoreService {
     }
   }
 
-  Future<List<models.Card>> getSortedCards({
+  Future<PaginatedResult<models.Card>> getSortedCards({
     required String sortField,
     bool descending = false,
     int limit = 50,
     DocumentSnapshot? startAfter,
   }) async {
     try {
+      // Generate cache key
+      final cacheKey =
+          'sorted_${sortField}_${descending}_${limit}_${startAfter?.id}';
+      final box = await Hive.openBox(_queryCacheBox);
+
+      // Check cache first
+      final cached = box.get(cacheKey);
+      if (cached != null) {
+        final timestamp = DateTime.parse(cached['timestamp']);
+        if (DateTime.now().difference(timestamp) < _cacheDuration) {
+          talker.debug('Returning cached sorted cards');
+          return PaginatedResult.fromJson(
+            Map<String, dynamic>.from(cached),
+            models.Card.fromJson,
+          );
+        }
+      }
+
       Query query = cardsCollection;
 
       // Map sort field to actual Firestore field path
@@ -206,13 +288,28 @@ class FirestoreService {
         query = query.startAfterDocument(startAfter);
       }
 
-      query = query.limit(limit);
+      query =
+          query.limit(limit + 1); // Get one extra to check if there are more
 
       talker
           .debug('Executing sorted query: $sortField, descending: $descending');
 
       final snapshot = await query.get();
-      return snapshot.docs.map(_convertToCard).toList();
+      final hasMore = snapshot.docs.length > limit;
+      final docs = hasMore ? snapshot.docs.take(limit).toList() : snapshot.docs;
+
+      final cards = docs.map(_convertToCard).toList();
+
+      final result = PaginatedResult(
+        items: cards,
+        lastDocument: docs.isNotEmpty ? docs.last : null,
+        hasMore: hasMore,
+      );
+
+      // Cache the result
+      await box.put(cacheKey, result.toJson());
+      await _cleanOldCache();
+      return result;
     } catch (e, stack) {
       talker.error('Error sorting cards', e, stack);
       rethrow;
