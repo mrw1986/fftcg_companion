@@ -10,8 +10,10 @@ class CardFilterOptions with _$CardFilterOptions {
   const factory CardFilterOptions({
     required Set<String> elements,
     required Set<String> types,
-    required Set<String> sets,
+    required Set<String> categories,
+    required Set<String> jobs,
     required Set<String> rarities,
+    required Set<String> sets,
     required (int, int) costRange,
     required (int, int) powerRange,
   }) = _CardFilterOptions;

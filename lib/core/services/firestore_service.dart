@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:fftcg_companion/features/cards/domain/models/card_filter_options.dart';
 
 part 'firestore_service.g.dart';
 
@@ -22,7 +23,202 @@ class FirestoreService {
   CollectionReference get historicalPricesCollection =>
       _firestore.collection('historicalPrices');
 
-  // Converters
+  Future<List<models.Card>> getCards({
+    int limit = 20,
+    String? startAfterId,
+    Query<Object?>? Function(Query<Object?> query)? queryBuilder,
+    String? sortField,
+    bool descending = false,
+  }) async {
+    Query query = cardsCollection;
+
+    // Apply custom query modifications if provided
+    if (queryBuilder != null) {
+      query = queryBuilder(query) ?? query;
+    }
+
+    // Apply sorting
+    if (sortField != null) {
+      query = query.orderBy(sortField, descending: descending);
+    } else {
+      // Default sorting by productId
+      query = query.orderBy('productId', descending: descending);
+    }
+
+    // Apply pagination
+    if (startAfterId != null) {
+      DocumentSnapshot startAfterDoc =
+          await cardsCollection.doc(startAfterId).get();
+      query = query.startAfterDocument(startAfterDoc);
+    }
+
+    // Apply limit
+    query = query.limit(limit);
+
+    try {
+      final snapshot = await query.get();
+      return snapshot.docs.map(_convertToCard).toList();
+    } catch (e, stack) {
+      talker.error('Error fetching cards', e, stack);
+      rethrow;
+    }
+  }
+
+  Future<List<models.Card>> searchCards(String query) async {
+    try {
+      final normalizedQuery = query.toLowerCase().trim();
+
+      // Create compound query
+      final nameQuery = cardsCollection
+          .where('cleanName', isGreaterThanOrEqualTo: normalizedQuery)
+          .where('cleanName', isLessThan: '${normalizedQuery}z')
+          .limit(20);
+
+      final numberQuery = cardsCollection
+          .where('cardNumbers', arrayContains: normalizedQuery.toUpperCase())
+          .limit(20);
+
+      // Execute queries in parallel
+      final results = await Future.wait([
+        nameQuery.get(),
+        numberQuery.get(),
+      ]);
+
+      // Combine and deduplicate results
+      final cards = <String, models.Card>{};
+
+      for (final snapshot in results) {
+        for (final doc in snapshot.docs) {
+          if (!cards.containsKey(doc.id)) {
+            cards[doc.id] = _convertToCard(doc);
+          }
+        }
+      }
+
+      return cards.values.toList();
+    } catch (e, stack) {
+      talker.error('Error searching cards', e, stack);
+      rethrow;
+    }
+  }
+
+  Future<List<models.Card>> getFilteredCards(models.CardFilters filters) async {
+    try {
+      Query query = cardsCollection;
+
+      // Apply filters
+      if (filters.elements.isNotEmpty) {
+        // Handle multiple elements - requires compound queries
+        List<Query> elementQueries = filters.elements.map((element) {
+          return cardsCollection.where('extendedData.Element.value',
+              isEqualTo: element);
+        }).toList();
+
+        // Get results from all element queries
+        List<QuerySnapshot> snapshots = await Future.wait(
+          elementQueries.map((q) => q.get()),
+        );
+
+        // Combine and deduplicate results
+        Map<String, DocumentSnapshot> uniqueResults = {};
+        for (var snapshot in snapshots) {
+          for (var doc in snapshot.docs) {
+            uniqueResults[doc.id] = doc;
+          }
+        }
+
+        // Convert to list of Cards
+        return uniqueResults.values.map(_convertToCard).toList();
+      }
+
+      if (filters.types.isNotEmpty) {
+        query = query.where('extendedData.CardType.value',
+            whereIn: filters.types.toList());
+      }
+
+      if (filters.categories.isNotEmpty) {
+        query = query.where('extendedData.Category.value',
+            whereIn: filters.categories.toList());
+      }
+
+      if (filters.jobs.isNotEmpty) {
+        query = query.where('extendedData.Job.value',
+            whereIn: filters.jobs.toList());
+      }
+
+      if (filters.rarities.isNotEmpty) {
+        query = query.where('extendedData.Rarity.value',
+            whereIn: filters.rarities.toList());
+      }
+
+      // Handle cost range
+      if (filters.minCost != null) {
+        query = query.where('extendedData.Cost.value',
+            isGreaterThanOrEqualTo: filters.minCost.toString());
+      }
+      if (filters.maxCost != null) {
+        query = query.where('extendedData.Cost.value',
+            isLessThanOrEqualTo: filters.maxCost.toString());
+      }
+
+      // Apply default sorting
+      query = query.orderBy('primaryCardNumber', descending: false);
+
+      talker.debug('Executing filtered query: ${query.parameters}');
+
+      final snapshot = await query.get();
+      final results = snapshot.docs.map(_convertToCard).toList();
+
+      talker.debug('Found ${results.length} cards matching filters');
+      return results;
+    } catch (e, stack) {
+      talker.error('Error applying filters', e, stack);
+      rethrow;
+    }
+  }
+
+  Future<List<models.Card>> getSortedCards({
+    required String sortField,
+    bool descending = false,
+    int limit = 50,
+    DocumentSnapshot? startAfter,
+  }) async {
+    try {
+      Query query = cardsCollection;
+
+      // Map sort field to actual Firestore field path
+      String fieldPath = switch (sortField) {
+        'name' => 'cleanName',
+        'number' => 'primaryCardNumber',
+        'cost' => 'extendedData.Cost.value',
+        'power' => 'extendedData.Power.value',
+        _ => 'primaryCardNumber', // default sort
+      };
+
+      query = query.orderBy(fieldPath, descending: descending);
+
+      // Add secondary sort by name for consistent ordering
+      if (fieldPath != 'cleanName') {
+        query = query.orderBy('cleanName', descending: false);
+      }
+
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      query = query.limit(limit);
+
+      talker
+          .debug('Executing sorted query: $sortField, descending: $descending');
+
+      final snapshot = await query.get();
+      return snapshot.docs.map(_convertToCard).toList();
+    } catch (e, stack) {
+      talker.error('Error sorting cards', e, stack);
+      rethrow;
+    }
+  }
+
   models.Card _convertToCard(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
 
@@ -32,7 +228,7 @@ class FirestoreService {
           (data['lastUpdated'] as Timestamp).toDate().toIso8601String();
     }
 
-    // Convert extendedData from subcollection if it exists
+    // Convert extendedData
     final extendedDataMap = <String, models.ExtendedData>{};
     if (data['extendedData'] != null) {
       (data['extendedData'] as Map<String, dynamic>).forEach((key, value) {
@@ -88,27 +284,6 @@ class FirestoreService {
         .map((snapshot) => snapshot.docs.map(_convertToCard).toList());
   }
 
-  Future<List<models.Card>> getCards({
-    int limit = 20,
-    String? startAfterId,
-    Query<Object?>? Function(Query<Object?> query)? queryBuilder,
-  }) async {
-    Query query = cardsCollection.orderBy('productId');
-
-    if (queryBuilder != null) {
-      query = queryBuilder(query) ?? query;
-    }
-
-    if (startAfterId != null) {
-      query = query.where('productId', isGreaterThan: int.parse(startAfterId));
-    }
-
-    query = query.limit(limit);
-
-    final snapshot = await query.get();
-    return snapshot.docs.map(_convertToCard).toList();
-  }
-
   Future<models.Card?> getCard(String id) async {
     try {
       talker.debug('Fetching card document: $id');
@@ -138,54 +313,6 @@ class FirestoreService {
       return models.Card.fromJson(data);
     } catch (e, stack) {
       talker.error('Error fetching card', e, stack);
-      rethrow;
-    }
-  }
-
-  Future<List<models.Card>> searchCards(String query) async {
-    try {
-      final normalizedQuery = query.toLowerCase().trim();
-      talker.debug('Performing Firestore search for: $normalizedQuery');
-
-      // Create queries
-      final queries = <Future<QuerySnapshot>>[];
-
-      // Query 1: Search by cleanName using prefix
-      queries.add(cardsCollection
-          .orderBy('cleanName')
-          .startAt([normalizedQuery]).endAt(['$normalizedQuery\uf8ff']).get());
-
-      // Query 2: Search by card numbers using array-contains
-      queries.add(cardsCollection
-          .where('cardNumbers', arrayContains: normalizedQuery.toUpperCase())
-          .get());
-
-      // Execute all queries concurrently
-      final results = await Future.wait(queries);
-
-      // Combine results and remove duplicates
-      final resultMap = <String, models.Card>{};
-
-      // Add results from cleanName query
-      final nameResults = results[0];
-      talker.debug('Name search results: ${nameResults.docs.length}');
-      for (final doc in nameResults.docs) {
-        resultMap[doc.id] = _convertToCard(doc);
-      }
-
-      // Add results from cardNumbers query
-      final numberResults = results[1];
-      talker.debug('Card number search results: ${numberResults.docs.length}');
-      for (final doc in numberResults.docs) {
-        if (!resultMap.containsKey(doc.id)) {
-          resultMap[doc.id] = _convertToCard(doc);
-        }
-      }
-
-      talker.debug('Total unique Firestore results: ${resultMap.length}');
-      return resultMap.values.toList();
-    } catch (e, stack) {
-      talker.error('Error searching cards in Firestore', e, stack);
       rethrow;
     }
   }
@@ -247,73 +374,110 @@ class FirestoreService {
 
   Future<Set<String>> getUniqueFieldValues(
       String collection, String field) async {
-    final snapshot = await _firestore.collection(collection).get();
-    final values = <String>{};
+    try {
+      final snapshot = await _firestore.collection(collection).get();
 
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      if (data['extendedData'] != null) {
-        final fieldData = data['extendedData'][field];
-        if (fieldData != null && fieldData['value'] != null) {
-          values.add(fieldData['value'].toString());
+      final values = <String>{};
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['extendedData'] != null &&
+            data['extendedData'][field] != null &&
+            data['extendedData'][field]['value'] != null) {
+          values.add(data['extendedData'][field]['value'].toString());
         }
       }
-    }
 
-    return values;
+      talker.debug('Found ${values.length} unique values for field: $field');
+      return values;
+    } catch (e, stack) {
+      talker.error('Error getting unique field values', e, stack);
+      rethrow;
+    }
   }
 
-  Future<models.CardFilterOptions> getFilterOptions() async {
-    return models.CardFilterOptions(
-      elements: await getUniqueFieldValues('cards', 'Element'),
-      types: await getUniqueFieldValues('cards', 'Type'),
-      sets: await getUniqueFieldValues('cards', 'Set'),
-      rarities: await getUniqueFieldValues('cards', 'Rarity'),
-      costRange: await _getCostRange(),
-      powerRange: await _getPowerRange(),
-    );
+  Future<CardFilterOptions> getFilterOptions() async {
+    try {
+      final elements = await getUniqueFieldValues('cards', 'Element');
+      final types = await getUniqueFieldValues('cards', 'CardType');
+      final categories = await getUniqueFieldValues('cards', 'Category');
+      final jobs = await getUniqueFieldValues('cards', 'Job');
+      final rarities = await getUniqueFieldValues('cards', 'Rarity');
+      final sets = await getUniqueFieldValues('cards', 'Set');
+      final (minCost, maxCost) = await _getCostRange();
+      final (minPower, maxPower) = await _getPowerRange();
+
+      return CardFilterOptions(
+        elements: elements,
+        types: types,
+        categories: categories,
+        jobs: jobs,
+        rarities: rarities,
+        sets: sets,
+        costRange: (minCost, maxCost),
+        powerRange: (minPower, maxPower),
+      );
+    } catch (e, stack) {
+      talker.error('Error getting filter options', e, stack);
+      rethrow;
+    }
   }
 
   Future<(int, int)> _getCostRange() async {
-    final snapshot = await _firestore
-        .collection('cards')
-        .orderBy('extendedData.Cost.value')
-        .get();
+    try {
+      final snapshot = await _firestore
+          .collection('cards')
+          .orderBy('extendedData.Cost.value')
+          .get();
 
-    int minCost = 999;
-    int maxCost = 0;
+      int minCost = 999;
+      int maxCost = 0;
 
-    for (var doc in snapshot.docs) {
-      final cost = doc.data()['extendedData']?['Cost']?['value'];
-      if (cost != null) {
-        final costValue = int.tryParse(cost.toString()) ?? 0;
-        minCost = costValue < minCost ? costValue : minCost;
-        maxCost = costValue > maxCost ? costValue : maxCost;
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['extendedData']?['Cost']?['value'] != null) {
+          final costValue =
+              int.tryParse(data['extendedData']['Cost']['value'].toString()) ??
+                  0;
+          minCost = costValue < minCost ? costValue : minCost;
+          maxCost = costValue > maxCost ? costValue : maxCost;
+        }
       }
-    }
 
-    return (minCost, maxCost);
+      talker.debug('Cost range: $minCost - $maxCost');
+      return (minCost, maxCost);
+    } catch (e, stack) {
+      talker.error('Error getting cost range', e, stack);
+      rethrow;
+    }
   }
 
   Future<(int, int)> _getPowerRange() async {
-    final snapshot = await _firestore
-        .collection('cards')
-        .orderBy('extendedData.Power.value')
-        .get();
+    try {
+      final snapshot = await _firestore
+          .collection('cards')
+          .orderBy('extendedData.Power.value')
+          .get();
 
-    int minPower = 999999;
-    int maxPower = 0;
+      int minPower = 999999;
+      int maxPower = 0;
 
-    for (var doc in snapshot.docs) {
-      final power = doc.data()['extendedData']?['Power']?['value'];
-      if (power != null) {
-        final powerValue = int.tryParse(power.toString()) ?? 0;
-        minPower = powerValue < minPower ? powerValue : minPower;
-        maxPower = powerValue > maxPower ? powerValue : maxPower;
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['extendedData']?['Power']?['value'] != null) {
+          final powerValue =
+              int.tryParse(data['extendedData']['Power']['value'].toString()) ??
+                  0;
+          minPower = powerValue < minPower ? powerValue : minPower;
+          maxPower = powerValue > maxPower ? powerValue : maxPower;
+        }
       }
-    }
 
-    return (minPower, maxPower);
+      talker.debug('Power range: $minPower - $maxPower');
+      return (minPower, maxPower);
+    } catch (e, stack) {
+      talker.error('Error getting power range', e, stack);
+      rethrow;
+    }
   }
 
   // Cleanup Methods

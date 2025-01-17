@@ -12,6 +12,12 @@ class CardFilters with _$CardFilters {
     // Types: Forward, Backup, Summon, Monster
     @Default({}) Set<String> types,
 
+    // Categories
+    @Default({}) Set<String> categories,
+
+    // Jobs
+    @Default({}) Set<String> jobs,
+
     // Cost: 0-12
     int? minCost,
     int? maxCost,

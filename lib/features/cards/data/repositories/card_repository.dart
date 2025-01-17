@@ -148,7 +148,17 @@ class CardRepository extends _$CardRepository {
       }
 
       if (filters.types.isNotEmpty &&
-          !filters.types.contains(card.extendedData['Type']?.value)) {
+          !filters.types.contains(card.extendedData['CardType']?.value)) {
+        return false;
+      }
+
+      if (filters.categories.isNotEmpty &&
+          !filters.categories.contains(card.extendedData['Category']?.value)) {
+        return false;
+      }
+
+      if (filters.jobs.isNotEmpty &&
+          !filters.jobs.contains(card.extendedData['Job']?.value)) {
         return false;
       }
 
@@ -202,6 +212,40 @@ class CardRepository extends _$CardRepository {
       return firestoreResults;
     } catch (e, stack) {
       talker.error('Error searching cards', e, stack);
+      rethrow;
+    }
+  }
+
+  Future<CardFilterOptions> getFilterOptions() async {
+    try {
+      return await _firestoreService.getFilterOptions();
+    } catch (e, stack) {
+      talker.error('Error getting filter options', e, stack);
+      // Return default values if fetch fails
+      return const CardFilterOptions(
+        elements: {},
+        types: {},
+        categories: {},
+        jobs: {},
+        sets: {},
+        rarities: {},
+        costRange: (0, 12),
+        powerRange: (0, 9999),
+      );
+    }
+  }
+
+  Future<List<Card>> getSortedCards({
+    required String sortField,
+    bool descending = false,
+  }) async {
+    try {
+      return await _firestoreService.getSortedCards(
+        sortField: sortField,
+        descending: descending,
+      );
+    } catch (e, stack) {
+      talker.error('Error sorting cards', e, stack);
       rethrow;
     }
   }

@@ -125,6 +125,31 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           if (!_isSearching ||
               MediaQuery.of(context).size.width >
                   MediaQuery.of(context).size.shortestSide) ...[
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.sort),
+              tooltip: 'Sort by',
+              onSelected: (value) {
+                ref.read(cardsNotifierProvider.notifier).sort(value);
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'number',
+                  child: Text('Sort by Number'),
+                ),
+                const PopupMenuItem(
+                  value: 'name',
+                  child: Text('Sort by Name'),
+                ),
+                const PopupMenuItem(
+                  value: 'cost',
+                  child: Text('Sort by Cost'),
+                ),
+                const PopupMenuItem(
+                  value: 'power',
+                  child: Text('Sort by Power'),
+                ),
+              ],
+            ),
             IconButton(
               icon: Icon(
                 viewPrefs.type == ViewType.grid

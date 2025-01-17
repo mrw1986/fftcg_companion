@@ -111,6 +111,22 @@ class CardsNotifier extends _$CardsNotifier {
       state = AsyncValue.error(error, stack);
     }
   }
+
+  Future<void> sort(String sortField) async {
+    state = const AsyncValue.loading();
+    _loadedCards.clear();
+    ref.read(cardRepositoryProvider.notifier).clearPrefetchCache();
+
+    try {
+      final repository = ref.read(cardRepositoryProvider.notifier);
+      final sortedCards = await repository.getSortedCards(sortField: sortField);
+      _loadedCards.addAll(sortedCards);
+      state = AsyncValue.data(sortedCards);
+    } catch (error, stack) {
+      talker.error('Error sorting cards', error, stack);
+      state = AsyncValue.error(error, stack);
+    }
+  }
 }
 
 @riverpod
