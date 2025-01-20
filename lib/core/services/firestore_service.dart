@@ -1,4 +1,3 @@
-// lib/core/services/firestore_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
@@ -51,6 +50,12 @@ class FirestoreService {
   static const Duration _cacheDuration = Duration(minutes: 5);
   static const String _queryCacheBox = 'query_cache';
 
+  // Helper method for case-insensitive text handling
+  String normalizeText(String? text) {
+    if (text == null || text.isEmpty) return '';
+    return text.toLowerCase().trim();
+  }
+
   FirestoreService(this._firestore) {
     _initCache();
   }
@@ -58,22 +63,30 @@ class FirestoreService {
   Future<void> _initCache() async {
     if (!Hive.isBoxOpen(_queryCacheBox)) {
       await Hive.openBox(_queryCacheBox);
+      await _cleanOldCache();
     }
   }
 
   Future<void> _cleanOldCache() async {
-    final box = await Hive.openBox(_queryCacheBox);
-    final now = DateTime.now();
+    try {
+      final box = await Hive.openBox(_queryCacheBox);
+      final now = DateTime.now();
 
-    final keysToDelete = box.keys.where((key) {
-      final cached = box.get(key);
-      if (cached == null || cached['timestamp'] == null) return true;
+      final keysToDelete = box.keys.where((key) {
+        final cached = box.get(key);
+        if (cached == null || cached['timestamp'] == null) return true;
 
-      final timestamp = DateTime.parse(cached['timestamp']);
-      return now.difference(timestamp) > _cacheDuration;
-    }).toList();
+        final timestamp = DateTime.parse(cached['timestamp']);
+        return now.difference(timestamp) > _cacheDuration;
+      }).toList();
 
-    await box.deleteAll(keysToDelete);
+      if (keysToDelete.isNotEmpty) {
+        await box.deleteAll(keysToDelete);
+        talker.debug('Cleaned ${keysToDelete.length} old cache entries');
+      }
+    } catch (e, stack) {
+      talker.error('Error cleaning old cache', e, stack);
+    }
   }
 
   // Collection References
@@ -91,72 +104,65 @@ class FirestoreService {
   }) async {
     Query query = cardsCollection;
 
-    // Apply custom query modifications if provided
-    if (queryBuilder != null) {
-      query = queryBuilder(query) ?? query;
-    }
-
-    // Apply sorting
-    if (sortField != null) {
-      query = query.orderBy(sortField, descending: descending);
-    } else {
-      // Default sorting by productId
-      query = query.orderBy('productId', descending: descending);
-    }
-
-    // Apply pagination
-    if (startAfterId != null) {
-      DocumentSnapshot startAfterDoc =
-          await cardsCollection.doc(startAfterId).get();
-      query = query.startAfterDocument(startAfterDoc);
-    }
-
-    // Apply limit
-    query = query.limit(limit);
-
     try {
+      // Apply custom query modifications if provided
+      if (queryBuilder != null) {
+        query = queryBuilder(query) ?? query;
+      }
+
+      // Apply sorting
+      if (sortField != null) {
+        // Handle nested fields properly
+        switch (sortField) {
+          case 'cost':
+            query = query.orderBy('extendedData.Cost.value',
+                descending: descending);
+            break;
+          case 'power':
+            query = query.orderBy('extendedData.Power.value',
+                descending: descending);
+            break;
+          case 'name':
+            query = query.orderBy('cleanName', descending: descending);
+            break;
+          default:
+            query = query.orderBy(sortField, descending: descending);
+        }
+      } else {
+        // Default sorting by lastUpdated for freshness
+        query = query.orderBy('lastUpdated', descending: true);
+      }
+
+      // Apply pagination
+      if (startAfterId != null) {
+        DocumentSnapshot startAfterDoc =
+            await cardsCollection.doc(startAfterId).get();
+        query = query.startAfterDocument(startAfterDoc);
+      }
+
+      // Apply limit
+      query = query.limit(limit);
+
+      // Execute query
       final snapshot = await query.get();
-      return snapshot.docs.map(_convertToCard).toList();
-    } catch (e, stack) {
-      talker.error('Error fetching cards', e, stack);
-      rethrow;
-    }
-  }
 
-  Future<List<models.Card>> searchCards(String query) async {
-    try {
-      final normalizedQuery = query.toLowerCase().trim();
-
-      // Create compound query
-      final nameQuery = cardsCollection
-          .where('cleanName', isGreaterThanOrEqualTo: normalizedQuery)
-          .where('cleanName', isLessThan: '${normalizedQuery}z')
-          .limit(20);
-
-      final numberQuery = cardsCollection
-          .where('cardNumbers', arrayContains: normalizedQuery.toUpperCase())
-          .limit(20);
-
-      // Execute queries in parallel
-      final results = await Future.wait([
-        nameQuery.get(),
-        numberQuery.get(),
-      ]);
-
-      // Combine and deduplicate results
-      final cards = <String, models.Card>{};
-
-      for (final snapshot in results) {
-        for (final doc in snapshot.docs) {
-          if (!cards.containsKey(doc.id)) {
-            cards[doc.id] = _convertToCard(doc);
-          }
+      // Convert documents with error handling
+      final cards = <models.Card>[];
+      for (final doc in snapshot.docs) {
+        try {
+          final card = _convertToCard(doc);
+          cards.add(card);
+        } catch (e, stack) {
+          talker.error(
+              'Error converting document ${doc.id}, skipping', e, stack);
+          // Continue processing other documents
+          continue;
         }
       }
 
-      return cards.values.toList();
+      return cards;
     } catch (e, stack) {
-      talker.error('Error searching cards', e, stack);
+      talker.error('Error fetching cards', e, stack);
       rethrow;
     }
   }
@@ -167,8 +173,9 @@ class FirestoreService {
 
       // Apply filters
       if (filters.elements.isNotEmpty) {
-        query = query.where('extendedData.Element.value',
-            whereIn: filters.elements.toList());
+        // Use array-contains-any for Elements since we can query multiple values
+        query = query.where('extendedData.Elements.value',
+            arrayContainsAny: filters.elements.toList());
       }
 
       if (filters.types.isNotEmpty) {
@@ -176,66 +183,56 @@ class FirestoreService {
             whereIn: filters.types.toList());
       }
 
+      // Handle numeric fields with proper paths
+      if (filters.minCost != null) {
+        query = query.where('extendedData.Cost.value',
+            isGreaterThanOrEqualTo: filters.minCost);
+      }
+
+      if (filters.maxCost != null) {
+        query = query.where('extendedData.Cost.value',
+            isLessThanOrEqualTo: filters.maxCost);
+      }
+
+      if (filters.minPower != null) {
+        query = query.where('extendedData.Power.value',
+            isGreaterThanOrEqualTo: filters.minPower);
+      }
+
+      if (filters.maxPower != null) {
+        query = query.where('extendedData.Power.value',
+            isLessThanOrEqualTo: filters.maxPower);
+      }
+
+      // Category filter
       if (filters.categories.isNotEmpty) {
         query = query.where('extendedData.Category.value',
             whereIn: filters.categories.toList());
       }
 
+      // Job filter
       if (filters.jobs.isNotEmpty) {
         query = query.where('extendedData.Job.value',
             whereIn: filters.jobs.toList());
       }
 
+      // Set filter
       if (filters.sets.isNotEmpty) {
         query = query.where('extendedData.Set.value',
             whereIn: filters.sets.toList());
       }
 
+      // Rarity filter
       if (filters.rarities.isNotEmpty) {
         query = query.where('extendedData.Rarity.value',
             whereIn: filters.rarities.toList());
       }
 
-      // Handle cost range
-      if (filters.minCost != null) {
-        query = query.where('extendedData.Cost.value',
-            isGreaterThanOrEqualTo: filters.minCost.toString());
-      }
-
-      if (filters.maxCost != null) {
-        query = query.where('extendedData.Cost.value',
-            isLessThanOrEqualTo: filters.maxCost.toString());
-      }
-
-      // Handle power range
-      if (filters.minPower != null) {
-        query = query.where('extendedData.Power.value',
-            isGreaterThanOrEqualTo: filters.minPower.toString());
-      }
-      if (filters.maxPower != null) {
-        query = query.where('extendedData.Power.value',
-            isLessThanOrEqualTo: filters.maxPower.toString());
-      }
-
-      // Handle text search
-      if (filters.searchText?.isNotEmpty ?? false) {
-        query = query
-            .where('cleanName',
-                isGreaterThanOrEqualTo: filters.searchText!.toLowerCase())
-            .where('cleanName',
-                isLessThan: '${filters.searchText!.toLowerCase()}z');
-      }
-
       // Apply default sorting
-      query = query.orderBy('primaryCardNumber', descending: false);
-
-      talker.debug('Executing filtered query: ${query.parameters}');
+      query = query.orderBy('lastUpdated', descending: true);
 
       final snapshot = await query.get();
-      final results = snapshot.docs.map(_convertToCard).toList();
-
-      talker.debug('Found ${results.length} cards matching filters');
-      return results;
+      return snapshot.docs.map(_convertToCard).toList();
     } catch (e, stack) {
       talker.error('Error applying filters', e, stack);
       rethrow;
@@ -245,83 +242,50 @@ class FirestoreService {
   Future<PaginatedResult<models.Card>> getSortedCards({
     required String sortField,
     bool descending = false,
-    int limit = 50,
     DocumentSnapshot? startAfter,
+    int limit = 50,
   }) async {
     try {
-      // Check cache first
-      final box = await Hive.openBox(_queryCacheBox);
-      final cacheKey =
-          'sorted_${sortField}_${descending}_${limit}_${startAfter?.id}';
-      final cached = box.get(cacheKey);
-
-      if (cached != null) {
-        final timestamp = DateTime.parse(cached['timestamp']);
-        if (DateTime.now().difference(timestamp) < _cacheDuration) {
-          talker.debug('Returning cached sorted cards');
-          return PaginatedResult.fromJson(
-            Map<String, dynamic>.from(cached),
-            models.Card.fromJson,
-          );
-        }
-      }
-
       Query query = cardsCollection;
 
-      // Map sort field to actual Firestore field path and field type
-      final sortConfig = switch (sortField) {
-        'name' => ('cleanName', null, false), // (field, subfield, isNumeric)
-        'number' => ('primaryCardNumber', null, false),
-        'cost' => ('extendedData.Cost.value', 'cleanName', true),
-        'power' => ('extendedData.Power.value', 'cleanName', true),
-        _ => ('primaryCardNumber', null, false), // default sort
-      };
-
-      final (primaryField, secondaryField, isNumeric) = sortConfig;
-
-      // Build the query based on field type
-      if (isNumeric) {
-        // For numeric fields (cost, power), first ensure the field exists
-        query = query.where(primaryField, isNull: false);
-
-        // Add the numeric sorting
-        query = query.orderBy(primaryField, descending: descending);
-
-        // Add secondary sort by name for consistent ordering
-        if (secondaryField != null) {
-          query = query.orderBy(secondaryField, descending: false);
-        }
-      } else {
-        // For text fields, just order by the field
-        query = query.orderBy(primaryField, descending: descending);
+      // Apply sorting based on field type
+      switch (sortField) {
+        case 'cost':
+          query = query
+              .orderBy('extendedData.Cost.value', descending: descending)
+              .orderBy('cleanName', descending: false);
+          break;
+        case 'power':
+          query = query
+              .orderBy('extendedData.Power.value', descending: descending)
+              .orderBy('cleanName', descending: false);
+          break;
+        case 'name':
+          query = query.orderBy('cleanName', descending: descending);
+          break;
+        case 'element':
+          query = query
+              .orderBy('extendedData.Elements.value', descending: descending)
+              .orderBy('cleanName', descending: false);
+          break;
+        default:
+          query = query.orderBy('lastUpdated', descending: true);
       }
 
+      // Apply pagination
       if (startAfter != null) {
         query = query.startAfterDocument(startAfter);
       }
-
-      query =
-          query.limit(limit + 1); // Get one extra to check if there are more
-
-      talker
-          .debug('Executing sorted query: $sortField, descending: $descending');
+      query = query.limit(limit);
 
       final snapshot = await query.get();
-      final hasMore = snapshot.docs.length > limit;
-      final docs = hasMore ? snapshot.docs.take(limit).toList() : snapshot.docs;
+      final cards = snapshot.docs.map(_convertToCard).toList();
 
-      final cards = docs.map(_convertToCard).toList();
-
-      final result = PaginatedResult(
+      return PaginatedResult(
         items: cards,
-        lastDocument: docs.isNotEmpty ? docs.last : null,
-        hasMore: hasMore,
+        lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+        hasMore: snapshot.docs.length >= limit,
       );
-
-      // Cache the result
-      await box.put(cacheKey, result.toJson());
-      await _cleanOldCache();
-      return result;
     } catch (e, stack) {
       talker.error('Error sorting cards', e, stack);
       rethrow;
@@ -329,25 +293,47 @@ class FirestoreService {
   }
 
   models.Card _convertToCard(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    try {
+      final data = doc.data() as Map<String, dynamic>;
+      talker.debug('Converting document data: $data');
 
-    // Convert Timestamp to DateTime
-    if (data['lastUpdated'] is Timestamp) {
-      data['lastUpdated'] =
-          (data['lastUpdated'] as Timestamp).toDate().toIso8601String();
+      // Handle extendedData first
+      final extendedDataMap = <String, models.ExtendedData>{};
+      if (data['extendedData'] != null) {
+        (data['extendedData'] as Map<String, dynamic>).forEach((key, value) {
+          extendedDataMap[key] = models.ExtendedData(
+            name: value['displayName'] ?? key,
+            displayName: value['displayName'] ?? key,
+            value: value['value'],
+          );
+        });
+      }
+
+      // Handle timestamps
+      final lastUpdated = data['lastUpdated'] is Timestamp
+          ? (data['lastUpdated'] as Timestamp).toDate()
+          : DateTime.now();
+
+      return models.Card(
+        productId: data['productId'] as int? ?? 0,
+        name: data['name'] as String? ?? 'Unknown',
+        cleanName: data['cleanName'] as String? ?? 'Unknown',
+        highResUrl: data['highResUrl'] as String? ?? '',
+        lowResUrl: data['lowResUrl'] as String? ?? '',
+        fullResUrl: data['fullResUrl'] as String? ?? '',
+        lastUpdated: lastUpdated,
+        groupId: data['groupId'] as int? ?? 0,
+        isNonCard: data['isNonCard'] as bool? ?? false,
+        cardNumbers: data['cardNumbers'] != null
+            ? List<String>.from(data['cardNumbers'])
+            : [],
+        primaryCardNumber: data['primaryCardNumber'] as String? ?? '',
+        extendedData: extendedDataMap,
+      );
+    } catch (e, stack) {
+      talker.error('Error converting document ${doc.id} to Card', e, stack);
+      rethrow;
     }
-
-    // Convert extendedData
-    final extendedDataMap = <String, models.ExtendedData>{};
-    if (data['extendedData'] != null) {
-      (data['extendedData'] as Map<String, dynamic>).forEach((key, value) {
-        extendedDataMap[key] =
-            models.ExtendedData.fromJson(value as Map<String, dynamic>);
-      });
-    }
-    data['extendedData'] = extendedDataMap;
-
-    return models.Card.fromJson(data);
   }
 
   models.Price _convertToPrice(DocumentSnapshot doc) {

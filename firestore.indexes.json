@@ -1,22 +1,133 @@
 {
   "indexes": [
     {
-      "collectionGroup": "cards",
+      "collectionGroup": "extendedData",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "value", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "extendedData",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "value", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "prices",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "extendedData.Element.value", "order": "ASCENDING" },
-        { "fieldPath": "extendedData.CardType.value", "order": "ASCENDING" },
+        { "fieldPath": "normal.midPrice", "order": "ASCENDING" },
         { "fieldPath": "lastUpdated", "order": "DESCENDING" }
       ]
     },
     {
-      "collectionGroup": "cards",
+      "collectionGroup": "prices",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "extendedData.Element.value", "order": "ASCENDING" },
+        { "fieldPath": "normal.midPrice", "order": "DESCENDING" },
         { "fieldPath": "lastUpdated", "order": "DESCENDING" }
       ]
     },
+    {
+      "collectionGroup": "prices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "foil.midPrice", "order": "ASCENDING" },
+        { "fieldPath": "lastUpdated", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "prices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "foil.midPrice", "order": "DESCENDING" },
+        { "fieldPath": "lastUpdated", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "extendedData",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "values", "arrayConfig": "CONTAINS" }
+      ]
+    },
+
+    {
+      "collectionGroup": "extendedData",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "values", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "value", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "extendedData",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "displayName", "order": "ASCENDING" },
+        { "fieldPath": "value", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "extendedData",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "value", "order": "ASCENDING" },
+        { "fieldPath": "displayName", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "extendedData",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "value", "order": "ASCENDING" },
+        { "fieldPath": "displayName", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "extendedData",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "value", "order": "ASCENDING" },
+        { "fieldPath": "displayName", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "extendedData",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "value", "order": "ASCENDING" },
+        { "fieldPath": "displayName", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "groups",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "lastUpdated", "order": "DESCENDING" }
+      ]
+    },
+
     {
       "collectionGroup": "historicalPrices",
       "queryScope": "COLLECTION",
@@ -25,11 +136,23 @@
         { "fieldPath": "date", "order": "DESCENDING" }
       ]
     },
+
+    {
+      "collectionGroup": "extendedData",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "values", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "value", "order": "ASCENDING" },
+        { "fieldPath": "displayName", "order": "ASCENDING" }
+      ]
+    },
+
     {
       "collectionGroup": "cards",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "extendedData.Power.value", "order": "ASCENDING" },
+        { "fieldPath": "name", "order": "ASCENDING" },
         { "fieldPath": "lastUpdated", "order": "DESCENDING" }
       ]
     },
@@ -37,89 +160,27 @@
       "collectionGroup": "cards",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "extendedData.Element.value", "order": "ASCENDING" },
-        { "fieldPath": "extendedData.Cost.value", "order": "ASCENDING" },
+        { "fieldPath": "name", "order": "DESCENDING" },
         { "fieldPath": "lastUpdated", "order": "DESCENDING" }
       ]
     },
+
     {
-      "collectionGroup": "cards",
-      "queryScope": "COLLECTION",
+      "collectionGroup": "extendedData",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "cleanName", "order": "ASCENDING" },
-        { "fieldPath": "lastUpdated", "order": "DESCENDING" }
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "value", "order": "ASCENDING" },
+        { "fieldPath": "values", "arrayConfig": "CONTAINS" }
       ]
     },
     {
-      "collectionGroup": "cards",
-      "queryScope": "COLLECTION",
+      "collectionGroup": "extendedData",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "extendedData.Cost.value", "order": "ASCENDING" },
-        { "fieldPath": "lastUpdated", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "cards",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "extendedData.CardType.value", "order": "ASCENDING" },
-        { "fieldPath": "lastUpdated", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "cards",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "cardNumbers", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "lastUpdated", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "prices",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "productId", "order": "ASCENDING" },
-        { "fieldPath": "lastUpdated", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "cards",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "primaryCardNumber", "order": "ASCENDING" },
-        { "fieldPath": "cleanName", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "cards",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "extendedData.Cost.value", "order": "DESCENDING" },
-        { "fieldPath": "cleanName", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "cards",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "extendedData.Power.value", "order": "DESCENDING" },
-        { "fieldPath": "cleanName", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "cards",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "extendedData.Cost.value", "order": "ASCENDING" },
-        { "fieldPath": "cleanName", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "cards",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "extendedData.Power.value", "order": "ASCENDING" },
-        { "fieldPath": "cleanName", "order": "ASCENDING" }
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "value", "order": "DESCENDING" },
+        { "fieldPath": "values", "arrayConfig": "CONTAINS" }
       ]
     }
   ]
