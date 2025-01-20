@@ -14,5 +14,21 @@
   },
   "[yaml]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
+  },
+  "dart.flutterSdkPath": "C:\\Users\\mrw19\\fvm\\versions\\stable",
+  "dart.sdkPath": "C:\\Users\\mrw19\\fvm\\versions\\stable\\bin\\cache\\dart-sdk",
+  "git.path": "C:\\Program Files\\Git\\cmd\\git.exe",
+  "terminal.integrated.env.windows": {
+    "PATH": "C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\bin;${env:PATH}"
+  },
+  "terminal.integrated.profiles.windows": {
+    "PowerShell": {
+      "source": "PowerShell",
+      "args": ["-NoLogo"],
+      "env": {
+        "PATH": "C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\bin;${env:PATH}"
+      }
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "PowerShell"
 }
