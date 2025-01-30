@@ -9,18 +9,9 @@ import 'package:fftcg_companion/core/utils/logger.dart';
 class CardImageCacheManager {
   static const key = 'cardImageCache';
   static const maxMemCacheSize = 50 * 1024 * 1024; // 50MB
-  static const maxCacheObjects = 500;
 
-  static final instance = CacheManager(
-    Config(
-      key,
-      stalePeriod: const Duration(days: 30),
-      maxNrOfCacheObjects: maxCacheObjects,
-      repo: JsonCacheInfoRepository(databaseName: key),
-      fileSystem: IOFileSystem(key),
-      fileService: HttpFileService(),
-    ),
-  );
+  static final _instance = DefaultCacheManager();
+  static DefaultCacheManager get instance => _instance;
 
   static void initCache() {
     PaintingBinding.instance.imageCache.maximumSize = 50;
@@ -183,26 +174,28 @@ class CachedCardImage extends StatelessWidget {
         color: colorScheme.errorContainer,
         borderRadius: borderRadius,
       ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.broken_image_rounded,
-              color: colorScheme.onErrorContainer,
-              size: 32,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Image Failed to Load',
-              style: TextStyle(
+      child: SingleChildScrollView(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.broken_image_rounded,
                 color: colorScheme.onErrorContainer,
-                fontSize: 12,
+                size: 32,
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Image Failed to Load',
+                style: TextStyle(
+                  color: colorScheme.onErrorContainer,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
