@@ -35,7 +35,7 @@ dependencies:
 
   # Authentication
   google_sign_in: ^6.2.2
-  google_api_availability: ^5.0.0
+  google_api_availability_android: ^1.0.1
 
   # UI Components
   flex_color_scheme: ^8.1.0
