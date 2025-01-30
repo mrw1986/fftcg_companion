@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read access to all users for cards collection
+    match /cards/{cardId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Allow read access to groups collection
+    match /groups/{groupId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Allow read access to prices collection
+    match /prices/{priceId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Allow read access to historical prices
+    match /historicalPrices/{priceId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

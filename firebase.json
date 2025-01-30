@@ -1,0 +1,26 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "fftcg-sync-service",
+          "appId": "1:161248420888:android:fa47f5ad0420c3107d4f6d",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "fftcg-sync-service",
+          "configurations": {
+            "android": "1:161248420888:android:fa47f5ad0420c3107d4f6d",
+            "ios": "1:161248420888:ios:1ba9081776d57ce07d4f6d"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,90 @@
+name: fftcg_companion
+description: A Final Fantasy TCG companion app for card management and collection tracking.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase
+  firebase_core: ^3.9.0
+  firebase_auth: ^5.3.4
+  cloud_firestore: ^5.6.0
+  firebase_analytics: ^11.3.6
+  firebase_crashlytics: ^4.2.0
+  firebase_app_check: ^0.3.1
+  firebase_storage: ^12.3.7
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Routing
+  go_router: ^14.6.3
+
+  # Local Storage
+  # hive: ^2.2.3
+  # hive_flutter: ^1.1.0
+  hive_ce: 2.9.0
+  hive_ce_flutter: 2.2.0
+
+  # Authentication
+  google_sign_in: ^6.2.2
+  google_api_availability: ^5.0.0
+
+  # UI Components
+  flex_color_scheme: ^8.1.0
+  flex_color_picker: ^3.7.0
+  flutter_animate: ^4.5.2
+  cached_network_image: ^3.4.1
+  flutter_cache_manager: ^3.4.1
+  flutter_svg: ^2.0.16
+  shimmer: ^3.0.0
+  fl_chart: ^0.70.1
+
+  # Utils
+  freezed_annotation: ^2.4.4
+  freezed: ^2.5.7
+  json_annotation: ^4.9.0
+  intl: ^0.20.1
+  collection: ^1.19.0
+  talker: ^4.6.0
+  talker_flutter: ^4.6.0
+  talker_riverpod_logger: ^4.6.0
+  url_launcher: ^6.3.1
+  share_plus: ^10.1.3
+  path_provider: ^2.1.5
+  package_info_plus: ^8.1.2
+  device_info_plus: ^11.2.0
+  image_picker: ^1.1.2
+  csv: ^6.0.0
+  google_fonts: ^6.2.1
+  crypto: ^3.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Code Generation
+  build_runner: ^2.4.14
+  custom_lint: ^0.7.0
+  json_serializable: ^6.7.1
+  riverpod_generator: ^2.3.9
+  riverpod_lint: ^2.6.0
+
+  # Testing
+  mocktail: ^1.0.4
+
+  # Development Tools
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
