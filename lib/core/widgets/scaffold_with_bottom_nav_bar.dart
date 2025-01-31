@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
-final selectedIndexProvider = StateProvider<int>((ref) => 0);
+import 'package:fftcg_companion/core/utils/logger.dart';
 
 class ScaffoldWithBottomNavBar extends ConsumerStatefulWidget {
   const ScaffoldWithBottomNavBar({
@@ -19,66 +19,83 @@ class ScaffoldWithBottomNavBar extends ConsumerStatefulWidget {
 
 class _ScaffoldWithBottomNavBarState
     extends ConsumerState<ScaffoldWithBottomNavBar> {
-  DateTime? _lastBackPressTime;
+  DateTime? _lastBackPress;
 
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = ref.watch(selectedIndexProvider);
+    final selectedIndex = ref.watch(selectedTabIndexProvider);
 
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (bool didPop, dynamic result) async {
-        if (didPop) {
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+
+        final router = GoRouter.of(context);
+        final location = GoRouterState.of(context).uri.path;
+
+        // If we can pop the current route, do it
+        if (router.canPop()) {
+          if (mounted) {
+            context.pop();
+            talker.debug('Popped current route: $location');
+          }
           return;
         }
 
-        final location = GoRouterState.of(context).uri.path;
+        // Handle root route specially
         if (location == '/cards') {
           final now = DateTime.now();
-          if (_lastBackPressTime == null ||
-              now.difference(_lastBackPressTime!) >
-                  const Duration(seconds: 2)) {
-            _lastBackPressTime = now;
-            if (!context.mounted) return;
+          if (_lastBackPress == null ||
+              now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
+            _lastBackPress = now;
+            if (!mounted) return;
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Press back again to exit'),
-                duration: Duration(seconds: 2),
-              ),
-            );
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                const SnackBar(
+                  content: Text('Press back again to exit'),
+                  duration: Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  margin: EdgeInsets.all(8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                  ),
+                ),
+              );
             return;
           }
-          Navigator.of(context).pop();
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            await SystemNavigator.pop(animated: true);
+          }
           return;
         }
 
-        if (!context.mounted) return;
-        context.pop();
+        // If not at root route, navigate to root
+        if (mounted) {
+          context.go('/cards');
+          ref.read(selectedTabIndexProvider.notifier).state = 0;
+          talker.debug('Navigated to root route from: $location');
+        }
       },
       child: Scaffold(
         body: widget.child,
         bottomNavigationBar: NavigationBar(
           selectedIndex: selectedIndex,
           onDestinationSelected: (index) {
-            ref.read(selectedIndexProvider.notifier).state = index;
-            switch (index) {
-              case 0:
-                context.go('/cards');
-                break;
-              case 1:
-                context.go('/collection');
-                break;
-              case 2:
-                context.go('/decks');
-                break;
-              case 3:
-                context.go('/scanner');
-                break;
-              case 4:
-                context.go('/profile');
-                break;
-            }
+            final newLocation = switch (index) {
+              0 => '/cards',
+              1 => '/collection',
+              2 => '/decks',
+              3 => '/scanner',
+              4 => '/profile',
+              _ => '/cards',
+            };
+
+            ref.read(selectedTabIndexProvider.notifier).state = index;
+            context.go(newLocation);
           },
           destinations: const [
             NavigationDestination(
@@ -107,3 +124,5 @@ class _ScaffoldWithBottomNavBarState
     );
   }
 }
+
+final selectedTabIndexProvider = StateProvider<int>((ref) => 0);

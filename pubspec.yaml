@@ -25,11 +25,9 @@ dependencies:
   riverpod_annotation: ^2.6.1
 
   # Routing
-  go_router: ^14.6.3
+  go_router: ^14.6.2
 
   # Local Storage
-  # hive: ^2.2.3
-  # hive_flutter: ^1.1.0
   hive_ce: 2.9.0
   hive_ce_flutter: 2.2.0
 
