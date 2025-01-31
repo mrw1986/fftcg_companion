@@ -1,6 +1,7 @@
 package com.mrw1986.fftcg_companion
 
 import android.os.Bundle
+import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.core.view.WindowCompat
@@ -11,6 +12,8 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.mrw1986.fftcg_companion/back_handler"
     private var methodChannel: MethodChannel? = null
+    private var lastBackPressTime: Long = 0
+    private val DOUBLE_BACK_PRESS_INTERVAL = 2000 // 2 seconds
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,11 +47,31 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun handleBackPress() {
-        methodChannel?.invokeMethod("handleBackPress", null) { result ->
-            if (result is Boolean && !result) {
-                finish()
+        methodChannel?.invokeMethod("handleBackPress", null, object : MethodChannel.Result {
+            override fun success(result: Any?) {
+                if (result is Boolean && !result) {
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastBackPressTime <= DOUBLE_BACK_PRESS_INTERVAL) {
+                        finish()
+                    } else {
+                        lastBackPressTime = currentTime
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Press back again to exit",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
             }
-        }
+            
+            override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
+                // Handle error if needed
+            }
+            
+            override fun notImplemented() {
+                // Handle not implemented if needed
+            }
+        })
     }
 
     @Deprecated("Deprecated in Java")

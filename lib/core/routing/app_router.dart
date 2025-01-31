@@ -165,7 +165,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
     if (_lastBackPress == null ||
         now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
       _lastBackPress = now;
-      if (!mounted) return true;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Press back again to exit'),
@@ -173,18 +173,11 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
           behavior: SnackBarBehavior.floating,
         ),
       );
-      return true;
+      return false;
     }
 
-    // On second back press within 2 seconds, exit the app
-    try {
-      await platform.invokeMethod('exitApp');
-      return true;
-    } catch (e) {
-      // If platform method fails, fallback to SystemNavigator
-      await SystemNavigator.pop(animated: true);
-      return true;
-    }
+    _lastBackPress = null; // Reset the timer
+    return false; // Let the platform handle the exit
   }
 
   void _navigateToIndex(int index) {
@@ -254,7 +247,10 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        await _handleBackPress();
+        final shouldStayInApp = await _handleBackPress();
+        if (!shouldStayInApp && mounted) {
+          await platform.invokeMethod('exitApp');
+        }
       },
       child: Scaffold(
         body: widget.child,
