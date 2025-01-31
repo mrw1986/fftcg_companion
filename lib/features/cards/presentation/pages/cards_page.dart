@@ -64,12 +64,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       barrierColor: Colors.black54,
       builder: (context) => Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface.withValues(
-                alpha: (0.95 * 255).roundToDouble(),
-                red: Theme.of(context).colorScheme.surface.r.toDouble(),
-                green: Theme.of(context).colorScheme.surface.g.toDouble(),
-                blue: Theme.of(context).colorScheme.surface.b.toDouble(),
-              ),
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
         child: TweenAnimationBuilder<double>(
@@ -882,26 +877,41 @@ class SortBottomSheet extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Material(
-      color: Colors.transparent,
+      color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
       child: ListTile(
         leading: Icon(
           icon,
-          color:
-              isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          color: isSelected
+              ? colorScheme.onSecondaryContainer
+              : colorScheme.onSurfaceVariant,
         ),
-        title: Text(title),
-        subtitle: Text(subtitle),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isSelected
+                ? colorScheme.onSecondaryContainer
+                : colorScheme.onSurface,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            color: isSelected
+                ? colorScheme.onSecondaryContainer
+                : colorScheme.onSurfaceVariant,
+          ),
+        ),
         trailing: showOrderIcon
             ? Icon(
                 isDescending ? Icons.arrow_downward : Icons.arrow_upward,
-                color: colorScheme.primary,
+                color: isSelected
+                    ? colorScheme.onSecondaryContainer
+                    : colorScheme.primary,
               )
             : null,
         selected: isSelected,
         onTap: onTap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
       ),
     );
   }
