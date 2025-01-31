@@ -24,11 +24,17 @@ GoRouter router(ref) {
     navigatorKey: key,
     initialLocation: '/cards',
     errorBuilder: (context, state) => ErrorScreen(error: state.error),
+    debugLogDiagnostics: true,
+    redirect: (context, state) {
+      // Handle any global redirects here if needed
+      return null;
+    },
     routes: [
       ShellRoute(
         builder: (context, state, child) => ScaffoldWithBottomNavBar(
           child: child,
         ),
+        navigatorKey: GlobalKey<NavigatorState>(),
         routes: [
           GoRoute(
             path: '/cards',
@@ -71,8 +77,9 @@ GoRouter router(ref) {
                 builder: (context, state) => TalkerScreen(
                   talker: talker,
                   theme: TalkerScreenTheme(
-                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                    textColor: Theme.of(context).colorScheme.onSurface,
+                    backgroundColor: const Color(0xFF2D2D2D),
+                    textColor: Colors.white,
+                    cardColor: const Color(0xFF1E1E1E),
                   ),
                 ),
               ),
