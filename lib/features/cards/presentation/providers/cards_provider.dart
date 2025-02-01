@@ -16,7 +16,6 @@ class SortingProgress extends _$SortingProgress {
 }
 
 @Riverpod(keepAlive: true)
-@Riverpod(keepAlive: true)
 class CardsNotifier extends _$CardsNotifier {
   static const int batchSize = 50;
   CardFilters? _currentFilters;

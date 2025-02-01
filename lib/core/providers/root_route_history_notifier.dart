@@ -1,3 +1,4 @@
+// lib/core/providers/root_route_history_notifier.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,18 +34,11 @@ class RootRouteHistoryNotifier extends StateNotifier<List<int>> {
       if (call.method == 'handleBackPress') {
         if (canGoBack) {
           removeLastHistory();
-          return;
+          return true;
         }
-
-        // Show exit toast and notify native side
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Press back again to exit'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-        await platform.invokeMethod('showExitToast');
+        return false; // Let app_router handle the back press
       }
+      return null;
     });
   }
 }

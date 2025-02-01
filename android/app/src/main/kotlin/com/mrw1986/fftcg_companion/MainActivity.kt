@@ -1,7 +1,6 @@
 package com.mrw1986.fftcg_companion
 
 import android.os.Bundle
-import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.core.view.WindowCompat
@@ -55,11 +54,7 @@ class MainActivity: FlutterActivity() {
                         finish()
                     } else {
                         lastBackPressTime = currentTime
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Press back again to exit",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        // Toast removed in favor of Flutter snackbar
                     }
                 }
             }

@@ -1,5 +1,5 @@
 // lib/features/cards/domain/models/card_hive_adapter.dart
-import 'package:hive_ce/hive.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card.dart';
 

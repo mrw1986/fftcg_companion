@@ -2,7 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 import '../providers/root_route_history_notifier.dart';
+import '../utils/logger.dart';
+import '../../features/cards/presentation/pages/cards_page.dart';
+import '../../features/cards/presentation/pages/card_details_page.dart';
+import '../../features/profile/presentation/pages/profile_page.dart';
+import '../../features/profile/presentation/pages/theme_settings_page.dart';
+import 'package:fftcg_companion/features/models.dart' as models;
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
@@ -21,9 +28,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/',
-            builder: (context, state) => const Scaffold(
-              body: Center(child: Text('Cards Screen')),
-            ),
+            builder: (context, state) => const CardsPage(),
           ),
           GoRoute(
             path: '/collection',
@@ -44,10 +49,41 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(
+            path: '/cards',
+            builder: (context, state) => const CardsPage(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (context, state) {
+                  final card = state.extra as models.Card;
+                  return CardDetailsPage(card: card);
+                },
+              ),
+            ],
+          ),
+          GoRoute(
             path: '/profile',
-            builder: (context, state) => const Scaffold(
-              body: Center(child: Text('Profile Screen')),
-            ),
+            builder: (context, state) => const ProfilePage(),
+            routes: [
+              GoRoute(
+                path: 'theme',
+                pageBuilder: (context, state) => MaterialPage(
+                  key: state.pageKey,
+                  child: const ThemeSettingsPage(),
+                ),
+              ),
+              GoRoute(
+                path: 'logs',
+                builder: (context, state) => TalkerScreen(
+                  talker: talker,
+                  theme: const TalkerScreenTheme(
+                    backgroundColor: Color(0xFF2D2D2D),
+                    textColor: Colors.white,
+                    cardColor: Color(0xFF1E1E1E),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -167,10 +203,28 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
       _lastBackPress = now;
       if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Press back again to exit'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Center(
+            child: Text(
+              'Press back again to exit',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          duration: const Duration(seconds: 2),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
           behavior: SnackBarBehavior.floating,
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          margin: EdgeInsets.only(
+            bottom: 24,
+            left: MediaQuery.of(context).size.width * 0.25,
+            right: MediaQuery.of(context).size.width * 0.25,
+          ),
+          elevation: 6,
         ),
       );
       return false;

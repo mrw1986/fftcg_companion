@@ -5,6 +5,7 @@ import 'package:fftcg_companion/features/models.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:fftcg_companion/features/cards/domain/models/card_hive_adapter.dart';
 
 class CachePersistence {
   static const String _cardCacheBox = 'card_cache';
@@ -15,6 +16,11 @@ class CachePersistence {
 
   static Future<void> initialize() async {
     try {
+      // Register adapters first
+      if (!Hive.isAdapterRegistered(0)) {
+        Hive.registerAdapter(CardAdapter());
+      }
+
       if (!Hive.isBoxOpen(_cardCacheBox)) {
         await Hive.openBox<Map>(_cardCacheBox);
       }

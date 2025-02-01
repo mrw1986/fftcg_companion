@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:hive_ce/hive.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/core/services/firestore_provider.dart';
 import 'package:fftcg_companion/features/models.dart';
@@ -10,8 +10,8 @@ part 'card_repository.g.dart';
 
 @Riverpod(keepAlive: true)
 class CardRepository extends _$CardRepository {
-  Box<Card>? _cardBox;
-  Box<Map<dynamic, dynamic>>? _queryCache;
+  Box<Map>? _cardBox;
+  Box<Map>? _queryCache;
   static const _queryCacheDuration = Duration(minutes: 30);
   Timer? _cleanupTimer;
 
@@ -33,7 +33,7 @@ class CardRepository extends _$CardRepository {
 
   Future<void> _initializeBoxes() async {
     try {
-      _cardBox = await Hive.openBox<Card>('cards');
+      _cardBox = await Hive.openBox<Map>('cards');
       _queryCache = await Hive.openBox<Map>('query_cache');
       talker.debug('Initialized Hive boxes for CardRepository');
     } catch (e, stack) {
