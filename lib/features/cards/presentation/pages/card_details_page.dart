@@ -73,7 +73,6 @@ class CardDetailsPage extends StatelessWidget {
                           'assets/images/card-back.jpeg',
                           fit: BoxFit.cover,
                         ),
-                        animate: false,
                         useProgressiveLoading: false,
                         onImageError: () {
                           talker.error(
@@ -136,7 +135,6 @@ class CardDetailsPage extends StatelessWidget {
                           'assets/images/card-back.jpeg',
                           fit: BoxFit.cover,
                         ),
-                        animate: false,
                         useProgressiveLoading: false,
                         onImageError: () {
                           talker.error(

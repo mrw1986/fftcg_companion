@@ -176,7 +176,7 @@ class _CachedCardImageState extends State<CachedCardImage>
         maxWidthDiskCache: safeTargetWidth,
         maxHeightDiskCache: safeTargetHeight,
         cacheKey: cacheKey,
-        // fadeInDuration: const Duration(milliseconds: 150),
+        fadeInDuration: const Duration(milliseconds: 150),
         placeholder: (context, url) {
           if (_isLoaded) {
             return Image.asset(
@@ -212,29 +212,30 @@ class _CachedCardImageState extends State<CachedCardImage>
             height: widget.height,
           );
 
-          // Only use flip animation on cards_page.dart
-          if (widget.animate &&
-              !CardImageCacheManager.hasBeenAnimated(targetUrl)) {
-            CardImageCacheManager.markAsAnimated(targetUrl);
-            talker.debug('CachedCardImage: Starting flip animation');
-            return FlippingCardImage(
-              key: ValueKey(cacheKey),
-              frontWidget: Image.asset(
-                'assets/images/card-back.jpeg',
-                fit: widget.fit,
-                width: widget.width,
-                height: widget.height,
-              ),
-              backWidget: imageWidget,
-              duration: const Duration(milliseconds: 500),
-              onAnimationComplete: () {
-                CardImageCacheManager.markAsAnimated(targetUrl);
-              },
-            );
+          if (!widget.animate ||
+              CardImageCacheManager.hasBeenAnimated(targetUrl)) {
+            talker.debug('CachedCardImage: Skipping animation for $targetUrl');
+            return imageWidget;
           }
 
-          talker.debug('CachedCardImage: Skipping animation for $targetUrl');
-          return imageWidget;
+          // Mark this URL as animated before starting the animation
+          CardImageCacheManager.markAsAnimated(targetUrl);
+
+          talker.debug('CachedCardImage: Starting flip animation');
+          return FlippingCardImage(
+            key: ValueKey(cacheKey),
+            frontWidget: Image.asset(
+              'assets/images/card-back.jpeg',
+              fit: widget.fit,
+              width: widget.width,
+              height: widget.height,
+            ),
+            backWidget: imageWidget,
+            duration: const Duration(milliseconds: 500),
+            onAnimationComplete: () {
+              CardImageCacheManager.markAsAnimated(targetUrl);
+            },
+          );
         },
         errorWidget: (context, url, error) {
           talker.error('Failed to load image: $url', error);
@@ -280,6 +281,18 @@ class _CachedCardImageState extends State<CachedCardImage>
         ),
       ),
     );
+  }
+
+  static Future<void> precacheImage(BuildContext context, String url) async {
+    try {
+      final provider = CachedNetworkImageProvider(
+        url,
+        cacheManager: CardImageCacheManager.instance,
+      );
+      provider.resolve(ImageConfiguration.empty);
+    } catch (e, stack) {
+      talker.error('Error precaching image: $url', e, stack);
+    }
   }
 }
 

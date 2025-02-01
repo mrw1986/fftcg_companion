@@ -28,31 +28,63 @@ class _FlippingCardImageState extends State<FlippingCardImage>
   late AnimationController _controller;
   late Animation<double> _animation;
   bool _showFrontSide = true;
+  bool _hasAnimated = false;
+  bool _isAnimating = false;
 
   @override
   void initState() {
     super.initState();
+    _setupAnimation();
+  }
+
+  void _setupAnimation() {
     _controller = AnimationController(
       duration: widget.duration,
       vsync: this,
     );
 
     _animation = Tween<double>(
-      begin: 0,
-      end: math.pi,
+      begin: math.pi,
+      end: 0.0,
     ).animate(CurvedAnimation(
       parent: _controller,
       curve: Curves.easeInOut,
-    ))
-      ..addListener(() {
-        if (_animation.value >= math.pi / 2) {
-          setState(() => _showFrontSide = false);
-        }
-      });
+    ));
 
-    _controller.forward().then((_) {
-      widget.onAnimationComplete?.call();
+    _animation.addStatusListener((status) {
+      if (status == AnimationStatus.forward) {
+        _isAnimating = true;
+        talker.debug('FlippingCardImage: Animation starting forward');
+      } else if (status == AnimationStatus.completed) {
+        _isAnimating = false;
+        _hasAnimated = true;
+        talker.debug('FlippingCardImage: Animation completed');
+        widget.onAnimationComplete?.call();
+      }
     });
+
+    _animation.addListener(() {
+      if (_animation.value <= math.pi / 2 && _showFrontSide && _isAnimating) {
+        setState(() {
+          _showFrontSide = false;
+          talker.debug('FlippingCardImage: Switching to front side');
+        });
+      }
+    });
+
+    // Only start animation if we haven't animated before
+    if (!_hasAnimated) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void didUpdateWidget(FlippingCardImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If the key changed but we're already animated, don't animate again
+    if (widget.key != oldWidget.key && !_hasAnimated && !_isAnimating) {
+      _controller.forward();
+    }
   }
 
   @override
@@ -67,7 +99,7 @@ class _FlippingCardImageState extends State<FlippingCardImage>
       animation: _animation,
       builder: (context, child) {
         final transform = Matrix4.identity()
-          ..setEntry(3, 2, 0.001)
+          ..setEntry(3, 2, 0.001) // Perspective
           ..rotateY(_animation.value);
 
         return Transform(
