@@ -3,8 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:fftcg_companion/core/widgets/flipping_card_image.dart';
 
 class CardImageCacheManager {
   static const key = 'cardImageCache';
@@ -13,14 +13,37 @@ class CardImageCacheManager {
   static final _instance = DefaultCacheManager();
   static DefaultCacheManager get instance => _instance;
 
+  // Track which images have already been animated
+  static final _animatedImages = <String>{};
+  static final _loadedImages = <String>{};
+
+  static bool hasBeenAnimated(String url) {
+    return _animatedImages.contains(url);
+  }
+
+  static bool isImageLoaded(String url) {
+    return _loadedImages.contains(url);
+  }
+
+  static void markAsAnimated(String url) {
+    _animatedImages.add(url);
+  }
+
+  static void markAsLoaded(String url) {
+    _loadedImages.add(url);
+  }
+
   static void initCache() {
-    PaintingBinding.instance.imageCache.maximumSize = 50;
+    PaintingBinding.instance.imageCache.maximumSize = 200; // Increased from 50
     PaintingBinding.instance.imageCache.maximumSizeBytes = maxMemCacheSize;
-    PaintingBinding.instance.imageCache.clear();
+    // Don't clear the cache on init to maintain images across navigation
+    // Only clear animation tracking
+    _animatedImages.clear();
+    _loadedImages.clear();
   }
 }
 
-class CachedCardImage extends StatelessWidget {
+class CachedCardImage extends StatefulWidget {
   final String imageUrl;
   final BoxFit fit;
   final double? width;
@@ -47,30 +70,48 @@ class CachedCardImage extends StatelessWidget {
   });
 
   @override
+  State<CachedCardImage> createState() => _CachedCardImageState();
+}
+
+class _CachedCardImageState extends State<CachedCardImage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  bool _isLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isLoaded = CardImageCacheManager.isImageLoaded(widget.imageUrl);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return RepaintBoundary(
       child: _buildNetworkImage(context),
     );
   }
 
   Widget _buildNetworkImage(BuildContext context) {
-    if (!useProgressiveLoading) {
+    if (!widget.useProgressiveLoading) {
       return _buildCachedImage(context);
     }
 
     return FutureBuilder<bool>(
-      future: CardImageUtils.isImageCached(imageUrl),
+      future: CardImageUtils.isImageCached(widget.imageUrl),
       builder: (context, snapshot) {
         if (snapshot.data == true) {
           return _buildCachedImage(context);
         }
 
-        final lowQualityUrl = imageUrl.contains('_in_1000x1000.jpg')
-            ? imageUrl.replaceAll('_in_1000x1000.jpg', '_400w.jpg')
-            : imageUrl.replaceAll('.jpg', '_400w.jpg');
+        final lowQualityUrl = widget.imageUrl.contains('_in_1000x1000.jpg')
+            ? widget.imageUrl.replaceAll('_in_1000x1000.jpg', '_400w.jpg')
+            : widget.imageUrl.replaceAll('.jpg', '_400w.jpg');
 
         return CachedNetworkImage(
-          imageUrl: imageUrl,
+          imageUrl: widget.imageUrl,
           cacheManager: CardImageCacheManager.instance,
           progressIndicatorBuilder: (context, url, progress) {
             return _buildCachedImage(context, imageUrl: lowQualityUrl);
@@ -79,15 +120,15 @@ class CachedCardImage extends StatelessWidget {
             decoration: BoxDecoration(
               image: DecorationImage(
                 image: imageProvider,
-                fit: fit,
+                fit: widget.fit,
               ),
-              borderRadius: borderRadius,
+              borderRadius: widget.borderRadius,
             ),
           ),
           errorWidget: (context, url, error) {
             talker.error('Failed to load image: $url', error);
-            onImageError?.call();
-            return errorWidget ?? _buildErrorWidget(context);
+            widget.onImageError?.call();
+            return widget.errorWidget ?? _buildErrorWidget(context);
           },
         );
       },
@@ -95,7 +136,8 @@ class CachedCardImage extends StatelessWidget {
   }
 
   Widget _buildCachedImage(BuildContext context, {String? imageUrl}) {
-    final targetUrl = imageUrl ?? this.imageUrl;
+    final targetUrl = imageUrl ?? widget.imageUrl;
+    final cacheKey = Uri.parse(targetUrl).pathSegments.last;
 
     // Calculate optimal cache dimensions based on device pixel ratio
     final pixelRatio = MediaQuery.of(context).devicePixelRatio;
@@ -104,62 +146,101 @@ class CachedCardImage extends StatelessWidget {
     int? safeTargetWidth;
     int? safeTargetHeight;
 
-    if (width != null && width!.isFinite && !width!.isNaN && width! > 0) {
-      final targetWidth = (width! * pixelRatio).toInt();
+    if (widget.width != null &&
+        widget.width!.isFinite &&
+        !widget.width!.isNaN &&
+        widget.width! > 0) {
+      final targetWidth = (widget.width! * pixelRatio).toInt();
       safeTargetWidth = targetWidth.clamp(1, 4096); // Max texture size 4096
     }
 
-    if (height != null && height!.isFinite && !height!.isNaN && height! > 0) {
-      final targetHeight = (height! * pixelRatio).toInt();
+    if (widget.height != null &&
+        widget.height!.isFinite &&
+        !widget.height!.isNaN &&
+        widget.height! > 0) {
+      final targetHeight = (widget.height! * pixelRatio).toInt();
       safeTargetHeight = targetHeight.clamp(1, 4096);
     }
 
-    return CachedNetworkImage(
-      imageUrl: targetUrl,
-      cacheManager: CardImageCacheManager.instance,
-      fit: fit,
-      width: width,
-      height: height,
-      // Only use cache dimensions if they're valid
-      memCacheWidth: safeTargetWidth,
-      memCacheHeight: safeTargetHeight,
-      maxWidthDiskCache: safeTargetWidth,
-      maxHeightDiskCache: safeTargetHeight,
-      cacheKey: Uri.parse(targetUrl).pathSegments.last,
-      // Skip fade animation for cached images
-      fadeInDuration: const Duration(milliseconds: 0),
-      imageBuilder: (context, imageProvider) => Container(
-        decoration: BoxDecoration(
-          image: DecorationImage(
+    return ClipRRect(
+      borderRadius: widget.borderRadius ?? BorderRadius.zero,
+      child: CachedNetworkImage(
+        key: ValueKey('cached_$cacheKey'),
+        imageUrl: targetUrl,
+        cacheManager: CardImageCacheManager.instance,
+        fit: widget.fit,
+        width: widget.width,
+        height: widget.height,
+        memCacheWidth: safeTargetWidth,
+        memCacheHeight: safeTargetHeight,
+        maxWidthDiskCache: safeTargetWidth,
+        maxHeightDiskCache: safeTargetHeight,
+        cacheKey: cacheKey,
+        // fadeInDuration: const Duration(milliseconds: 150),
+        placeholder: (context, url) {
+          if (_isLoaded) {
+            return Image.asset(
+              'assets/images/card-back.jpeg',
+              fit: widget.fit,
+              width: widget.width,
+              height: widget.height,
+            );
+          }
+          return widget.placeholder ??
+              Image.asset(
+                'assets/images/card-back.jpeg',
+                fit: widget.fit,
+                width: widget.width,
+                height: widget.height,
+              );
+        },
+        imageBuilder: (context, imageProvider) {
+          if (!_isLoaded) {
+            _isLoaded = true;
+            CardImageCacheManager.markAsLoaded(targetUrl);
+            talker.debug(
+                'CachedCardImage: Image loaded successfully: $targetUrl');
+          }
+
+          // Keep the image in memory cache
+          imageProvider.resolve(ImageConfiguration.empty);
+
+          final imageWidget = Image(
             image: imageProvider,
-            fit: fit,
-          ),
-          borderRadius: borderRadius,
-        ),
-      ),
-      placeholder: (context, url) =>
-          placeholder ?? _buildDefaultPlaceholder(context),
-      errorWidget: (context, url, error) {
-        talker.error('Failed to load image: $url', error);
-        onImageError?.call();
-        return errorWidget ?? _buildErrorWidget(context);
-      },
-    );
-  }
+            fit: widget.fit,
+            width: widget.width,
+            height: widget.height,
+          );
 
-  Widget _buildDefaultPlaceholder(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+          // Only use flip animation on cards_page.dart
+          if (widget.animate &&
+              !CardImageCacheManager.hasBeenAnimated(targetUrl)) {
+            CardImageCacheManager.markAsAnimated(targetUrl);
+            talker.debug('CachedCardImage: Starting flip animation');
+            return FlippingCardImage(
+              key: ValueKey(cacheKey),
+              frontWidget: Image.asset(
+                'assets/images/card-back.jpeg',
+                fit: widget.fit,
+                width: widget.width,
+                height: widget.height,
+              ),
+              backWidget: imageWidget,
+              duration: const Duration(milliseconds: 500),
+              onAnimationComplete: () {
+                CardImageCacheManager.markAsAnimated(targetUrl);
+              },
+            );
+          }
 
-    return Shimmer.fromColors(
-      baseColor: colorScheme.surfaceContainerHighest,
-      highlightColor: colorScheme.surface,
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: borderRadius,
-        ),
+          talker.debug('CachedCardImage: Skipping animation for $targetUrl');
+          return imageWidget;
+        },
+        errorWidget: (context, url, error) {
+          talker.error('Failed to load image: $url', error);
+          widget.onImageError?.call();
+          return widget.errorWidget ?? _buildErrorWidget(context);
+        },
       ),
     );
   }
@@ -168,11 +249,11 @@ class CachedCardImage extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      width: width,
-      height: height,
+      width: widget.width,
+      height: widget.height,
       decoration: BoxDecoration(
         color: colorScheme.errorContainer,
-        borderRadius: borderRadius,
+        borderRadius: widget.borderRadius,
       ),
       child: SingleChildScrollView(
         child: Center(
@@ -199,18 +280,6 @@ class CachedCardImage extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static Future<void> precacheImage(BuildContext context, String url) async {
-    try {
-      final provider = CachedNetworkImageProvider(
-        url,
-        cacheManager: CardImageCacheManager.instance,
-      );
-      provider.resolve(ImageConfiguration.empty);
-    } catch (e, stack) {
-      talker.error('Error precaching image: $url', e, stack);
-    }
   }
 }
 

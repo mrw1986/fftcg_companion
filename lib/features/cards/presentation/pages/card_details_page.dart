@@ -1,9 +1,7 @@
 // lib/features/cards/presentation/pages/card_details_page.dart
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
-import 'package:fftcg_companion/shared/widgets/shimmer_placeholder.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 
 class CardDetailsPage extends StatelessWidget {
@@ -71,10 +69,12 @@ class CardDetailsPage extends StatelessWidget {
                             card.getImageUrl(quality: models.ImageQuality.high),
                         fit: BoxFit.cover,
                         borderRadius: BorderRadius.circular(3),
-                        placeholder: ShimmerPlaceholder(
-                          borderRadius: BorderRadius.circular(3),
+                        placeholder: Image.asset(
+                          'assets/images/card-back.jpeg',
+                          fit: BoxFit.cover,
                         ),
-                        useProgressiveLoading: true,
+                        animate: false,
+                        useProgressiveLoading: false,
                         onImageError: () {
                           talker.error(
                               'Failed to load high-res image for card: ${card.productId}');
@@ -95,7 +95,7 @@ class CardDetailsPage extends StatelessWidget {
                     Text(
                       card.name,
                       style: Theme.of(context).textTheme.headlineMedium,
-                    ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
+                    ),
                     const SizedBox(height: 16),
                     _buildExtendedDataSection(context),
                   ],
@@ -128,14 +128,16 @@ class CardDetailsPage extends StatelessWidget {
                     child: AspectRatio(
                       aspectRatio: 223 / 311,
                       child: CachedCardImage(
-                        imageUrl:
-                            card.getImageUrl(quality: models.ImageQuality.high),
+                        imageUrl: card.getImageUrl(
+                            quality: models.ImageQuality.medium),
                         fit: BoxFit.cover,
                         borderRadius: BorderRadius.circular(3),
-                        placeholder: ShimmerPlaceholder(
-                          borderRadius: BorderRadius.circular(3),
+                        placeholder: Image.asset(
+                          'assets/images/card-back.jpeg',
+                          fit: BoxFit.cover,
                         ),
-                        useProgressiveLoading: true,
+                        animate: false,
+                        useProgressiveLoading: false,
                         onImageError: () {
                           talker.error(
                               'Failed to load high-res image for card: ${card.productId}');
@@ -159,11 +161,11 @@ class CardDetailsPage extends StatelessWidget {
                                 fontWeight: FontWeight.bold,
                                 color: Theme.of(context).colorScheme.primary,
                               ),
-                    ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
+                    ),
                     const SizedBox(height: 24),
                     _buildExtendedDataSection(context),
                   ],
-                ).animate().fadeIn(delay: 200.ms).slideX(),
+                ),
               ),
             ),
           ],

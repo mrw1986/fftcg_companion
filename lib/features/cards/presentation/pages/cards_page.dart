@@ -3,7 +3,6 @@ import 'dart:async';
 
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
-import 'package:fftcg_companion/shared/widgets/shimmer_placeholder.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
@@ -11,7 +10,6 @@ import 'package:fftcg_companion/features/cards/presentation/providers/view_prefe
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
 
 final searchControllerProvider =
@@ -133,12 +131,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         elevation: 4,
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
-      )
-          .animate()
-          .fadeIn(duration: 400.ms)
-          .slideY(begin: 1, end: 0)
-          .then()
-          .shimmer(duration: 1.seconds, delay: 2.seconds),
+      ),
     );
   }
 
@@ -305,10 +298,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             card: cards[index],
             viewSize: viewPrefs.gridSize,
             showLabels: viewPrefs.showLabels,
-          ).animate().fadeIn(
-                duration: const Duration(milliseconds: 200),
-                delay: Duration(milliseconds: 50 * (index % 10)),
-              ),
+          ),
           childCount: cards.length,
           addAutomaticKeepAlives: true,
           addRepaintBoundaries: true,
@@ -337,10 +327,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             card: cards[index],
             viewSize: viewSize,
             isSmallScreen: isSmallScreen,
-          ).animate().fadeIn(
-                duration: const Duration(milliseconds: 200),
-                delay: Duration(milliseconds: 50 * (index % 10)),
-              ),
+          ),
           childCount: cards.length,
           addAutomaticKeepAlives: true,
           addRepaintBoundaries: true,
@@ -374,21 +361,27 @@ class _CardGridItemState extends State<CardGridItem>
   @override
   void initState() {
     super.initState();
-    _preloadHighResImage();
+    _preloadImages();
   }
 
   bool _isPreloading = false;
 
-  void _preloadHighResImage() async {
+  void _preloadImages() async {
     if (_isPreloading) return;
 
     try {
       _isPreloading = true;
-      await CardImageUtils.prefetchImage(
-        widget.card.getImageUrl(quality: models.ImageQuality.high),
-      );
+      // Prefetch both medium and high quality images
+      await Future.wait([
+        CardImageUtils.prefetchImage(
+          widget.card.getImageUrl(quality: models.ImageQuality.medium),
+        ),
+        CardImageUtils.prefetchImage(
+          widget.card.getImageUrl(quality: models.ImageQuality.high),
+        ),
+      ]);
     } catch (e, stack) {
-      talker.error('Failed to preload image', e, stack);
+      talker.error('Failed to preload images', e, stack);
     } finally {
       if (mounted) {
         setState(() => _isPreloading = false);
@@ -457,8 +450,9 @@ class _CardGridItemState extends State<CardGridItem>
                   height: double.infinity,
                   fit: BoxFit.cover,
                   borderRadius: BorderRadius.circular(imageRadius),
-                  placeholder: ShimmerPlaceholder(
-                    borderRadius: BorderRadius.circular(imageRadius),
+                  placeholder: Image.asset(
+                    'assets/images/card-back.jpeg',
+                    fit: BoxFit.cover,
                   ),
                   onImageError: () {
                     talker.error(
@@ -536,14 +530,23 @@ class _CardListItemState extends State<CardListItem>
   @override
   void initState() {
     super.initState();
-    _preloadHighResImage();
+    _preloadImages();
   }
 
-  void _preloadHighResImage() {
-    // Replace CachedCardImage.prefetchImage with CardImageUtils.prefetchImage
-    CardImageUtils.prefetchImage(
-      widget.card.getImageUrl(quality: models.ImageQuality.high),
-    );
+  void _preloadImages() async {
+    try {
+      // Prefetch both medium and high quality images
+      await Future.wait([
+        CardImageUtils.prefetchImage(
+          widget.card.getImageUrl(quality: models.ImageQuality.medium),
+        ),
+        CardImageUtils.prefetchImage(
+          widget.card.getImageUrl(quality: models.ImageQuality.high),
+        ),
+      ]);
+    } catch (e, stack) {
+      talker.error('Failed to preload images', e, stack);
+    }
   }
 
   String? getExtendedValue(String key) {
@@ -616,8 +619,9 @@ class _CardListItemState extends State<CardListItem>
                         width: imageWidth,
                         height: height,
                         borderRadius: BorderRadius.circular(3),
-                        placeholder: ShimmerPlaceholder(
-                          borderRadius: BorderRadius.circular(3),
+                        placeholder: Image.asset(
+                          'assets/images/card-back.jpeg',
+                          fit: BoxFit.contain,
                         ),
                         onImageError: () {
                           talker.error(
