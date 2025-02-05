@@ -89,9 +89,16 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
   Future<void> _prefetchSetInfo() async {
     try {
       final firestoreService = ref.read(firestoreServiceProvider);
-      final groupsSnapshot = await firestoreService.groupsCollection
-          .get()
-          .timeout(const Duration(seconds: 10));
+      final groupsSnapshot =
+          await firestoreService.groupsCollection.get().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          talker.warning('Set information fetch timed out, retrying once...');
+          return firestoreService.groupsCollection
+              .get()
+              .timeout(const Duration(seconds: 30));
+        },
+      );
 
       if (!groupsSnapshot.docs.any((doc) => doc.exists)) {
         talker.warning('No set information found in Firestore');

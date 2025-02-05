@@ -20,6 +20,8 @@ class CardFilters with _$CardFilters {
     // Add sorting fields
     String? sortField,
     @Default(false) bool sortDescending,
+    // Add sealed products toggle
+    @Default(true) bool showSealedProducts,
   }) = _CardFilters;
 
   factory CardFilters.fromJson(Map<String, dynamic> json) =>

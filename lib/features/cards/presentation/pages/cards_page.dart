@@ -490,10 +490,11 @@ class _CardGridItemState extends State<CardGridItem>
                           overflow: TextOverflow.ellipsis,
                           style: titleStyle,
                         ),
-                        Text(
-                          widget.card.primaryCardNumber,
-                          style: subtitleStyle,
-                        ),
+                        if (widget.card.displayNumber != null)
+                          Text(
+                            widget.card.displayNumber!,
+                            style: subtitleStyle,
+                          ),
                       ],
                     ),
                   ),
@@ -658,17 +659,18 @@ class _CardListItemState extends State<CardListItem>
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        widget.card.primaryCardNumber,
-                        style: (switch (widget.viewSize) {
-                          ViewSize.small => textTheme.bodySmall,
-                          ViewSize.normal => textTheme.bodyMedium,
-                          ViewSize.large => textTheme.bodyLarge,
-                        })
-                            ?.copyWith(
-                          color: colorScheme.onSurface,
+                      if (widget.card.displayNumber != null)
+                        Text(
+                          widget.card.displayNumber!,
+                          style: (switch (widget.viewSize) {
+                            ViewSize.small => textTheme.bodySmall,
+                            ViewSize.normal => textTheme.bodyMedium,
+                            ViewSize.large => textTheme.bodyLarge,
+                          })
+                              ?.copyWith(
+                            color: colorScheme.onSurface,
+                          ),
                         ),
-                      ),
                       if (widget.viewSize == ViewSize.large) ...[
                         const SizedBox(height: 8),
                         _buildMetadataChips(context, colorScheme),

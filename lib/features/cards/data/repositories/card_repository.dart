@@ -55,11 +55,39 @@ class CardRepository extends _$CardRepository {
     String? startAfterId,
     CardFilters? filters,
   }) {
-    return {
-      'limit': limit,
-      'startAfterId': startAfterId,
-      'filters': filters?.toJson(),
-    }.toString();
+    if (filters == null) {
+      return 'l$limit${startAfterId != null ? '-s$startAfterId' : ''}';
+    }
+
+    // Create compact filter string
+    final parts = <String>[];
+
+    // Add basic filters with short prefixes
+    if (filters.elements.isNotEmpty) parts.add('e${filters.elements.length}');
+    if (filters.types.isNotEmpty) parts.add('t${filters.types.length}');
+    if (filters.sets.isNotEmpty) parts.add('s${filters.sets.length}');
+    if (filters.rarities.isNotEmpty) parts.add('r${filters.rarities.length}');
+
+    // Add range filters if present
+    if (filters.minCost != null) parts.add('c>${filters.minCost}');
+    if (filters.maxCost != null) parts.add('c<${filters.maxCost}');
+    if (filters.minPower != null) parts.add('p>${filters.minPower}');
+    if (filters.maxPower != null) parts.add('p<${filters.maxPower}');
+
+    // Add boolean flags
+    if (filters.isNormalOnly == true) parts.add('n');
+    if (filters.isFoilOnly == true) parts.add('f');
+    if (!filters.showSealedProducts) parts.add('ns');
+
+    // Add sort info if present
+    if (filters.sortField?.isNotEmpty == true) {
+      parts.add(
+          'o${filters.sortField![0]}${filters.sortDescending ? 'd' : 'a'}');
+    }
+
+    // Combine everything into a compact key
+    final filterStr = parts.isEmpty ? '' : '-${parts.join('')}';
+    return 'l$limit${startAfterId != null ? '-s$startAfterId' : ''}$filterStr';
   }
 
   Future<List<Card>> getCards({
@@ -126,17 +154,37 @@ class CardRepository extends _$CardRepository {
       Query<Map<String, dynamic>> query = firestoreService.cardsCollection;
       query = _applyFilters(query, filters);
 
+      final snapshot = await query.get();
+      var cards =
+          snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
+
+      // Apply sorting after fetching
       if (filters.sortField != null) {
-        query = query.orderBy(
-          filters.sortField!,
-          descending: filters.sortDescending,
-        );
+        cards.sort((a, b) {
+          // Handle number sorting specially
+          if (filters.sortField == 'number') {
+            final comparison = a.compareByNumber(b);
+            return filters.sortDescending ? -comparison : comparison;
+          }
+
+          // Handle other sort fields
+          switch (filters.sortField) {
+            case 'name':
+              final comparison = a.compareByName(b);
+              return filters.sortDescending ? -comparison : comparison;
+            case 'cost':
+              final comparison = a.compareByCost(b);
+              return filters.sortDescending ? -comparison : comparison;
+            case 'power':
+              final comparison = a.compareByPower(b);
+              return filters.sortDescending ? -comparison : comparison;
+            default:
+              return 0;
+          }
+        });
       }
 
-      final snapshot = await query.get();
-      return snapshot.docs
-          .map((doc) => Card.fromFirestore(doc.data()))
-          .toList();
+      return cards;
     } catch (e, stack) {
       talker.error('Error applying filters', e, stack);
       rethrow;
@@ -221,6 +269,16 @@ class CardRepository extends _$CardRepository {
     Query<Map<String, dynamic>> query,
     CardFilters filters,
   ) {
+    // Always filter out non-cards when:
+    // 1. showSealedProducts is false, or
+    // 2. Sorting by number, cost, or power (these don't apply to sealed products)
+    if (!filters.showSealedProducts ||
+        filters.sortField == 'number' ||
+        filters.sortField == 'cost' ||
+        filters.sortField == 'power') {
+      query = query.where('isNonCard', isEqualTo: false);
+    }
+
     if (filters.elements.isNotEmpty) {
       query =
           query.where('elements', arrayContainsAny: filters.elements.toList());

@@ -282,18 +282,6 @@ class _CachedCardImageState extends State<CachedCardImage>
       ),
     );
   }
-
-  static Future<void> precacheImage(BuildContext context, String url) async {
-    try {
-      final provider = CachedNetworkImageProvider(
-        url,
-        cacheManager: CardImageCacheManager.instance,
-      );
-      provider.resolve(ImageConfiguration.empty);
-    } catch (e, stack) {
-      talker.error('Error precaching image: $url', e, stack);
-    }
-  }
 }
 
 class CardImageUtils {

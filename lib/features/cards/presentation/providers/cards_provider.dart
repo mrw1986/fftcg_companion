@@ -26,6 +26,13 @@ class CardsNotifier extends _$CardsNotifier {
   Future<List<models.Card>> build() async {
     // Wait for CardRepository to initialize
     await ref.read(cardRepositoryProvider.future);
+
+    // Set default sort to Card Number (Ascending)
+    _currentFilters = const CardFilters(
+      sortField: 'number',
+      sortDescending: false,
+    );
+
     return _loadInitialBatch();
   }
 
@@ -76,7 +83,24 @@ class CardsNotifier extends _$CardsNotifier {
   }
 
   Future<void> applyFilters(CardFilters filters) async {
+    // Check if only reapplying the same sort
+    final isSameSort = _currentFilters?.sortField == filters.sortField &&
+        _currentFilters?.sortDescending == filters.sortDescending;
+    final onlySortChanged = _currentFilters != null &&
+        _currentFilters!.copyWith(
+              sortField: filters.sortField,
+              sortDescending: filters.sortDescending,
+            ) ==
+            filters;
+
+    // If it's the exact same filters, do nothing
     if (_currentFilters == filters) return;
+
+    // If only reapplying the same sort, don't reload
+    if (isSameSort && onlySortChanged && state.hasValue) {
+      _currentFilters = filters;
+      return;
+    }
 
     ref.read(sortingProgressProvider.notifier).start();
     state = const AsyncValue.loading();
@@ -104,7 +128,13 @@ class CardsNotifier extends _$CardsNotifier {
     state = const AsyncValue.loading();
     _loadedCards.clear();
     _isLoadingMore = false;
-    _currentFilters = null;
+
+    // Reset to default sort (Card Number Ascending)
+    _currentFilters = const CardFilters(
+      sortField: 'number',
+      sortDescending: false,
+    );
+
     state = await AsyncValue.guard(_loadInitialBatch);
   }
 }

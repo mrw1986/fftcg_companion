@@ -64,6 +64,10 @@ class FilterNotifier extends StateNotifier<CardFilters> {
     state = state.copyWith(sets: sets);
   }
 
+  void toggleShowSealedProducts() {
+    state = state.copyWith(showSealedProducts: !state.showSealedProducts);
+  }
+
   void reset() {
     state = const CardFilters();
   }
@@ -190,6 +194,15 @@ class FilterDialog extends ConsumerWidget {
                                       max?.toInt(),
                                     ),
                           ).animate().slideX().fadeIn(delay: 600.ms),
+                        Divider(color: colorScheme.outlineVariant),
+                        _buildSwitchRow(
+                          context,
+                          'Show Sealed Products',
+                          filters.showSealedProducts,
+                          (_) => ref
+                              .read(filterProvider.notifier)
+                              .toggleShowSealedProducts(),
+                        ).animate().slideX().fadeIn(delay: 700.ms),
                       ],
                     ),
                   ),
@@ -399,6 +412,30 @@ class FilterDialog extends ConsumerWidget {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildSwitchRow(
+    BuildContext context,
+    String title,
+    bool value,
+    void Function(bool) onChanged,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
     );
   }
 

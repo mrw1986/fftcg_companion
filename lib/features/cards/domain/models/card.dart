@@ -21,8 +21,6 @@ class Card with _$Card {
     DateTime? lastUpdated,
     required int groupId,
     @Default(false) bool isNonCard,
-    required List<String> cardNumbers,
-    required String primaryCardNumber,
     String? cardType,
     String? category,
     int? cost,
@@ -49,10 +47,6 @@ class Card with _$Card {
           : null,
       groupId: data['groupId'] as int? ?? 0,
       isNonCard: data['isNonCard'] as bool? ?? false,
-      cardNumbers:
-          (data['cardNumbers'] as List?)?.map((e) => e.toString()).toList() ??
-              [],
-      primaryCardNumber: data['primaryCardNumber'] as String? ?? '',
       cardType: data['cardType'] as String?,
       category: data['category'] as String?,
       cost: data['cost'] as int?,
@@ -77,8 +71,6 @@ class Card with _$Card {
       if (lastUpdated != null) 'lastUpdated': Timestamp.fromDate(lastUpdated!),
       'groupId': groupId,
       'isNonCard': isNonCard,
-      'cardNumbers': cardNumbers,
-      'primaryCardNumber': primaryCardNumber,
       if (cardType != null) 'cardType': cardType,
       if (category != null) 'category': category,
       if (cost != null) 'cost': cost,
@@ -99,17 +91,41 @@ class Card with _$Card {
   bool get isSummon => cardType?.toLowerCase() == 'summon';
   bool get isMonster => cardType?.toLowerCase() == 'monster';
 
+  // Display helpers
+  String? get displayNumber => isNonCard ? null : number;
+  String get displayRarity => isNonCard ? 'Sealed Product' : (rarity ?? '');
+
   // Rarity helpers
-  bool get isCommon => rarity?.toLowerCase() == 'c';
-  bool get isRare => rarity?.toLowerCase() == 'r';
-  bool get isHeroic => rarity?.toLowerCase() == 'h';
-  bool get isLegendary => rarity?.toLowerCase() == 'l';
-  bool get isSpecial => rarity?.toLowerCase() == 's';
-  bool get isPromo => rarity?.toLowerCase() == 'p';
+  bool get isCommon => !isNonCard && rarity?.toLowerCase() == 'c';
+  bool get isRare => !isNonCard && rarity?.toLowerCase() == 'r';
+  bool get isHeroic => !isNonCard && rarity?.toLowerCase() == 'h';
+  bool get isLegendary => !isNonCard && rarity?.toLowerCase() == 'l';
+  bool get isSpecial => !isNonCard && rarity?.toLowerCase() == 's';
+  bool get isPromo => !isNonCard && rarity?.toLowerCase() == 'p';
 
   // Compare cards for sorting
   int compareByNumber(Card other) {
-    return primaryCardNumber.compareTo(other.primaryCardNumber);
+    // If either card is a non-card, sort them to the end
+    if (isNonCard && other.isNonCard) return 0;
+    if (isNonCard) return 1;
+    if (other.isNonCard) return -1;
+
+    // Compare by number field if both are actual cards
+    final thisNum = number ?? '';
+    final otherNum = other.number ?? '';
+
+    // Extract numeric parts for comparison
+    final thisMatch = RegExp(r'(\d+)').firstMatch(thisNum);
+    final otherMatch = RegExp(r'(\d+)').firstMatch(otherNum);
+
+    if (thisMatch != null && otherMatch != null) {
+      final thisNumeric = int.parse(thisMatch.group(1)!);
+      final otherNumeric = int.parse(otherMatch.group(1)!);
+      return thisNumeric.compareTo(otherNumeric);
+    }
+
+    // Fall back to string comparison if no numbers found
+    return thisNum.compareTo(otherNum);
   }
 
   int compareByCost(Card other) {
@@ -135,8 +151,7 @@ class Card with _$Card {
     final searchTerm = term.toLowerCase().trim();
     return name.toLowerCase().contains(searchTerm) ||
         cleanName.toLowerCase().contains(searchTerm) ||
-        cardNumbers
-            .any((number) => number.toLowerCase().contains(searchTerm)) ||
+        (displayNumber?.toLowerCase().contains(searchTerm) ?? false) ||
         (description?.toLowerCase().contains(searchTerm) ?? false);
   }
 

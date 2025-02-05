@@ -60,7 +60,7 @@ class CardDetailsPage extends StatelessWidget {
                   tag: 'card_${card.productId}',
                   child: Material(
                     color: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: BorderRadius.circular(3),
+                    borderRadius: BorderRadius.circular(3.0),
                     clipBehavior: Clip.antiAlias,
                     child: AspectRatio(
                       aspectRatio: 223 / 311,
@@ -68,7 +68,7 @@ class CardDetailsPage extends StatelessWidget {
                         imageUrl:
                             card.getImageUrl(quality: models.ImageQuality.high),
                         fit: BoxFit.cover,
-                        borderRadius: BorderRadius.circular(3),
+                        borderRadius: BorderRadius.circular(3.0),
                         placeholder: Image.asset(
                           'assets/images/card-back.jpeg',
                           fit: BoxFit.cover,
@@ -91,11 +91,6 @@ class CardDetailsPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      card.name,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 16),
                     _buildExtendedDataSection(context),
                   ],
                 ),
@@ -122,7 +117,7 @@ class CardDetailsPage extends StatelessWidget {
                   tag: 'card_${card.productId}',
                   child: Material(
                     color: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: BorderRadius.circular(3),
+                    borderRadius: BorderRadius.circular(3.0),
                     clipBehavior: Clip.antiAlias,
                     child: AspectRatio(
                       aspectRatio: 223 / 311,
@@ -130,7 +125,7 @@ class CardDetailsPage extends StatelessWidget {
                         imageUrl: card.getImageUrl(
                             quality: models.ImageQuality.medium),
                         fit: BoxFit.cover,
-                        borderRadius: BorderRadius.circular(3),
+                        borderRadius: BorderRadius.circular(3.0),
                         placeholder: Image.asset(
                           'assets/images/card-back.jpeg',
                           fit: BoxFit.cover,
@@ -152,15 +147,6 @@ class CardDetailsPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      card.name,
-                      style:
-                          Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                    ),
-                    const SizedBox(height: 24),
                     _buildExtendedDataSection(context),
                   ],
                 ),
@@ -183,19 +169,42 @@ class CardDetailsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInfoRow('Card Number', card.primaryCardNumber, textTheme),
-            const Divider(height: 24),
-            if (card.elements.isNotEmpty)
-              _buildInfoRow('Element', card.elements.join(', '), textTheme),
+            Text(
+              card.name,
+              style: textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Card Number
+            if (card.displayNumber != null) ...[
+              _buildInfoRow('Card Number', card.displayNumber!, textTheme),
+              const Divider(height: 24),
+            ],
+            // Rarity
+            _buildInfoRow('Rarity', card.displayRarity, textTheme),
+            // Card Type
             if (card.cardType != null)
               _buildInfoRow('Type', card.cardType!, textTheme),
+            // Job
+            if (card.job != null) _buildInfoRow('Job', card.job!, textTheme),
+            // Elements
+            if (card.elements.isNotEmpty)
+              _buildInfoRow('Element(s)', card.elements.join(', '), textTheme),
+            // Cost
             if (card.cost != null)
               _buildInfoRow('Cost', card.cost.toString(), textTheme),
-            if (card.job != null) _buildInfoRow('Job', card.job!, textTheme),
+            // Power
+            if (card.power != null)
+              _buildInfoRow('Power', card.power.toString(), textTheme),
+            // Category
             if (card.category != null)
               _buildInfoRow('Category', card.category!, textTheme),
-            if (card.rarity != null)
-              _buildInfoRow('Rarity', card.rarity!, textTheme),
+            // Set
+            if (card.groupId != 0)
+              _buildInfoRow('Set', card.groupId.toString(), textTheme),
+            // Description (if exists)
             if (card.description != null) ...[
               const Divider(height: 24),
               Text(

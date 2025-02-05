@@ -46,13 +46,13 @@ class HistoricalPrice with _$HistoricalPrice {
   }
 
   // Helper methods
-  bool get hasNormalPrice => normal.price != null;
-  bool get hasFoilPrice => foil.price != null;
+  bool get hasNormalPrice => normal.low != null;
+  bool get hasFoilPrice => foil.low != null;
   bool get hasPrices => hasNormalPrice || hasFoilPrice;
 
   double? get lowestPrice => [
-        if (normal.price != null) normal.price,
-        if (foil.price != null) foil.price,
+        if (normal.low != null) normal.low,
+        if (foil.low != null) foil.low,
       ].reduce((a, b) => a! < b! ? a : b);
 
   // Comparison methods
@@ -67,15 +67,15 @@ class HistoricalPrice with _$HistoricalPrice {
   ) {
     if (current == null || previous == null) return null;
 
-    final currentNormal = current.normal.price;
-    final previousNormal = previous.normal.price;
+    final currentNormal = current.normal.low;
+    final previousNormal = previous.normal.low;
 
     if (currentNormal != null && previousNormal != null) {
       return ((currentNormal - previousNormal) / previousNormal) * 100;
     }
 
-    final currentFoil = current.foil.price;
-    final previousFoil = previous.foil.price;
+    final currentFoil = current.foil.low;
+    final previousFoil = previous.foil.low;
 
     if (currentFoil != null && previousFoil != null) {
       return ((currentFoil - previousFoil) / previousFoil) * 100;
@@ -90,8 +90,7 @@ class HistoricalPriceData with _$HistoricalPriceData {
   const HistoricalPriceData._();
 
   const factory HistoricalPriceData({
-    double? price,
-    int? quantity,
+    double? low,
   }) = _HistoricalPriceData;
 
   factory HistoricalPriceData.fromJson(Map<String, dynamic> json) =>
@@ -99,34 +98,23 @@ class HistoricalPriceData with _$HistoricalPriceData {
 
   factory HistoricalPriceData.fromFirestore(Map<String, dynamic> data) {
     return HistoricalPriceData(
-      price: (data['price'] as num?)?.toDouble(),
-      quantity: data['quantity'] as int?,
+      low: (data['low'] as num?)?.toDouble(),
     );
   }
 
   Map<String, dynamic> toFirestore() {
     return {
-      if (price != null) 'price': price,
-      if (quantity != null) 'quantity': quantity,
+      if (low != null) 'low': low,
     };
   }
 
   // Helper methods
-  bool get hasData => price != null && quantity != null;
-  bool get hasPrice => price != null;
-  bool get hasQuantity => quantity != null;
+  bool get hasPrice => low != null;
 
   // Price analysis
   static double? calculateAveragePrice(List<HistoricalPriceData> data) {
-    final prices = data.where((d) => d.price != null).map((d) => d.price!);
+    final prices = data.where((d) => d.low != null).map((d) => d.low!);
     if (prices.isEmpty) return null;
     return prices.reduce((a, b) => a + b) / prices.length;
-  }
-
-  static int? calculateTotalQuantity(List<HistoricalPriceData> data) {
-    final quantities =
-        data.where((d) => d.quantity != null).map((d) => d.quantity!);
-    if (quantities.isEmpty) return null;
-    return quantities.reduce((a, b) => a + b);
   }
 }
