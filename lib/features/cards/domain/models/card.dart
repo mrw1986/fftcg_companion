@@ -1,6 +1,7 @@
 // lib/features/cards/domain/models/card.dart
 
 import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:fftcg_companion/core/utils/soundex.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -30,14 +31,24 @@ class Card with _$Card {
     String? number,
     int? power,
     String? rarity,
+    @Default([]) List<String> cardNumbers,
+    @Default([]) List<String> searchTerms,
   }) = _Card;
 
   factory Card.fromJson(Map<String, dynamic> json) => _$CardFromJson(json);
 
   factory Card.fromFirestore(Map<String, dynamic> data) {
+    final name = data['name'] as String? ?? '';
+    final number = data['number'] as String?;
+    final cardNumbers =
+        (data['cardNumbers'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    // Get search terms array
+    final searchTerms =
+        (data['searchTerms'] as List?)?.map((e) => e.toString()).toList() ?? [];
+
     return Card(
       productId: data['productId'] as int? ?? 0,
-      name: data['name'] as String? ?? '',
+      name: name,
       cleanName: data['cleanName'] as String? ?? '',
       fullResUrl: data['fullResUrl'] as String? ?? '',
       highResUrl: data['highResUrl'] as String? ?? '',
@@ -54,33 +65,43 @@ class Card with _$Card {
       elements:
           (data['elements'] as List?)?.map((e) => e.toString()).toList() ?? [],
       job: data['job'] as String?,
-      number: data['number'] as String?,
+      number: number,
       power: data['power'] as int?,
       rarity: data['rarity'] as String?,
+      cardNumbers: cardNumbers,
+      searchTerms: searchTerms,
     );
   }
 
   Map<String, dynamic> toFirestore() {
-    return {
+    final Map<String, dynamic> data = {
       'productId': productId,
       'name': name,
       'cleanName': cleanName,
       'fullResUrl': fullResUrl,
       'highResUrl': highResUrl,
       'lowResUrl': lowResUrl,
-      if (lastUpdated != null) 'lastUpdated': Timestamp.fromDate(lastUpdated!),
       'groupId': groupId,
       'isNonCard': isNonCard,
-      if (cardType != null) 'cardType': cardType,
-      if (category != null) 'category': category,
-      if (cost != null) 'cost': cost,
-      if (description != null) 'description': description,
       'elements': elements,
-      if (job != null) 'job': job,
-      if (number != null) 'number': number,
-      if (power != null) 'power': power,
-      if (rarity != null) 'rarity': rarity,
+      'cardNumbers': cardNumbers,
+      'searchTerms': searchTerms,
     };
+
+    // Add optional fields
+    if (lastUpdated != null) {
+      data['lastUpdated'] = Timestamp.fromDate(lastUpdated!);
+    }
+    if (cardType != null) data['cardType'] = cardType;
+    if (category != null) data['category'] = category;
+    if (cost != null) data['cost'] = cost;
+    if (description != null) data['description'] = description;
+    if (job != null) data['job'] = job;
+    if (number != null) data['number'] = number;
+    if (power != null) data['power'] = power;
+    if (rarity != null) data['rarity'] = rarity;
+
+    return data;
   }
 
   // Helper methods for card properties
@@ -149,36 +170,9 @@ class Card with _$Card {
   // Search helpers
   bool matchesSearchTerm(String term) {
     final searchTerm = term.toLowerCase().trim();
-    return name.toLowerCase().contains(searchTerm) ||
-        cleanName.toLowerCase().contains(searchTerm) ||
-        (displayNumber?.toLowerCase().contains(searchTerm) ?? false) ||
-        (description?.toLowerCase().contains(searchTerm) ?? false);
-  }
-
-  bool matchesElement(String element) {
-    return elements.any((e) => e.toLowerCase() == element.toLowerCase());
-  }
-
-  bool matchesType(String type) {
-    return cardType?.toLowerCase() == type.toLowerCase();
-  }
-
-  bool matchesRarity(String rarityToMatch) {
-    return rarity?.toLowerCase() == rarityToMatch.toLowerCase();
-  }
-
-  bool matchesCostRange(int? minCost, int? maxCost) {
-    if (cost == null) return false;
-    if (minCost != null && cost! < minCost) return false;
-    if (maxCost != null && cost! > maxCost) return false;
-    return true;
-  }
-
-  bool matchesPowerRange(int? minPower, int? maxPower) {
-    if (power == null) return false;
-    if (minPower != null && power! < minPower) return false;
-    if (maxPower != null && power! > maxPower) return false;
-    return true;
+    return searchTerms.contains(searchTerm) ||
+        searchTerms.any((token) => token.startsWith(searchTerm)) ||
+        searchTerms.contains(SoundexUtil.generate(searchTerm));
   }
 
   // URL helpers

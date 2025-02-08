@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/core/services/firestore_provider.dart';
 import 'package:fftcg_companion/features/models.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:fftcg_companion/core/utils/soundex.dart';
 
 part 'card_repository.g.dart';
 
@@ -20,7 +21,6 @@ class CardRepository extends _$CardRepository {
     await _initializeBoxes();
     _setupCleanupTimer();
 
-    // Add a ref listener to handle disposal
     ref.onDispose(() {
       _cleanupTimer?.cancel();
       _cardBox?.close();
@@ -50,44 +50,57 @@ class CardRepository extends _$CardRepository {
     );
   }
 
-  String _generateCacheKey({
-    required int limit,
-    String? startAfterId,
-    CardFilters? filters,
-  }) {
-    if (filters == null) {
-      return 'l$limit${startAfterId != null ? '-s$startAfterId' : ''}';
+  Future<List<Card>> searchCards(String searchTerm) async {
+    try {
+      final firestoreService = ref.read(firestoreServiceProvider);
+      final normalizedQuery = searchTerm.toLowerCase().trim();
+
+      if (normalizedQuery.isEmpty) {
+        return [];
+      }
+
+      // Generate search terms
+      final searchTerms = <String>{normalizedQuery};
+
+      // Add progressive substrings for prefix search
+      for (int i = 1; i < normalizedQuery.length; i++) {
+        searchTerms.add(normalizedQuery.substring(0, i));
+      }
+
+      // Add soundex term
+      searchTerms.add(SoundexUtil.generate(normalizedQuery));
+
+      // Search using arrayContainsAny
+      final snapshot = await firestoreService.cardsCollection
+          .where('searchTerms', arrayContainsAny: searchTerms.toList())
+          .limit(50)
+          .get();
+
+      final cards =
+          snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
+
+      // Sort by relevance
+      cards.sort((a, b) {
+        int getRelevance(Card card) {
+          final name = card.name.toLowerCase();
+          // Exact match gets highest priority
+          if (name == normalizedQuery) return 4;
+          // Starts with gets second priority
+          if (name.startsWith(normalizedQuery)) return 3;
+          // Contains gets third priority
+          if (name.contains(normalizedQuery)) return 2;
+          // Soundex match gets lowest priority
+          return 1;
+        }
+
+        return getRelevance(b).compareTo(getRelevance(a));
+      });
+
+      return cards;
+    } catch (e, stack) {
+      talker.error('Error searching cards', e, stack);
+      rethrow;
     }
-
-    // Create compact filter string
-    final parts = <String>[];
-
-    // Add basic filters with short prefixes
-    if (filters.elements.isNotEmpty) parts.add('e${filters.elements.length}');
-    if (filters.types.isNotEmpty) parts.add('t${filters.types.length}');
-    if (filters.sets.isNotEmpty) parts.add('s${filters.sets.length}');
-    if (filters.rarities.isNotEmpty) parts.add('r${filters.rarities.length}');
-
-    // Add range filters if present
-    if (filters.minCost != null) parts.add('c>${filters.minCost}');
-    if (filters.maxCost != null) parts.add('c<${filters.maxCost}');
-    if (filters.minPower != null) parts.add('p>${filters.minPower}');
-    if (filters.maxPower != null) parts.add('p<${filters.maxPower}');
-
-    // Add boolean flags
-    if (filters.isNormalOnly == true) parts.add('n');
-    if (filters.isFoilOnly == true) parts.add('f');
-    if (!filters.showSealedProducts) parts.add('ns');
-
-    // Add sort info if present
-    if (filters.sortField?.isNotEmpty == true) {
-      parts.add(
-          'o${filters.sortField![0]}${filters.sortDescending ? 'd' : 'a'}');
-    }
-
-    // Combine everything into a compact key
-    final filterStr = parts.isEmpty ? '' : '-${parts.join('')}';
-    return 'l$limit${startAfterId != null ? '-s$startAfterId' : ''}$filterStr';
   }
 
   Future<List<Card>> getCards({
@@ -148,6 +161,40 @@ class CardRepository extends _$CardRepository {
     }
   }
 
+  String _generateCacheKey({
+    required int limit,
+    String? startAfterId,
+    CardFilters? filters,
+  }) {
+    if (filters == null) {
+      return 'l$limit${startAfterId != null ? '-s$startAfterId' : ''}';
+    }
+
+    final parts = <String>[];
+
+    if (filters.elements.isNotEmpty) parts.add('e${filters.elements.length}');
+    if (filters.types.isNotEmpty) parts.add('t${filters.types.length}');
+    if (filters.sets.isNotEmpty) parts.add('s${filters.sets.length}');
+    if (filters.rarities.isNotEmpty) parts.add('r${filters.rarities.length}');
+
+    if (filters.minCost != null) parts.add('c>${filters.minCost}');
+    if (filters.maxCost != null) parts.add('c<${filters.maxCost}');
+    if (filters.minPower != null) parts.add('p>${filters.minPower}');
+    if (filters.maxPower != null) parts.add('p<${filters.maxPower}');
+
+    if (filters.isNormalOnly == true) parts.add('n');
+    if (filters.isFoilOnly == true) parts.add('f');
+    if (!filters.showSealedProducts) parts.add('ns');
+
+    if (filters.sortField?.isNotEmpty == true) {
+      parts.add(
+          'o${filters.sortField![0]}${filters.sortDescending ? 'd' : 'a'}');
+    }
+
+    final filterStr = parts.isEmpty ? '' : '-${parts.join('')}';
+    return 'l$limit${startAfterId != null ? '-s$startAfterId' : ''}$filterStr';
+  }
+
   Future<List<Card>> getFilteredCards(CardFilters filters) async {
     try {
       final firestoreService = ref.read(firestoreServiceProvider);
@@ -158,16 +205,13 @@ class CardRepository extends _$CardRepository {
       var cards =
           snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
 
-      // Apply sorting after fetching
       if (filters.sortField != null) {
         cards.sort((a, b) {
-          // Handle number sorting specially
           if (filters.sortField == 'number') {
             final comparison = a.compareByNumber(b);
             return filters.sortDescending ? -comparison : comparison;
           }
 
-          // Handle other sort fields
           switch (filters.sortField) {
             case 'name':
               final comparison = a.compareByName(b);
@@ -191,25 +235,6 @@ class CardRepository extends _$CardRepository {
     }
   }
 
-  Future<List<Card>> searchCards(String searchTerm) async {
-    try {
-      final firestoreService = ref.read(firestoreServiceProvider);
-      final normalizedQuery = searchTerm.toLowerCase().trim();
-
-      final snapshot = await firestoreService.cardsCollection
-          .where('cleanName', isGreaterThanOrEqualTo: normalizedQuery)
-          .where('cleanName', isLessThan: '${normalizedQuery}z')
-          .get();
-
-      return snapshot.docs
-          .map((doc) => Card.fromFirestore(doc.data()))
-          .toList();
-    } catch (e, stack) {
-      talker.error('Error searching cards', e, stack);
-      rethrow;
-    }
-  }
-
   Future<List<Card>?> _getFromCache(String key) async {
     if (_queryCache == null) return null;
 
@@ -225,8 +250,21 @@ class CardRepository extends _$CardRepository {
 
     try {
       final cardsList = (cached['cards'] as List).map((item) {
-        // Convert Map<dynamic, dynamic> to Map<String, dynamic>
-        final jsonMap = Map<String, dynamic>.from(item as Map);
+        // Convert the raw map to ensure proper types for nested maps
+        final Map<String, dynamic> jsonMap = {};
+        (item as Map).forEach((key, value) {
+          if (key == 'searchName' || key == 'searchNumber') {
+            // Convert nested maps to proper Map<String, num>
+            final Map<String, num> convertedMap = {};
+            (value as Map).forEach((k, v) {
+              convertedMap[k.toString()] =
+                  (v is num) ? v : num.parse(v.toString());
+            });
+            jsonMap[key.toString()] = convertedMap;
+          } else {
+            jsonMap[key.toString()] = value;
+          }
+        });
         return Card.fromJson(jsonMap);
       }).toList();
       return cardsList;
@@ -269,9 +307,6 @@ class CardRepository extends _$CardRepository {
     Query<Map<String, dynamic>> query,
     CardFilters filters,
   ) {
-    // Always filter out non-cards when:
-    // 1. showSealedProducts is false, or
-    // 2. Sorting by number, cost, or power (these don't apply to sealed products)
     if (!filters.showSealedProducts ||
         filters.sortField == 'number' ||
         filters.sortField == 'cost' ||

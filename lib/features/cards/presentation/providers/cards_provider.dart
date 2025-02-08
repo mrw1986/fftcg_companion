@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
@@ -139,12 +140,41 @@ class CardsNotifier extends _$CardsNotifier {
   }
 }
 
+final _searchCache = <String, List<models.Card>>{};
+Timer? _searchDebounceTimer;
+
 @riverpod
 Future<List<models.Card>> cardSearch(ref, String query) async {
-  if (query.isEmpty) return [];
+  if (query.length < 2) return [];
+
+  // Check cache first
+  if (_searchCache.containsKey(query)) {
+    return _searchCache[query]!;
+  }
+
+  // Cancel previous timer and create new debounced search
+  _searchDebounceTimer?.cancel();
+  await Future.delayed(const Duration(milliseconds: 300));
 
   try {
-    return await ref.read(cardRepositoryProvider.notifier).searchCards(query);
+    final results =
+        await ref.read(cardRepositoryProvider.notifier).searchCards(query);
+
+    // Cache the results
+    if (results.isNotEmpty) {
+      _searchCache[query] = results;
+
+      // Clear old cache entries if cache gets too large
+      if (_searchCache.length > 50) {
+        final oldestKeys =
+            _searchCache.keys.take(_searchCache.length - 50).toList();
+        for (final key in oldestKeys) {
+          _searchCache.remove(key);
+        }
+      }
+    }
+
+    return results;
   } catch (error, stack) {
     talker.error('Error searching cards', error, stack);
     return [];
