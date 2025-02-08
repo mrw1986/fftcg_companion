@@ -62,13 +62,15 @@ class CardRepository extends _$CardRepository {
       // Generate search terms
       final searchTerms = <String>{normalizedQuery};
 
-      // Add progressive substrings for prefix search
-      for (int i = 1; i < normalizedQuery.length; i++) {
-        searchTerms.add(normalizedQuery.substring(0, i));
+      // Only add progressive substrings and soundex for longer queries
+      if (normalizedQuery.length > 3) {
+        // Add progressive substrings for prefix search
+        for (int i = 3; i < normalizedQuery.length; i++) {
+          searchTerms.add(normalizedQuery.substring(0, i));
+        }
+        // Add soundex term for longer queries
+        searchTerms.add(SoundexUtil.generate(normalizedQuery));
       }
-
-      // Add soundex term
-      searchTerms.add(SoundexUtil.generate(normalizedQuery));
 
       // Search using arrayContainsAny
       final snapshot = await firestoreService.cardsCollection
@@ -79,21 +81,54 @@ class CardRepository extends _$CardRepository {
       final cards =
           snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
 
-      // Sort by relevance
+      // Enhanced relevance sorting
       cards.sort((a, b) {
         int getRelevance(Card card) {
           final name = card.name.toLowerCase();
           // Exact match gets highest priority
-          if (name == normalizedQuery) return 4;
-          // Starts with gets second priority
-          if (name.startsWith(normalizedQuery)) return 3;
-          // Contains gets third priority
-          if (name.contains(normalizedQuery)) return 2;
-          // Soundex match gets lowest priority
-          return 1;
+          if (name == normalizedQuery) return 5;
+          // Starts with query term gets high priority
+          if (name.startsWith(normalizedQuery)) return 4;
+          // Contains full query term gets medium priority
+          if (name.contains(normalizedQuery)) return 3;
+          // For longer queries (>3 chars), give some priority to partial matches
+          if (normalizedQuery.length > 3) {
+            // Partial match at word boundary gets low priority
+            if (name.split(' ').any((word) => word.startsWith(normalizedQuery)))
+              return 2;
+            // Soundex match gets lowest priority
+            if (SoundexUtil.generate(name) ==
+                SoundexUtil.generate(normalizedQuery)) return 1;
+          }
+          // No relevant match
+          return 0;
         }
 
-        return getRelevance(b).compareTo(getRelevance(a));
+        final relevanceA = getRelevance(a);
+        final relevanceB = getRelevance(b);
+
+        // Filter out completely irrelevant matches
+        if (normalizedQuery.length <= 3) {
+          // For short queries, only keep exact matches or starts-with matches
+          if (relevanceA < 4 && relevanceB < 4) return 0;
+        } else {
+          // For longer queries, filter out anything below partial word boundary matches
+          if (relevanceA < 2 && relevanceB < 2) return 0;
+        }
+
+        return relevanceB.compareTo(relevanceA);
+      });
+
+      // Remove cards with 0 relevance
+      cards.removeWhere((card) {
+        final name = card.name.toLowerCase();
+        if (normalizedQuery.length <= 3) {
+          // For short queries, must exactly match or start with query
+          return !name.startsWith(normalizedQuery);
+        }
+        // For longer queries, must at least partially match at word boundaries
+        return !name.contains(normalizedQuery) &&
+            !name.split(' ').any((word) => word.startsWith(normalizedQuery));
       });
 
       return cards;
