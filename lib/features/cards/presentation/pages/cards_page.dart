@@ -95,33 +95,59 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.read(cardsNotifierProvider.notifier).refresh(),
-        child: cards.when(
-          data: (cardList) {
-            final displayedCards = searchResults?.value ?? cardList;
+        child: _isSearching
+            ? searchResults?.when(
+                  data: (searchedCards) {
+                    if (searchedCards.isEmpty) {
+                      return const Center(
+                        child: Text('No cards found'),
+                      );
+                    }
+                    return CustomScrollView(
+                      controller: _scrollController,
+                      slivers: [
+                        viewPrefs.type == ViewType.grid
+                            ? _buildSliverGrid(searchedCards, viewPrefs)
+                            : _buildSliverList(
+                                searchedCards, viewPrefs.listSize),
+                      ],
+                    );
+                  },
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                  error: (error, stack) => ErrorView(
+                    message: error.toString(),
+                    onRetry: () =>
+                        ref.refresh(cardSearchProvider(searchController.text)),
+                  ),
+                ) ??
+                const Center(child: CircularProgressIndicator())
+            : cards.when(
+                data: (cardList) {
+                  if (cardList.isEmpty) {
+                    return const Center(
+                      child: Text('No cards found'),
+                    );
+                  }
 
-            if (displayedCards.isEmpty) {
-              return const Center(
-                child: Text('No cards found'),
-              );
-            }
-
-            return CustomScrollView(
-              controller: _scrollController,
-              slivers: [
-                viewPrefs.type == ViewType.grid
-                    ? _buildSliverGrid(displayedCards, viewPrefs)
-                    : _buildSliverList(displayedCards, viewPrefs.listSize),
-              ],
-            );
-          },
-          loading: () => const Center(
-            child: CircularProgressIndicator(),
-          ),
-          error: (error, stack) => ErrorView(
-            message: error.toString(),
-            onRetry: () => ref.refresh(cardsNotifierProvider),
-          ),
-        ),
+                  return CustomScrollView(
+                    controller: _scrollController,
+                    slivers: [
+                      viewPrefs.type == ViewType.grid
+                          ? _buildSliverGrid(cardList, viewPrefs)
+                          : _buildSliverList(cardList, viewPrefs.listSize),
+                    ],
+                  );
+                },
+                loading: () => const Center(
+                  child: CircularProgressIndicator(),
+                ),
+                error: (error, stack) => ErrorView(
+                  message: error.toString(),
+                  onRetry: () => ref.refresh(cardsNotifierProvider),
+                ),
+              ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showSortBottomSheet(context),

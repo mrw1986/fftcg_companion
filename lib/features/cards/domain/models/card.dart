@@ -33,6 +33,7 @@ class Card with _$Card {
     String? rarity,
     @Default([]) List<String> cardNumbers,
     @Default([]) List<String> searchTerms,
+    @Default([]) List<String> set,
   }) = _Card;
 
   factory Card.fromJson(Map<String, dynamic> json) => _$CardFromJson(json);
@@ -70,6 +71,7 @@ class Card with _$Card {
       rarity: data['rarity'] as String?,
       cardNumbers: cardNumbers,
       searchTerms: searchTerms,
+      set: (data['set'] as List?)?.map((e) => e.toString()).toList() ?? [],
     );
   }
 
@@ -86,6 +88,7 @@ class Card with _$Card {
       'elements': elements,
       'cardNumbers': cardNumbers,
       'searchTerms': searchTerms,
+      'set': set,
     };
 
     // Add optional fields
@@ -135,17 +138,36 @@ class Card with _$Card {
     final thisNum = number ?? '';
     final otherNum = other.number ?? '';
 
-    // Extract numeric parts for comparison
-    final thisMatch = RegExp(r'(\d+)').firstMatch(thisNum);
-    final otherMatch = RegExp(r'(\d+)').firstMatch(otherNum);
+    // Split numbers into parts (e.g., "2-017R" -> ["2", "017"])
+    final thisParts = thisNum.split('-');
+    final otherParts = otherNum.split('-');
 
-    if (thisMatch != null && otherMatch != null) {
-      final thisNumeric = int.parse(thisMatch.group(1)!);
-      final otherNumeric = int.parse(otherMatch.group(1)!);
-      return thisNumeric.compareTo(otherNumeric);
+    // Compare first number (set number)
+    if (thisParts.isNotEmpty && otherParts.isNotEmpty) {
+      final thisSetNum = int.tryParse(
+              RegExp(r'(\d+)').firstMatch(thisParts[0])?.group(1) ?? '') ??
+          0;
+      final otherSetNum = int.tryParse(
+              RegExp(r'(\d+)').firstMatch(otherParts[0])?.group(1) ?? '') ??
+          0;
+
+      if (thisSetNum != otherSetNum) {
+        return thisSetNum.compareTo(otherSetNum);
+      }
+
+      // If set numbers are equal and there's a second part, compare card numbers
+      if (thisParts.length > 1 && otherParts.length > 1) {
+        final thisCardNum = int.tryParse(
+                RegExp(r'(\d+)').firstMatch(thisParts[1])?.group(1) ?? '') ??
+            0;
+        final otherCardNum = int.tryParse(
+                RegExp(r'(\d+)').firstMatch(otherParts[1])?.group(1) ?? '') ??
+            0;
+        return thisCardNum.compareTo(otherCardNum);
+      }
     }
 
-    // Fall back to string comparison if no numbers found
+    // Fall back to string comparison if parsing fails
     return thisNum.compareTo(otherNum);
   }
 
@@ -157,7 +179,12 @@ class Card with _$Card {
   }
 
   int compareByName(Card other) {
-    return cleanName.compareTo(other.cleanName);
+    // First compare by name
+    final nameComparison = cleanName.compareTo(other.cleanName);
+    if (nameComparison != 0) return nameComparison;
+
+    // If names are equal, compare by card number
+    return compareByNumber(other);
   }
 
   int compareByPower(Card other) {

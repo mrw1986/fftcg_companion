@@ -142,6 +142,7 @@ class CardsNotifier extends _$CardsNotifier {
 
 final _searchCache = <String, List<models.Card>>{};
 Timer? _searchDebounceTimer;
+Object? _searchDebounceKey;
 
 @riverpod
 Future<List<models.Card>> cardSearch(ref, String query) async {
@@ -152,13 +153,30 @@ Future<List<models.Card>> cardSearch(ref, String query) async {
     return _searchCache[query]!;
   }
 
-  // Cancel previous timer and create new debounced search
+  // Create a unique key for this search request
+  final searchKey = Object();
+  ref.keepAlive();
+
+  // Set this as the current search request
+  _searchDebounceKey = searchKey;
+
+  // Debounce the search
   _searchDebounceTimer?.cancel();
   await Future.delayed(const Duration(milliseconds: 300));
+
+  // If this is no longer the current search request, cancel it
+  if (searchKey != _searchDebounceKey) {
+    return [];
+  }
 
   try {
     final results =
         await ref.read(cardRepositoryProvider.notifier).searchCards(query);
+
+    // If this is no longer the current search request, cancel it
+    if (searchKey != _searchDebounceKey) {
+      return [];
+    }
 
     // Cache the results
     if (results.isNotEmpty) {

@@ -5,7 +5,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/core/services/firestore_provider.dart';
 import 'package:fftcg_companion/features/models.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
-import 'package:fftcg_companion/core/utils/soundex.dart';
 
 part 'card_repository.g.dart';
 
@@ -62,20 +61,51 @@ class CardRepository extends _$CardRepository {
       // Generate search terms
       final searchTerms = <String>{normalizedQuery};
 
-      // Add cleaned number format if query looks like a card number
+      // Handle number formats
       if (normalizedQuery.contains('-') ||
           RegExp(r'[0-9]').hasMatch(normalizedQuery)) {
-        searchTerms.add(normalizedQuery.replaceAll(RegExp(r'[^a-z0-9]'), ''));
+        // Add original number format
+        searchTerms.add(normalizedQuery);
+
+        // If query contains hyphen (e.g., "1-001H" or "20-040L")
+        if (normalizedQuery.contains('-')) {
+          final parts = normalizedQuery.split('-');
+          if (parts.length == 2) {
+            final prefix = parts[0];
+            final suffix = parts[1];
+
+            // Add set number variations (e.g., "1", "20")
+            if (prefix.isNotEmpty) {
+              searchTerms.add(prefix);
+              searchTerms.add('$prefix-');
+            }
+
+            // Add progressive card number variations
+            if (prefix.isNotEmpty && suffix.isNotEmpty) {
+              for (int i = 1; i <= suffix.length; i++) {
+                searchTerms.add('$prefix-${suffix.substring(0, i)}');
+              }
+            }
+          }
+        }
+        // If it's just a number (potential set number), add variations
+        else if (RegExp(r'^\d+$').hasMatch(normalizedQuery)) {
+          searchTerms.add('$normalizedQuery-');
+        }
+
+        // We no longer need progressive substrings of the cleaned number
+        // as we already have proper variations with hyphens
       }
 
-      // Only add progressive substrings and soundex for longer queries
-      if (normalizedQuery.length > 3) {
+      // Only add progressive substrings and soundex for longer name-based queries
+      if (normalizedQuery.length > 3 &&
+          !normalizedQuery.contains('-') &&
+          !RegExp(r'[0-9]').hasMatch(normalizedQuery)) {
         // Add progressive substrings for prefix search
         for (int i = 3; i < normalizedQuery.length; i++) {
           searchTerms.add(normalizedQuery.substring(0, i));
         }
-        // Add soundex term for longer queries
-        searchTerms.add(SoundexUtil.generate(normalizedQuery));
+        // We no longer use soundex codes
       }
 
       // Search using arrayContainsAny
@@ -119,9 +149,8 @@ class CardRepository extends _$CardRepository {
           if (number.contains(normalizedQuery) ||
               cardNumbers.any((n) => n.contains(normalizedQuery))) return 2;
 
-          // Soundex match gets lowest priority
-          if (SoundexUtil.generate(name) ==
-              SoundexUtil.generate(normalizedQuery)) return 1;
+          // We no longer use soundex matching
+          return 0;
         }
 
         // No relevant match
@@ -133,8 +162,14 @@ class CardRepository extends _$CardRepository {
         final relevanceA = getRelevance(a);
         final relevanceB = getRelevance(b);
 
-        // If both have same relevance, sort alphabetically
+        // If both have same relevance, sort based on query type
         if (relevanceA == relevanceB) {
+          // If query looks like a card number, sort by number
+          if (normalizedQuery.contains('-') ||
+              RegExp(r'[0-9]').hasMatch(normalizedQuery)) {
+            return a.compareByNumber(b);
+          }
+          // Otherwise sort alphabetically by name
           return a.name.toLowerCase().compareTo(b.name.toLowerCase());
         }
         // Otherwise sort by relevance

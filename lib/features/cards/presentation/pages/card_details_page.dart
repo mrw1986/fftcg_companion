@@ -202,8 +202,8 @@ class CardDetailsPage extends StatelessWidget {
             if (card.category != null)
               _buildInfoRow('Category', card.category!, textTheme),
             // Set
-            if (card.groupId != 0)
-              _buildInfoRow('Set', card.groupId.toString(), textTheme),
+            if (card.set.isNotEmpty)
+              _buildInfoRow('Set', card.set.join(', '), textTheme),
             // Description (if exists)
             if (card.description != null) ...[
               const Divider(height: 24),
