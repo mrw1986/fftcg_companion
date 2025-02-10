@@ -94,11 +94,16 @@ class CardRepository extends _$CardRepository {
           // For longer queries (>3 chars), give some priority to partial matches
           if (normalizedQuery.length > 3) {
             // Partial match at word boundary gets low priority
-            if (name.split(' ').any((word) => word.startsWith(normalizedQuery)))
+            if (name
+                .split(' ')
+                .any((word) => word.startsWith(normalizedQuery))) {
               return 2;
+            }
             // Soundex match gets lowest priority
             if (SoundexUtil.generate(name) ==
-                SoundexUtil.generate(normalizedQuery)) return 1;
+                SoundexUtil.generate(normalizedQuery)) {
+              return 1;
+            }
           }
           // No relevant match
           return 0;
