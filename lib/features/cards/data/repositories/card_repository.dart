@@ -62,6 +62,12 @@ class CardRepository extends _$CardRepository {
       // Generate search terms
       final searchTerms = <String>{normalizedQuery};
 
+      // Add cleaned number format if query looks like a card number
+      if (normalizedQuery.contains('-') ||
+          RegExp(r'[0-9]').hasMatch(normalizedQuery)) {
+        searchTerms.add(normalizedQuery.replaceAll(RegExp(r'[^a-z0-9]'), ''));
+      }
+
       // Only add progressive substrings and soundex for longer queries
       if (normalizedQuery.length > 3) {
         // Add progressive substrings for prefix search
@@ -81,59 +87,79 @@ class CardRepository extends _$CardRepository {
       final cards =
           snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
 
-      // Enhanced relevance sorting
-      cards.sort((a, b) {
-        int getRelevance(Card card) {
-          final name = card.name.toLowerCase();
-          // Exact match gets highest priority
-          if (name == normalizedQuery) return 5;
-          // Starts with query term gets high priority
-          if (name.startsWith(normalizedQuery)) return 4;
-          // Contains full query term gets medium priority
-          if (name.contains(normalizedQuery)) return 3;
-          // For longer queries (>3 chars), give some priority to partial matches
-          if (normalizedQuery.length > 3) {
-            // Partial match at word boundary gets low priority
-            if (name
-                .split(' ')
-                .any((word) => word.startsWith(normalizedQuery))) {
-              return 2;
-            }
-            // Soundex match gets lowest priority
-            if (SoundexUtil.generate(name) ==
-                SoundexUtil.generate(normalizedQuery)) {
-              return 1;
-            }
-          }
-          // No relevant match
-          return 0;
+      // Helper function to calculate relevance score
+      int getRelevance(Card card) {
+        final name = card.name.toLowerCase();
+        final number = card.number?.toLowerCase() ?? '';
+        final cardNumbers =
+            card.cardNumbers.map((n) => n.toLowerCase()).toList();
+
+        // Exact matches get highest priority
+        if (name == normalizedQuery ||
+            number == normalizedQuery ||
+            cardNumbers.contains(normalizedQuery)) return 6;
+
+        // Starts with query term gets high priority
+        if (name.startsWith(normalizedQuery) ||
+            number.startsWith(normalizedQuery) ||
+            cardNumbers.any((n) => n.startsWith(normalizedQuery))) return 5;
+
+        // Contains full query term gets medium-high priority
+        if (name.contains(normalizedQuery) ||
+            number.contains(normalizedQuery) ||
+            cardNumbers.any((n) => n.contains(normalizedQuery))) return 4;
+
+        // For longer queries (>3 chars), give some priority to partial matches
+        if (normalizedQuery.length > 3) {
+          // Partial match at word boundary gets medium priority
+          if (name.split(' ').any((word) => word.startsWith(normalizedQuery)))
+            return 3;
+
+          // Number partial match gets low-medium priority
+          if (number.contains(normalizedQuery) ||
+              cardNumbers.any((n) => n.contains(normalizedQuery))) return 2;
+
+          // Soundex match gets lowest priority
+          if (SoundexUtil.generate(name) ==
+              SoundexUtil.generate(normalizedQuery)) return 1;
         }
 
+        // No relevant match
+        return 0;
+      }
+
+      // Enhanced relevance sorting
+      cards.sort((a, b) {
         final relevanceA = getRelevance(a);
         final relevanceB = getRelevance(b);
 
-        // Filter out completely irrelevant matches
-        if (normalizedQuery.length <= 3) {
-          // For short queries, only keep exact matches or starts-with matches
-          if (relevanceA < 4 && relevanceB < 4) return 0;
-        } else {
-          // For longer queries, filter out anything below partial word boundary matches
-          if (relevanceA < 2 && relevanceB < 2) return 0;
+        // If both have same relevance, sort alphabetically
+        if (relevanceA == relevanceB) {
+          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
         }
-
+        // Otherwise sort by relevance
         return relevanceB.compareTo(relevanceA);
       });
 
       // Remove cards with 0 relevance
       cards.removeWhere((card) {
         final name = card.name.toLowerCase();
+        final number = card.number?.toLowerCase() ?? '';
+        final cardNumbers =
+            card.cardNumbers.map((n) => n.toLowerCase()).toList();
+
         if (normalizedQuery.length <= 3) {
           // For short queries, must exactly match or start with query
-          return !name.startsWith(normalizedQuery);
+          return !name.startsWith(normalizedQuery) &&
+              !number.startsWith(normalizedQuery) &&
+              !cardNumbers.any((n) => n.startsWith(normalizedQuery));
         }
-        // For longer queries, must at least partially match at word boundaries
+
+        // For longer queries, must at least partially match
         return !name.contains(normalizedQuery) &&
-            !name.split(' ').any((word) => word.startsWith(normalizedQuery));
+            !name.split(' ').any((word) => word.startsWith(normalizedQuery)) &&
+            !number.contains(normalizedQuery) &&
+            !cardNumbers.any((n) => n.contains(normalizedQuery));
       });
 
       return cards;
