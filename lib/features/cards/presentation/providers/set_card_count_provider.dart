@@ -12,8 +12,8 @@ Future<int> setCardCount(ref, String setId) async {
       final firestoreService = ref.watch(firestoreServiceProvider);
 
       try {
-        final query = firestoreService.cardsCollection
-            .where('groupId', isEqualTo: int.parse(setId));
+        final query =
+            firestoreService.cardsCollection.where('set', arrayContains: setId);
         final snapshot = await query.count().get();
 
         talker.debug('Got card count for set $setId: ${snapshot.count ?? 0}');

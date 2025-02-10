@@ -142,32 +142,40 @@ class Card with _$Card {
     final thisParts = thisNum.split('-');
     final otherParts = otherNum.split('-');
 
-    // Compare first number (set number)
-    if (thisParts.isNotEmpty && otherParts.isNotEmpty) {
-      final thisSetNum = int.tryParse(
-              RegExp(r'(\d+)').firstMatch(thisParts[0])?.group(1) ?? '') ??
-          0;
-      final otherSetNum = int.tryParse(
-              RegExp(r'(\d+)').firstMatch(otherParts[0])?.group(1) ?? '') ??
-          0;
-
-      if (thisSetNum != otherSetNum) {
-        return thisSetNum.compareTo(otherSetNum);
-      }
-
-      // If set numbers are equal and there's a second part, compare card numbers
-      if (thisParts.length > 1 && otherParts.length > 1) {
-        final thisCardNum = int.tryParse(
-                RegExp(r'(\d+)').firstMatch(thisParts[1])?.group(1) ?? '') ??
-            0;
-        final otherCardNum = int.tryParse(
-                RegExp(r'(\d+)').firstMatch(otherParts[1])?.group(1) ?? '') ??
-            0;
-        return thisCardNum.compareTo(otherCardNum);
-      }
+    if (thisParts.isEmpty || otherParts.isEmpty) {
+      return thisNum.compareTo(otherNum);
     }
 
-    // Fall back to string comparison if parsing fails
+    // Check if first parts are numeric
+    final thisFirstIsNumeric = RegExp(r'^\d+$').hasMatch(thisParts[0]);
+    final otherFirstIsNumeric = RegExp(r'^\d+$').hasMatch(otherParts[0]);
+
+    // If one is numeric and other isn't, numeric comes first
+    if (thisFirstIsNumeric && !otherFirstIsNumeric) return -1;
+    if (!thisFirstIsNumeric && otherFirstIsNumeric) return 1;
+
+    // If both are numeric or both are non-numeric, compare first parts
+    final firstPartComparison = thisParts[0].compareTo(otherParts[0]);
+    if (firstPartComparison != 0) return firstPartComparison;
+
+    // If first parts are equal and there's a second part, compare those
+    if (thisParts.length > 1 && otherParts.length > 1) {
+      // Extract numeric portion from second part
+      final thisSecondNum = int.tryParse(
+              RegExp(r'(\d+)').firstMatch(thisParts[1])?.group(1) ?? '') ??
+          0;
+      final otherSecondNum = int.tryParse(
+              RegExp(r'(\d+)').firstMatch(otherParts[1])?.group(1) ?? '') ??
+          0;
+
+      final secondPartComparison = thisSecondNum.compareTo(otherSecondNum);
+      if (secondPartComparison != 0) return secondPartComparison;
+
+      // If numeric parts are equal, compare full strings
+      return thisParts[1].compareTo(otherParts[1]);
+    }
+
+    // Fall back to string comparison
     return thisNum.compareTo(otherNum);
   }
 
@@ -203,14 +211,16 @@ class Card with _$Card {
   }
 
   // URL helpers
-  String getImageUrl({ImageQuality quality = ImageQuality.high}) {
+  String? getImageUrl({ImageQuality quality = ImageQuality.high}) {
     final url = switch (quality) {
-      ImageQuality.low => lowResUrl,
-      ImageQuality.medium => highResUrl,
-      ImageQuality.high => fullResUrl,
+      ImageQuality.low => lowResUrl.isEmpty ? null : lowResUrl,
+      ImageQuality.medium => highResUrl.isEmpty ? null : highResUrl,
+      ImageQuality.high => fullResUrl.isEmpty ? null : fullResUrl,
     };
 
-    talker.debug('Getting image URL: $url for quality: $quality');
+    if (url != null) {
+      talker.debug('Getting image URL: $url for quality: $quality');
+    }
     return url;
   }
 }

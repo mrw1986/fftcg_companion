@@ -222,10 +222,7 @@ class FilterDialog extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: () {
-                      ref.read(filterProvider.notifier).reset();
-                      Navigator.pop(context);
-                    },
+                    onPressed: () => ref.read(filterProvider.notifier).reset(),
                     child: Text('Reset',
                         style: TextStyle(color: colorScheme.primary)),
                   ),
@@ -465,7 +462,9 @@ class FilterDialog extends ConsumerWidget {
           ),
           min: min,
           max: max,
-          divisions: (max - min).toInt(),
+          divisions: title == 'Power'
+              ? ((max - min) / 1000).toInt()
+              : (max - min).toInt(),
           labels: RangeLabels(
             (currentMin ?? min).toInt().toString(),
             (currentMax ?? max).toInt().toString(),

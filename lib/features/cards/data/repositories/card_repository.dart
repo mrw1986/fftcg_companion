@@ -82,7 +82,6 @@ class CardRepository extends _$CardRepository {
       final firestoreService = ref.read(firestoreServiceProvider);
       final snapshot = await firestoreService.cardsCollection
           .where('searchTerms', arrayContainsAny: searchTerms.toList())
-          .limit(50)
           .get();
 
       final cards =
@@ -185,11 +184,13 @@ class CardRepository extends _$CardRepository {
   }
 
   Future<List<Card>> getCards({
-    int limit = 50,
     String? startAfterId,
     CardFilters? filters,
     bool forceRefresh = false,
   }) async {
+    // Apply default sorting if no filters provided
+    filters = filters ??
+        const CardFilters(sortField: 'number', sortDescending: false);
     try {
       final cache = await ref.read(cardCacheNotifierProvider.future);
 
@@ -204,20 +205,6 @@ class CardRepository extends _$CardRepository {
             filteredCards = _applyLocalFilters(filteredCards, filters);
           }
 
-          // Apply pagination
-          if (startAfterId != null) {
-            final startIndex = filteredCards.indexWhere(
-                (card) => card.productId.toString() == startAfterId);
-            if (startIndex != -1 && startIndex + 1 < filteredCards.length) {
-              filteredCards = filteredCards.sublist(startIndex + 1);
-            }
-          }
-
-          // Apply limit
-          if (filteredCards.length > limit) {
-            filteredCards = filteredCards.sublist(0, limit);
-          }
-
           return filteredCards;
         }
       }
@@ -226,21 +213,39 @@ class CardRepository extends _$CardRepository {
       final firestoreService = ref.read(firestoreServiceProvider);
       Query<Map<String, dynamic>> query = firestoreService.cardsCollection;
 
-      if (filters != null) {
-        query = _applyFilters(query, filters);
+      // Apply non-card filter first
+      if (!filters.showSealedProducts ||
+          filters.sortField == 'number' ||
+          filters.sortField == 'cost' ||
+          filters.sortField == 'power') {
+        query = query.where('isNonCard', isEqualTo: false);
       }
 
-      if (startAfterId != null) {
-        final lastDoc =
-            await firestoreService.cardsCollection.doc(startAfterId).get();
-        if (lastDoc.exists) {
-          query = query.startAfterDocument(lastDoc);
-        }
+      // Due to Firestore limitations with array queries, we'll fetch all cards
+      // and filter locally when array filters are present
+      if (filters.elements.isNotEmpty || filters.sets.isNotEmpty) {
+        final snapshot = await query.get();
+        var cards =
+            snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
+        return _applyLocalFilters(cards, filters);
       }
 
-      final snapshot = await query.limit(limit).get();
-      final cards =
+      // Apply non-array filters in Firestore
+      if (filters.types.isNotEmpty) {
+        query = query.where('cardType', whereIn: filters.types.toList());
+      }
+      if (filters.rarities.isNotEmpty) {
+        query = query.where('rarity', whereIn: filters.rarities.toList());
+      }
+
+      final snapshot = await query.get();
+      var cards =
           snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
+
+      // Apply array filters locally since Firestore has limitations
+      if (filters != null) {
+        cards = _applyLocalFilters(cards, filters);
+      }
 
       // Cache the results
       if (cards.isNotEmpty) {
@@ -265,20 +270,7 @@ class CardRepository extends _$CardRepository {
       }
 
       // Otherwise fetch from Firestore
-      final firestoreService = ref.read(firestoreServiceProvider);
-      Query<Map<String, dynamic>> query = firestoreService.cardsCollection;
-      query = _applyFilters(query, filters);
-
-      final snapshot = await query.get();
-      final cards =
-          snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
-
-      // Cache the results
-      if (cards.isNotEmpty) {
-        await cache.cacheCards(cards);
-      }
-
-      return cards;
+      return getCards(filters: filters);
     } catch (e, stack) {
       talker.error('Error applying filters', e, stack);
       rethrow;
@@ -289,40 +281,49 @@ class CardRepository extends _$CardRepository {
     var filteredCards = cards.where((card) {
       if (!filters.showSealedProducts && card.isNonCard) return false;
 
-      if (filters.elements.isNotEmpty &&
-          !filters.elements.any((e) => card.elements.contains(e))) {
-        return false;
+      // Apply element filter
+      if (filters.elements.isNotEmpty) {
+        if (!card.elements.any((e) => filters.elements.contains(e))) {
+          return false;
+        }
       }
 
-      if (filters.types.isNotEmpty && !filters.types.contains(card.cardType)) {
-        return false;
+      // Apply type filter
+      if (filters.types.isNotEmpty) {
+        if (!filters.types.contains(card.cardType)) {
+          return false;
+        }
       }
 
-      if (filters.sets.isNotEmpty &&
-          !filters.sets.contains(card.groupId.toString())) {
-        return false;
+      // Apply set filter
+      if (filters.sets.isNotEmpty) {
+        if (!card.set.any((s) => filters.sets.contains(s))) {
+          return false;
+        }
       }
 
-      if (filters.rarities.isNotEmpty &&
-          !filters.rarities.contains(card.rarity)) {
-        return false;
+      // Apply rarity filter
+      if (filters.rarities.isNotEmpty) {
+        if (!filters.rarities.contains(card.rarity)) {
+          return false;
+        }
       }
 
+      // Apply cost filter
       if (filters.minCost != null &&
           (card.cost == null || card.cost! < filters.minCost!)) {
         return false;
       }
-
       if (filters.maxCost != null &&
           (card.cost == null || card.cost! > filters.maxCost!)) {
         return false;
       }
 
+      // Apply power filter
       if (filters.minPower != null &&
           (card.power == null || card.power! < filters.minPower!)) {
         return false;
       }
-
       if (filters.maxPower != null &&
           (card.power == null || card.power! > filters.maxPower!)) {
         return false;
@@ -346,44 +347,5 @@ class CardRepository extends _$CardRepository {
     }
 
     return filteredCards;
-  }
-
-  Query<Map<String, dynamic>> _applyFilters(
-    Query<Map<String, dynamic>> query,
-    CardFilters filters,
-  ) {
-    if (!filters.showSealedProducts ||
-        filters.sortField == 'number' ||
-        filters.sortField == 'cost' ||
-        filters.sortField == 'power') {
-      query = query.where('isNonCard', isEqualTo: false);
-    }
-
-    if (filters.elements.isNotEmpty) {
-      query =
-          query.where('elements', arrayContainsAny: filters.elements.toList());
-    }
-    if (filters.types.isNotEmpty) {
-      query = query.where('cardType', whereIn: filters.types.toList());
-    }
-    if (filters.sets.isNotEmpty) {
-      query = query.where('groupId', whereIn: filters.sets.toList());
-    }
-    if (filters.rarities.isNotEmpty) {
-      query = query.where('rarity', whereIn: filters.rarities.toList());
-    }
-    if (filters.minCost != null) {
-      query = query.where('cost', isGreaterThanOrEqualTo: filters.minCost);
-    }
-    if (filters.maxCost != null) {
-      query = query.where('cost', isLessThanOrEqualTo: filters.maxCost);
-    }
-    if (filters.minPower != null) {
-      query = query.where('power', isGreaterThanOrEqualTo: filters.minPower);
-    }
-    if (filters.maxPower != null) {
-      query = query.where('power', isLessThanOrEqualTo: filters.maxPower);
-    }
-    return query;
   }
 }

@@ -37,10 +37,6 @@ class SetInfo with _$SetInfo {
 class FilterOptionsNotifier extends _$FilterOptionsNotifier {
   final Map<String, SetInfo> _setInfo = {};
 
-  static const _opusPattern =
-      r'^(?:OP|Opus\s*)?([0-9]+|(?:X{1,3}|IX|IV|V?I{1,3}))$';
-  final _opusRegex = RegExp(_opusPattern, caseSensitive: false);
-
   @override
   Future<CardFilterOptions> build() async {
     try {
@@ -60,8 +56,8 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
         types: const {'Forward', 'Backup', 'Summon', 'Monster'},
         rarities: const {'C', 'R', 'H', 'L', 'S', 'P'},
         sets: _setInfo.keys.toSet(),
-        costRange: (0, 10),
-        powerRange: (0, 10000),
+        costRange: _costRange,
+        powerRange: _powerRange,
       );
     } catch (e, stack) {
       talker.error('Error building filter options', e, stack);
@@ -86,53 +82,111 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
     }
   }
 
+  (int, int) _costRange = (0, 10);
+  (int, int) _powerRange = (0, 10000);
+
   Future<void> _prefetchSetInfo() async {
     try {
       final firestoreService = ref.read(firestoreServiceProvider);
-      final groupsSnapshot =
-          await firestoreService.groupsCollection.get().timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          talker.warning('Set information fetch timed out, retrying once...');
-          return firestoreService.groupsCollection
-              .get()
-              .timeout(const Duration(seconds: 30));
-        },
-      );
-
-      if (!groupsSnapshot.docs.any((doc) => doc.exists)) {
-        talker.warning('No set information found in Firestore');
+      // Get all cards to determine ranges and sets
+      final snapshot = await firestoreService.cardsCollection.get();
+      if (snapshot.docs.isEmpty) {
+        talker.warning('No cards found in Firestore');
         return;
       }
 
-      for (final doc in groupsSnapshot.docs) {
-        if (!doc.exists) continue;
+      // Find min/max cost and power from all cards
+      int? minCost, maxCost;
+      int? minPower, maxPower;
+      final allSets = <String>{};
 
+      for (final doc in snapshot.docs) {
         final data = doc.data();
-        final setId = doc.id;
 
-        // Use null-safe accessors
-        final name = data['name'] as String? ?? setId;
-        final abbreviation =
-            data['abbreviation'] as String?; // Keep as nullable
-        final publishedOn = data['publishedOn'] as String?;
-        final publishedDate = publishedOn?.isNotEmpty == true
-            ? DateTime.parse(publishedOn!)
-            : DateTime(1900);
+        // Get cost range
+        final cost = data['cost'] as int?;
+        if (cost != null) {
+          minCost = minCost == null
+              ? cost
+              : cost < minCost
+                  ? cost
+                  : minCost;
+          maxCost = maxCost == null
+              ? cost
+              : cost > maxCost
+                  ? cost
+                  : maxCost;
+        }
 
+        // Get power range
+        final power = data['power'] as int?;
+        if (power != null) {
+          minPower = minPower == null
+              ? power
+              : power < minPower
+                  ? power
+                  : minPower;
+          maxPower = maxPower == null
+              ? power
+              : power > maxPower
+                  ? power
+                  : maxPower;
+        }
+
+        // Get sets
+        final cardSets = (data['set'] as List?)?.map((e) => e.toString()) ?? [];
+        allSets.addAll(cardSets);
+      }
+
+      // Update ranges
+      if (minCost != null && maxCost != null) {
+        _costRange = (minCost, maxCost);
+      }
+      if (minPower != null && maxPower != null) {
+        // Round power range to nearest 1000
+        _powerRange = (
+          (minPower / 1000).floor() * 1000,
+          ((maxPower / 1000).ceil() + 1) * 1000
+        );
+      }
+
+      // Sort sets by opus number if possible
+      final sets = allSets.toList()
+        ..sort((a, b) {
+          // Extract opus numbers if they exist
+          final aMatch = RegExp(r'Opus (\w+)').firstMatch(a);
+          final bMatch = RegExp(r'Opus (\w+)').firstMatch(b);
+
+          if (aMatch != null && bMatch != null) {
+            // Both are opus sets, sort by roman numeral
+            return _parseOpusNumber(aMatch.group(1)!)
+                .compareTo(_parseOpusNumber(bMatch.group(1)!));
+          } else if (aMatch != null) {
+            // Only a is opus, put it first
+            return -1;
+          } else if (bMatch != null) {
+            // Only b is opus, put it first
+            return 1;
+          } else {
+            // Neither are opus, sort alphabetically
+            return a.compareTo(b);
+          }
+        });
+
+      for (final setName in sets) {
         final (category, sortOrder) = _categorizeSet(
-          setId: setId,
-          name: name,
-          abbreviation:
-              abbreviation ?? setId, // Provide default for categorization
+          setId: setName,
+          name: setName,
+          abbreviation: setName,
         );
 
-        _setInfo[setId] = SetInfo(
-          id: setId,
-          name: name,
-          abbreviation: abbreviation, // Can now be null
+        _setInfo[setName] = SetInfo(
+          id: setName,
+          name: setName,
+          abbreviation: null,
           category: category,
-          publishedDate: publishedDate,
+          publishedDate:
+              DateTime(1900), // Default date since we don't have this info
           sortOrder: sortOrder,
         );
       }
@@ -147,34 +201,29 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
   (SetCategory, int) _categorizeSet({
     required String setId,
     required String name,
-    required String abbreviation, // Now guaranteed to be non-null
+    required String abbreviation,
   }) {
-    // Check for promotional sets first
-    if (name.contains('Promo') ||
-        abbreviation == 'PR' ||
-        name.contains('Promotional')) {
+    // Check for Opus sets first - this includes both "Opus X" format and just "Opus"
+    if (name.startsWith('Opus')) {
+      final opusMatch = RegExp(r'Opus\s*(\w+)?').firstMatch(name);
+      if (opusMatch != null) {
+        final opusNum = opusMatch.group(1) != null
+            ? _parseOpusNumber(opusMatch.group(1)!)
+            : 0; // For just "Opus"
+        return (SetCategory.opus, 2000 + opusNum);
+      }
+    }
+
+    // Check for promotional sets
+    if (name.toLowerCase().contains('promo') ||
+        name.toLowerCase().contains('promotional')) {
       return (SetCategory.promotional, 1000);
     }
 
-    // Check for Opus sets
-    final opusMatch = _opusRegex.firstMatch(abbreviation);
-    if (opusMatch != null) {
-      final opusNum = _parseOpusNumber(opusMatch.group(1)!);
-      return (SetCategory.opus, 2000 + opusNum);
-    }
-
-    // Handle numeric-only abbreviations
-    if (RegExp(r'^\d+$').hasMatch(abbreviation)) {
-      return (SetCategory.collection, 3000 + int.parse(abbreviation));
-    }
-
     // Collections and special sets
-    if (name.contains('Collection') ||
-        name.contains('Deck') ||
-        name.contains('Starter') ||
-        name.contains('Heroes') ||
-        name.contains('Crystal') ||
-        name.contains('Hidden')) {
+    if (name.toLowerCase().contains('collection') ||
+        name.toLowerCase().contains('deck') ||
+        name.toLowerCase().contains('starter')) {
       return (SetCategory.collection, 3500);
     }
 

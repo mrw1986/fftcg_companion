@@ -18,10 +18,8 @@ class SortingProgress extends _$SortingProgress {
 
 @Riverpod(keepAlive: true)
 class CardsNotifier extends _$CardsNotifier {
-  static const int batchSize = 50;
   CardFilters? _currentFilters;
   final _loadedCards = <models.Card>[];
-  bool _isLoadingMore = false;
 
   @override
   Future<List<models.Card>> build() async {
@@ -40,46 +38,16 @@ class CardsNotifier extends _$CardsNotifier {
   Future<List<models.Card>> _loadInitialBatch() async {
     try {
       final repository = ref.read(cardRepositoryProvider.notifier);
-      var cards = await repository.getCards(
-        limit: batchSize,
-        filters: _currentFilters,
-      );
+      var cards = await repository.getCards(filters: _currentFilters);
 
       _loadedCards.clear();
       _loadedCards.addAll(cards);
 
-      talker.debug('Loaded initial batch of ${cards.length} cards');
+      talker.debug('Loaded ${cards.length} cards');
       return cards;
     } catch (error, stack) {
-      talker.error('Error loading initial batch', error, stack);
+      talker.error('Error loading cards', error, stack);
       rethrow;
-    }
-  }
-
-  Future<void> loadMore() async {
-    if (_isLoadingMore || !state.hasValue) return;
-    if (_loadedCards.isEmpty) return;
-
-    try {
-      _isLoadingMore = true;
-      final repository = ref.read(cardRepositoryProvider.notifier);
-
-      final lastCardId = _loadedCards.last.productId.toString();
-      var newCards = await repository.getCards(
-        limit: batchSize,
-        startAfterId: lastCardId,
-        filters: _currentFilters,
-      );
-
-      if (newCards.isNotEmpty) {
-        _loadedCards.addAll(newCards);
-        state = AsyncValue.data([..._loadedCards]);
-      }
-    } catch (error, stack) {
-      talker.error('Error loading more cards', error, stack);
-      state = AsyncValue.error(error, stack);
-    } finally {
-      _isLoadingMore = false;
     }
   }
 
@@ -128,15 +96,25 @@ class CardsNotifier extends _$CardsNotifier {
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     _loadedCards.clear();
-    _isLoadingMore = false;
 
-    // Reset to default sort (Card Number Ascending)
-    _currentFilters = const CardFilters(
-      sortField: 'number',
-      sortDescending: false,
-    );
+    try {
+      // Reset to default sort (Card Number Ascending)
+      _currentFilters = const CardFilters(
+        sortField: 'number',
+        sortDescending: false,
+      );
 
-    state = await AsyncValue.guard(_loadInitialBatch);
+      final repository = ref.read(cardRepositoryProvider.notifier);
+      final cards = await repository.getCards(filters: _currentFilters);
+
+      _loadedCards.clear();
+      _loadedCards.addAll(cards);
+
+      state = AsyncValue.data(cards);
+    } catch (error, stack) {
+      talker.error('Error refreshing cards', error, stack);
+      state = AsyncValue.error(error, stack);
+    }
   }
 }
 

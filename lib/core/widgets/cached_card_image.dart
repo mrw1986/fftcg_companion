@@ -40,7 +40,7 @@ class CardImageCacheManager {
 }
 
 class CachedCardImage extends StatefulWidget {
-  final String imageUrl;
+  final String? imageUrl;
   final BoxFit fit;
   final double? width;
   final double? height;
@@ -79,7 +79,8 @@ class _CachedCardImageState extends State<CachedCardImage>
   @override
   void initState() {
     super.initState();
-    _isLoaded = CardImageCacheManager.isImageLoaded(widget.imageUrl);
+    _isLoaded = widget.imageUrl != null &&
+        CardImageCacheManager.isImageLoaded(widget.imageUrl!);
   }
 
   @override
@@ -92,7 +93,9 @@ class _CachedCardImageState extends State<CachedCardImage>
 
   Widget _buildNetworkImage(BuildContext context) {
     // Validate URL
-    if (widget.imageUrl.isEmpty || !Uri.parse(widget.imageUrl).hasAuthority) {
+    if (widget.imageUrl == null ||
+        widget.imageUrl!.isEmpty ||
+        !Uri.parse(widget.imageUrl!).hasAuthority) {
       widget.onImageError?.call();
       return widget.errorWidget ?? _buildErrorWidget(context);
     }
@@ -108,12 +111,12 @@ class _CachedCardImageState extends State<CachedCardImage>
           return _buildCachedImage(context);
         }
 
-        final lowQualityUrl = widget.imageUrl.contains('_in_1000x1000.jpg')
-            ? widget.imageUrl.replaceAll('_in_1000x1000.jpg', '_400w.jpg')
-            : widget.imageUrl.replaceAll('.jpg', '_400w.jpg');
+        final lowQualityUrl = widget.imageUrl!.contains('_in_1000x1000.jpg')
+            ? widget.imageUrl!.replaceAll('_in_1000x1000.jpg', '_400w.jpg')
+            : widget.imageUrl!.replaceAll('.jpg', '_400w.jpg');
 
         return CachedNetworkImage(
-          imageUrl: widget.imageUrl,
+          imageUrl: widget.imageUrl!,
           cacheManager: CardImageCacheManager.instance,
           progressIndicatorBuilder: (context, url, progress) {
             return _buildCachedImage(context, imageUrl: lowQualityUrl);
@@ -141,7 +144,9 @@ class _CachedCardImageState extends State<CachedCardImage>
     final targetUrl = imageUrl ?? widget.imageUrl;
 
     // Validate URL
-    if (targetUrl.isEmpty || !Uri.parse(targetUrl).hasAuthority) {
+    if (targetUrl == null ||
+        targetUrl.isEmpty ||
+        !Uri.parse(targetUrl).hasAuthority) {
       widget.onImageError?.call();
       return widget.errorWidget ?? _buildErrorWidget(context);
     }
@@ -294,15 +299,16 @@ class _CachedCardImageState extends State<CachedCardImage>
 }
 
 class CardImageUtils {
-  static Future<bool> isImageCached(String url) async {
-    if (url.isEmpty || !Uri.parse(url).hasAuthority) return false;
+  static Future<bool> isImageCached(String? url) async {
+    if (url == null || url.isEmpty || !Uri.parse(url).hasAuthority)
+      return false;
     final fileKey = Uri.parse(url).pathSegments.lastOrNull ?? url;
     final file = await CardImageCacheManager.instance.getFileFromCache(fileKey);
     return file != null;
   }
 
-  static Future<void> prefetchImage(String url) async {
-    if (url.isEmpty || !Uri.parse(url).hasAuthority) {
+  static Future<void> prefetchImage(String? url) async {
+    if (url == null || url.isEmpty || !Uri.parse(url).hasAuthority) {
       talker.error('Invalid image URL: $url');
       return;
     }

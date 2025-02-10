@@ -25,33 +25,11 @@ class CardsPage extends ConsumerStatefulWidget {
 }
 
 class _CardsPageState extends ConsumerState<CardsPage> {
-  final _scrollController = ScrollController();
-  Timer? _scrollDebounce;
   bool _isSearching = false;
 
   @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-  }
-
-  @override
   void dispose() {
-    _scrollDebounce?.cancel();
-    _scrollController.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    _scrollDebounce?.cancel();
-    _scrollDebounce = Timer(const Duration(milliseconds: 150), () {
-      if (!mounted) return;
-
-      if (_scrollController.position.pixels >=
-          _scrollController.position.maxScrollExtent * 0.8) {
-        ref.read(cardsNotifierProvider.notifier).loadMore();
-      }
-    });
   }
 
   void _showSortBottomSheet(BuildContext context) {
@@ -106,7 +84,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                           );
                         }
                         return CustomScrollView(
-                          controller: _scrollController,
                           slivers: [
                             viewPrefs.type == ViewType.grid
                                 ? _buildSliverGrid(searchedCards, viewPrefs)
@@ -134,7 +111,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                   }
 
                   return CustomScrollView(
-                    controller: _scrollController,
                     slivers: [
                       viewPrefs.type == ViewType.grid
                           ? _buildSliverGrid(cardList, viewPrefs)
