@@ -7,18 +7,30 @@ part 'theme_provider.g.dart';
 
 @Riverpod(keepAlive: true)
 class ThemeModeController extends _$ThemeModeController {
+  static const _boxName = 'settings';
   static const _themeModeKey = 'theme_mode';
+
+  Box? _getBox() {
+    if (!Hive.isBoxOpen(_boxName)) {
+      return null;
+    }
+    return Hive.box(_boxName);
+  }
 
   @override
   ThemeMode build() {
-    final box = Hive.box('settings');
-    final savedMode = box.get(_themeModeKey, defaultValue: 'system');
+    final box = _getBox();
+    final savedMode =
+        box?.get(_themeModeKey, defaultValue: 'system') ?? 'system';
     return _stringToThemeMode(savedMode);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
     try {
-      final box = Hive.box('settings');
+      if (!Hive.isBoxOpen(_boxName)) {
+        await Hive.openBox(_boxName);
+      }
+      final box = Hive.box(_boxName);
       await box.put(_themeModeKey, _themeModeToString(mode));
       talker.debug('Theme mode updated to: ${mode.toString()}');
       state = mode;
@@ -47,27 +59,39 @@ class ThemeModeController extends _$ThemeModeController {
 
 @Riverpod(keepAlive: true)
 class ThemeColorController extends _$ThemeColorController {
+  static const _boxName = 'settings';
   static const _themeColorKey = 'theme_color';
+
+  Box? _getBox() {
+    if (!Hive.isBoxOpen(_boxName)) {
+      return null;
+    }
+    return Hive.box(_boxName);
+  }
 
   @override
   Color build() {
-    final box = Hive.box('settings');
+    final box = _getBox();
     // Default to Material You Purple (0xFF6750A4)
-    final savedColor = box.get(_themeColorKey, defaultValue: 0xFF6750A4);
+    final savedColor =
+        box?.get(_themeColorKey, defaultValue: 0xFF6750A4) ?? 0xFF6750A4;
     return Color(savedColor);
   }
 
   Future<void> setThemeColor(Color color) async {
-    final box = Hive.box('settings');
+    if (!Hive.isBoxOpen(_boxName)) {
+      await Hive.openBox(_boxName);
+    }
+    final box = Hive.box(_boxName);
     await box.put(_themeColorKey, _colorToInt(color));
     state = color;
   }
 
   int _colorToInt(Color color) {
-    final a = (color.a * 255).round();
-    final r = (color.r * 255).round();
-    final g = (color.g * 255).round();
-    final b = (color.b * 255).round();
+    final a = color.a.toInt();
+    final r = color.r.toInt();
+    final g = color.g.toInt();
+    final b = color.b.toInt();
 
     return (a << 24) | (r << 16) | (g << 8) | b;
   }
@@ -75,12 +99,6 @@ class ThemeColorController extends _$ThemeColorController {
 
 extension ColorUtils on Color {
   int toHexArgb() {
-    // Convert double values to integers before bit operations
-    final alphaInt = a.toInt();
-    final redInt = r.toInt();
-    final greenInt = g.toInt();
-    final blueInt = b.toInt();
-
-    return (alphaInt << 24) | (redInt << 16) | (greenInt << 8) | blueInt;
+    return (a.toInt() << 24) | (r.toInt() << 16) | (g.toInt() << 8) | b.toInt();
   }
 }

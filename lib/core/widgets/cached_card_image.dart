@@ -1,5 +1,3 @@
-// lib/core/widgets/cached_card_image.dart
-
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -34,10 +32,8 @@ class CardImageCacheManager {
   }
 
   static void initCache() {
-    PaintingBinding.instance.imageCache.maximumSize = 200; // Increased from 50
+    PaintingBinding.instance.imageCache.maximumSize = 200;
     PaintingBinding.instance.imageCache.maximumSizeBytes = maxMemCacheSize;
-    // Don't clear the cache on init to maintain images across navigation
-    // Only clear animation tracking
     _animatedImages.clear();
     _loadedImages.clear();
   }
@@ -95,6 +91,12 @@ class _CachedCardImageState extends State<CachedCardImage>
   }
 
   Widget _buildNetworkImage(BuildContext context) {
+    // Validate URL
+    if (widget.imageUrl.isEmpty || !Uri.parse(widget.imageUrl).hasAuthority) {
+      widget.onImageError?.call();
+      return widget.errorWidget ?? _buildErrorWidget(context);
+    }
+
     if (!widget.useProgressiveLoading) {
       return _buildCachedImage(context);
     }
@@ -137,7 +139,14 @@ class _CachedCardImageState extends State<CachedCardImage>
 
   Widget _buildCachedImage(BuildContext context, {String? imageUrl}) {
     final targetUrl = imageUrl ?? widget.imageUrl;
-    final cacheKey = Uri.parse(targetUrl).pathSegments.last;
+
+    // Validate URL
+    if (targetUrl.isEmpty || !Uri.parse(targetUrl).hasAuthority) {
+      widget.onImageError?.call();
+      return widget.errorWidget ?? _buildErrorWidget(context);
+    }
+
+    final cacheKey = Uri.parse(targetUrl).pathSegments.lastOrNull ?? targetUrl;
 
     // Calculate optimal cache dimensions based on device pixel ratio
     final pixelRatio = MediaQuery.of(context).devicePixelRatio;
@@ -286,12 +295,18 @@ class _CachedCardImageState extends State<CachedCardImage>
 
 class CardImageUtils {
   static Future<bool> isImageCached(String url) async {
-    final fileKey = Uri.parse(url).pathSegments.last;
+    if (url.isEmpty || !Uri.parse(url).hasAuthority) return false;
+    final fileKey = Uri.parse(url).pathSegments.lastOrNull ?? url;
     final file = await CardImageCacheManager.instance.getFileFromCache(fileKey);
     return file != null;
   }
 
   static Future<void> prefetchImage(String url) async {
+    if (url.isEmpty || !Uri.parse(url).hasAuthority) {
+      talker.error('Invalid image URL: $url');
+      return;
+    }
+
     try {
       await CardImageCacheManager.instance.downloadFile(url);
       talker.debug('Prefetched image: $url');

@@ -146,7 +146,7 @@ Object? _searchDebounceKey;
 
 @riverpod
 Future<List<models.Card>> cardSearch(ref, String query) async {
-  if (query.length < 2) return [];
+  if (query.isEmpty) return [];
 
   // Check cache first
   if (_searchCache.containsKey(query)) {

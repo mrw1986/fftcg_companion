@@ -1,61 +1,35 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/core/services/firestore_provider.dart';
 import 'package:fftcg_companion/features/models.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:fftcg_companion/core/providers/card_cache_provider.dart';
 
 part 'card_repository.g.dart';
 
 @Riverpod(keepAlive: true)
 class CardRepository extends _$CardRepository {
-  Box<Map>? _cardBox;
-  Box<Map>? _queryCache;
-  static const _queryCacheDuration = Duration(minutes: 30);
-  Timer? _cleanupTimer;
-
   @override
   FutureOr<void> build() async {
-    await _initializeBoxes();
-    _setupCleanupTimer();
-
-    ref.onDispose(() {
-      _cleanupTimer?.cancel();
-      _cardBox?.close();
-      _queryCache?.close();
-      talker.debug('Disposed CardRepository resources');
-    });
-
+    // Initialize card cache
+    await ref.read(cardCacheNotifierProvider.future);
     return;
-  }
-
-  Future<void> _initializeBoxes() async {
-    try {
-      _cardBox = await Hive.openBox<Map>('cards');
-      _queryCache = await Hive.openBox<Map>('query_cache');
-      talker.debug('Initialized Hive boxes for CardRepository');
-    } catch (e, stack) {
-      talker.error('Failed to initialize Hive boxes', e, stack);
-      rethrow;
-    }
-  }
-
-  void _setupCleanupTimer() {
-    _cleanupTimer?.cancel();
-    _cleanupTimer = Timer.periodic(
-      const Duration(hours: 1),
-      (_) => _cleanupCache(),
-    );
   }
 
   Future<List<Card>> searchCards(String searchTerm) async {
     try {
-      final firestoreService = ref.read(firestoreServiceProvider);
+      final cache = await ref.read(cardCacheNotifierProvider.future);
       final normalizedQuery = searchTerm.toLowerCase().trim();
 
       if (normalizedQuery.isEmpty) {
         return [];
+      }
+
+      // Check cache first
+      final cachedResults = await cache.getCachedSearchResults(normalizedQuery);
+      if (cachedResults != null) {
+        return cachedResults;
       }
 
       // Generate search terms
@@ -92,12 +66,9 @@ class CardRepository extends _$CardRepository {
         else if (RegExp(r'^\d+$').hasMatch(normalizedQuery)) {
           searchTerms.add('$normalizedQuery-');
         }
-
-        // We no longer need progressive substrings of the cleaned number
-        // as we already have proper variations with hyphens
       }
 
-      // Only add progressive substrings and soundex for longer name-based queries
+      // Only add progressive substrings for longer name-based queries
       if (normalizedQuery.length > 3 &&
           !normalizedQuery.contains('-') &&
           !RegExp(r'[0-9]').hasMatch(normalizedQuery)) {
@@ -105,10 +76,10 @@ class CardRepository extends _$CardRepository {
         for (int i = 3; i < normalizedQuery.length; i++) {
           searchTerms.add(normalizedQuery.substring(0, i));
         }
-        // We no longer use soundex codes
       }
 
       // Search using arrayContainsAny
+      final firestoreService = ref.read(firestoreServiceProvider);
       final snapshot = await firestoreService.cardsCollection
           .where('searchTerms', arrayContainsAny: searchTerms.toList())
           .limit(50)
@@ -127,30 +98,36 @@ class CardRepository extends _$CardRepository {
         // Exact matches get highest priority
         if (name == normalizedQuery ||
             number == normalizedQuery ||
-            cardNumbers.contains(normalizedQuery)) return 6;
+            cardNumbers.contains(normalizedQuery)) {
+          return 6;
+        }
 
         // Starts with query term gets high priority
         if (name.startsWith(normalizedQuery) ||
             number.startsWith(normalizedQuery) ||
-            cardNumbers.any((n) => n.startsWith(normalizedQuery))) return 5;
+            cardNumbers.any((n) => n.startsWith(normalizedQuery))) {
+          return 5;
+        }
 
         // Contains full query term gets medium-high priority
         if (name.contains(normalizedQuery) ||
             number.contains(normalizedQuery) ||
-            cardNumbers.any((n) => n.contains(normalizedQuery))) return 4;
+            cardNumbers.any((n) => n.contains(normalizedQuery))) {
+          return 4;
+        }
 
         // For longer queries (>3 chars), give some priority to partial matches
         if (normalizedQuery.length > 3) {
           // Partial match at word boundary gets medium priority
-          if (name.split(' ').any((word) => word.startsWith(normalizedQuery)))
+          if (name.split(' ').any((word) => word.startsWith(normalizedQuery))) {
             return 3;
+          }
 
           // Number partial match gets low-medium priority
           if (number.contains(normalizedQuery) ||
-              cardNumbers.any((n) => n.contains(normalizedQuery))) return 2;
-
-          // We no longer use soundex matching
-          return 0;
+              cardNumbers.any((n) => n.contains(normalizedQuery))) {
+            return 2;
+          }
         }
 
         // No relevant match
@@ -170,7 +147,7 @@ class CardRepository extends _$CardRepository {
             return a.compareByNumber(b);
           }
           // Otherwise sort alphabetically by name
-          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+          return a.compareByName(b);
         }
         // Otherwise sort by relevance
         return relevanceB.compareTo(relevanceA);
@@ -197,6 +174,9 @@ class CardRepository extends _$CardRepository {
             !cardNumbers.any((n) => n.contains(normalizedQuery));
       });
 
+      // Cache the results
+      await cache.cacheSearchResults(normalizedQuery, cards);
+
       return cards;
     } catch (e, stack) {
       talker.error('Error searching cards', e, stack);
@@ -210,21 +190,39 @@ class CardRepository extends _$CardRepository {
     CardFilters? filters,
     bool forceRefresh = false,
   }) async {
-    if (!forceRefresh) {
-      final cacheKey = _generateCacheKey(
-        limit: limit,
-        startAfterId: startAfterId,
-        filters: filters,
-      );
-
-      final cached = await _getFromCache(cacheKey);
-      if (cached != null) {
-        talker.debug('Returning cached cards for key: $cacheKey');
-        return cached;
-      }
-    }
-
     try {
+      final cache = await ref.read(cardCacheNotifierProvider.future);
+
+      // Check cache first if not forcing refresh
+      if (!forceRefresh) {
+        final cachedCards = await cache.getCachedCards();
+        if (cachedCards.isNotEmpty) {
+          var filteredCards = cachedCards;
+
+          // Apply filters if needed
+          if (filters != null) {
+            filteredCards = _applyLocalFilters(filteredCards, filters);
+          }
+
+          // Apply pagination
+          if (startAfterId != null) {
+            final startIndex = filteredCards.indexWhere(
+                (card) => card.productId.toString() == startAfterId);
+            if (startIndex != -1 && startIndex + 1 < filteredCards.length) {
+              filteredCards = filteredCards.sublist(startIndex + 1);
+            }
+          }
+
+          // Apply limit
+          if (filteredCards.length > limit) {
+            filteredCards = filteredCards.sublist(0, limit);
+          }
+
+          return filteredCards;
+        }
+      }
+
+      // Fetch from Firestore
       final firestoreService = ref.read(firestoreServiceProvider);
       Query<Map<String, dynamic>> query = firestoreService.cardsCollection;
 
@@ -244,15 +242,9 @@ class CardRepository extends _$CardRepository {
       final cards =
           snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
 
+      // Cache the results
       if (cards.isNotEmpty) {
-        await _cacheResults(
-          _generateCacheKey(
-            limit: limit,
-            startAfterId: startAfterId,
-            filters: filters,
-          ),
-          cards,
-        );
+        await cache.cacheCards(cards);
       }
 
       return cards;
@@ -262,71 +254,28 @@ class CardRepository extends _$CardRepository {
     }
   }
 
-  String _generateCacheKey({
-    required int limit,
-    String? startAfterId,
-    CardFilters? filters,
-  }) {
-    if (filters == null) {
-      return 'l$limit${startAfterId != null ? '-s$startAfterId' : ''}';
-    }
-
-    final parts = <String>[];
-
-    if (filters.elements.isNotEmpty) parts.add('e${filters.elements.length}');
-    if (filters.types.isNotEmpty) parts.add('t${filters.types.length}');
-    if (filters.sets.isNotEmpty) parts.add('s${filters.sets.length}');
-    if (filters.rarities.isNotEmpty) parts.add('r${filters.rarities.length}');
-
-    if (filters.minCost != null) parts.add('c>${filters.minCost}');
-    if (filters.maxCost != null) parts.add('c<${filters.maxCost}');
-    if (filters.minPower != null) parts.add('p>${filters.minPower}');
-    if (filters.maxPower != null) parts.add('p<${filters.maxPower}');
-
-    if (filters.isNormalOnly == true) parts.add('n');
-    if (filters.isFoilOnly == true) parts.add('f');
-    if (!filters.showSealedProducts) parts.add('ns');
-
-    if (filters.sortField?.isNotEmpty == true) {
-      parts.add(
-          'o${filters.sortField![0]}${filters.sortDescending ? 'd' : 'a'}');
-    }
-
-    final filterStr = parts.isEmpty ? '' : '-${parts.join('')}';
-    return 'l$limit${startAfterId != null ? '-s$startAfterId' : ''}$filterStr';
-  }
-
   Future<List<Card>> getFilteredCards(CardFilters filters) async {
     try {
+      final cache = await ref.read(cardCacheNotifierProvider.future);
+      final cachedCards = await cache.getCachedCards();
+
+      // If we have cached cards, apply filters locally
+      if (cachedCards.isNotEmpty) {
+        return _applyLocalFilters(cachedCards, filters);
+      }
+
+      // Otherwise fetch from Firestore
       final firestoreService = ref.read(firestoreServiceProvider);
       Query<Map<String, dynamic>> query = firestoreService.cardsCollection;
       query = _applyFilters(query, filters);
 
       final snapshot = await query.get();
-      var cards =
+      final cards =
           snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
 
-      if (filters.sortField != null) {
-        cards.sort((a, b) {
-          if (filters.sortField == 'number') {
-            final comparison = a.compareByNumber(b);
-            return filters.sortDescending ? -comparison : comparison;
-          }
-
-          switch (filters.sortField) {
-            case 'name':
-              final comparison = a.compareByName(b);
-              return filters.sortDescending ? -comparison : comparison;
-            case 'cost':
-              final comparison = a.compareByCost(b);
-              return filters.sortDescending ? -comparison : comparison;
-            case 'power':
-              final comparison = a.compareByPower(b);
-              return filters.sortDescending ? -comparison : comparison;
-            default:
-              return 0;
-          }
-        });
+      // Cache the results
+      if (cards.isNotEmpty) {
+        await cache.cacheCards(cards);
       }
 
       return cards;
@@ -336,72 +285,67 @@ class CardRepository extends _$CardRepository {
     }
   }
 
-  Future<List<Card>?> _getFromCache(String key) async {
-    if (_queryCache == null) return null;
+  List<Card> _applyLocalFilters(List<Card> cards, CardFilters filters) {
+    var filteredCards = cards.where((card) {
+      if (!filters.showSealedProducts && card.isNonCard) return false;
 
-    final cached = _queryCache!.get(key);
-    if (cached == null) return null;
+      if (filters.elements.isNotEmpty &&
+          !filters.elements.any((e) => card.elements.contains(e))) {
+        return false;
+      }
 
-    final timestamp = cached['timestamp'] as DateTime?;
-    if (timestamp == null ||
-        DateTime.now().difference(timestamp) > _queryCacheDuration) {
-      await _queryCache!.delete(key);
-      return null;
-    }
+      if (filters.types.isNotEmpty && !filters.types.contains(card.cardType)) {
+        return false;
+      }
 
-    try {
-      final cardsList = (cached['cards'] as List).map((item) {
-        // Convert the raw map to ensure proper types for nested maps
-        final Map<String, dynamic> jsonMap = {};
-        (item as Map).forEach((key, value) {
-          if (key == 'searchName' || key == 'searchNumber') {
-            // Convert nested maps to proper Map<String, num>
-            final Map<String, num> convertedMap = {};
-            (value as Map).forEach((k, v) {
-              convertedMap[k.toString()] =
-                  (v is num) ? v : num.parse(v.toString());
-            });
-            jsonMap[key.toString()] = convertedMap;
-          } else {
-            jsonMap[key.toString()] = value;
-          }
-        });
-        return Card.fromJson(jsonMap);
-      }).toList();
-      return cardsList;
-    } catch (e, stack) {
-      talker.error('Error deserializing cached cards', e, stack);
-      await _queryCache!.delete(key);
-      return null;
-    }
-  }
+      if (filters.sets.isNotEmpty &&
+          !filters.sets.contains(card.groupId.toString())) {
+        return false;
+      }
 
-  Future<void> _cleanupCache() async {
-    if (_queryCache == null) return;
+      if (filters.rarities.isNotEmpty &&
+          !filters.rarities.contains(card.rarity)) {
+        return false;
+      }
 
-    final now = DateTime.now();
-    final keysToDelete = _queryCache!.keys.where((key) {
-      final cached = _queryCache!.get(key);
-      if (cached == null) return true;
+      if (filters.minCost != null &&
+          (card.cost == null || card.cost! < filters.minCost!)) {
+        return false;
+      }
 
-      final timestamp = cached['timestamp'] as DateTime?;
-      return timestamp == null ||
-          now.difference(timestamp) > _queryCacheDuration;
+      if (filters.maxCost != null &&
+          (card.cost == null || card.cost! > filters.maxCost!)) {
+        return false;
+      }
+
+      if (filters.minPower != null &&
+          (card.power == null || card.power! < filters.minPower!)) {
+        return false;
+      }
+
+      if (filters.maxPower != null &&
+          (card.power == null || card.power! > filters.maxPower!)) {
+        return false;
+      }
+
+      return true;
     }).toList();
 
-    if (keysToDelete.isNotEmpty) {
-      await _queryCache!.deleteAll(keysToDelete);
-      talker.debug('Cleaned up ${keysToDelete.length} cached queries');
+    // Apply sorting
+    if (filters.sortField != null) {
+      filteredCards.sort((a, b) {
+        final comparison = switch (filters.sortField) {
+          'number' => a.compareByNumber(b),
+          'name' => a.compareByName(b),
+          'cost' => a.compareByCost(b),
+          'power' => a.compareByPower(b),
+          _ => 0,
+        };
+        return filters.sortDescending ? -comparison : comparison;
+      });
     }
-  }
 
-  Future<void> _cacheResults(String key, List<Card> cards) async {
-    if (_queryCache == null) return;
-
-    await _queryCache!.put(key, {
-      'timestamp': DateTime.now(),
-      'cards': cards.map((card) => card.toJson()).toList(),
-    });
+    return filteredCards;
   }
 
   Query<Map<String, dynamic>> _applyFilters(

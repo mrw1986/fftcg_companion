@@ -38,10 +38,9 @@ Future<void> initializeApp() async {
 
     // Open required boxes before any other initialization
     await Future.wait([
-      Hive.openBox<Map>('card_cache'),
-      Hive.openBox<Map>('query_cache'),
       Hive.openBox<Map>('sort_cache'),
-      Hive.openBox('settings'),
+      Hive.openBox(
+          'settings'), // Settings box should be dynamic to store different types
       Hive.openBox('cache_metadata'),
     ]);
 

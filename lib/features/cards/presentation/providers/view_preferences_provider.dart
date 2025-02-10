@@ -69,33 +69,54 @@ enum ViewSize {
 
 @riverpod
 class ViewPreferences extends _$ViewPreferences {
+  static const _boxName = 'settings';
   static const _viewTypeKey = 'view_type';
   static const _gridSizeKey = 'grid_size';
   static const _listSizeKey = 'list_size';
   static const _showLabelsKey = 'show_labels';
 
+  Box? _getBox() {
+    if (!Hive.isBoxOpen(_boxName)) {
+      try {
+        return Hive.box(_boxName);
+      } catch (e) {
+        return null;
+      }
+    }
+    return Hive.box(_boxName);
+  }
+
+  Future<Box> _openBox() async {
+    if (!Hive.isBoxOpen(_boxName)) {
+      return await Hive.openBox(_boxName);
+    }
+    return Hive.box(_boxName);
+  }
+
   @override
   ({ViewType type, ViewSize gridSize, ViewSize listSize, bool showLabels})
       build() {
-    final box = Hive.box('settings');
+    final box = _getBox();
     return (
       type: _loadViewType(box),
       gridSize: _loadSize(box, _gridSizeKey),
       listSize: _loadSize(box, _listSizeKey),
-      showLabels: box.get(_showLabelsKey, defaultValue: true),
+      showLabels: box?.get(_showLabelsKey, defaultValue: true) ?? true,
     );
   }
 
-  ViewType _loadViewType(Box box) {
-    final saved = box.get(_viewTypeKey, defaultValue: ViewType.grid.name);
+  ViewType _loadViewType(Box? box) {
+    final saved = box?.get(_viewTypeKey, defaultValue: ViewType.grid.name);
+    if (saved == null) return ViewType.grid;
     return ViewType.values.firstWhere(
       (e) => e.name == saved,
       orElse: () => ViewType.grid,
     );
   }
 
-  ViewSize _loadSize(Box box, String key) {
-    final saved = box.get(key, defaultValue: ViewSize.normal.name);
+  ViewSize _loadSize(Box? box, String key) {
+    final saved = box?.get(key, defaultValue: ViewSize.normal.name);
+    if (saved == null) return ViewSize.normal;
     return ViewSize.values.firstWhere(
       (e) => e.name == saved,
       orElse: () => ViewSize.normal,
@@ -103,7 +124,7 @@ class ViewPreferences extends _$ViewPreferences {
   }
 
   Future<void> toggleViewType() async {
-    final box = Hive.box('settings');
+    final box = await _openBox();
     final newType = state.type == ViewType.grid ? ViewType.list : ViewType.grid;
     await box.put(_viewTypeKey, newType.name);
     state = (
@@ -115,7 +136,7 @@ class ViewPreferences extends _$ViewPreferences {
   }
 
   Future<void> setGridSize(ViewSize size) async {
-    final box = Hive.box('settings');
+    final box = await _openBox();
     await box.put(_gridSizeKey, size.name);
     state = (
       type: state.type,
@@ -126,7 +147,7 @@ class ViewPreferences extends _$ViewPreferences {
   }
 
   Future<void> setListSize(ViewSize size) async {
-    final box = Hive.box('settings');
+    final box = await _openBox();
     await box.put(_listSizeKey, size.name);
     state = (
       type: state.type,
@@ -137,7 +158,7 @@ class ViewPreferences extends _$ViewPreferences {
   }
 
   Future<void> toggleLabels() async {
-    final box = Hive.box('settings');
+    final box = await _openBox();
     await box.put(_showLabelsKey, !state.showLabels);
     state = (
       type: state.type,

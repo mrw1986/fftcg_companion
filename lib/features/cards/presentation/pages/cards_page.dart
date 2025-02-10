@@ -96,33 +96,35 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       body: RefreshIndicator(
         onRefresh: () => ref.read(cardsNotifierProvider.notifier).refresh(),
         child: _isSearching
-            ? searchResults?.when(
-                  data: (searchedCards) {
-                    if (searchedCards.isEmpty) {
-                      return const Center(
-                        child: Text('No cards found'),
-                      );
-                    }
-                    return CustomScrollView(
-                      controller: _scrollController,
-                      slivers: [
-                        viewPrefs.type == ViewType.grid
-                            ? _buildSliverGrid(searchedCards, viewPrefs)
-                            : _buildSliverList(
-                                searchedCards, viewPrefs.listSize),
-                      ],
-                    );
-                  },
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                  error: (error, stack) => ErrorView(
-                    message: error.toString(),
-                    onRetry: () =>
-                        ref.refresh(cardSearchProvider(searchController.text)),
-                  ),
-                ) ??
-                const Center(child: CircularProgressIndicator())
+            ? searchController.text.isEmpty
+                ? const SizedBox.shrink()
+                : searchResults?.when(
+                      data: (searchedCards) {
+                        if (searchedCards.isEmpty) {
+                          return const Center(
+                            child: Text('No cards found'),
+                          );
+                        }
+                        return CustomScrollView(
+                          controller: _scrollController,
+                          slivers: [
+                            viewPrefs.type == ViewType.grid
+                                ? _buildSliverGrid(searchedCards, viewPrefs)
+                                : _buildSliverList(
+                                    searchedCards, viewPrefs.listSize),
+                          ],
+                        );
+                      },
+                      loading: () => const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                      error: (error, stack) => ErrorView(
+                        message: error.toString(),
+                        onRetry: () => ref
+                            .refresh(cardSearchProvider(searchController.text)),
+                      ),
+                    ) ??
+                    const Center(child: CircularProgressIndicator())
             : cards.when(
                 data: (cardList) {
                   if (cardList.isEmpty) {
