@@ -13,7 +13,7 @@ import 'package:fftcg_companion/app/app.dart';
 import 'package:fftcg_companion/firebase_options.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
-import 'package:fftcg_companion/features/cards/presentation/providers/filter_options_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/initialization_provider.dart';
 import 'package:fftcg_companion/core/storage/cache_persistence.dart';
 
 final _container = ProviderContainer();
@@ -28,7 +28,7 @@ Future<void> initializeApp() async {
       enabled: true,
       useHistory: true,
       maxHistoryItems: 1000,
-      useConsoleLogs: true,
+      useConsoleLogs: false, // Disable console logs except for errors
     ),
   );
 
@@ -43,26 +43,20 @@ Future<void> initializeApp() async {
           'settings'), // Settings box should be dynamic to store different types
       Hive.openBox('cache_metadata'),
     ]);
-
-    talker.debug('Hive boxes initialized successfully');
-
-    // Initialize Firebase
+// Initialize Firebase
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    talker.debug('Firebase initialized successfully');
 
-    // Initialize CachePersistence
+// Initialize CachePersistence
     await CachePersistence.initialize();
-    talker.debug('Cache persistence initialized');
 
-    // Initialize image cache
+// Initialize image cache
     CardImageCacheManager.initCache();
-    talker.debug('Image cache initialized successfully');
 
-    // Pre-load filter options but don't await
-    _container.read(filterOptionsNotifierProvider);
-    talker.debug('Filter options loading started');
+// Start app initialization
+    await _container.read(initializationProvider.future);
+    talker.debug('App initialization completed');
   } catch (e, stack) {
     talker.error('Error during initialization', e, stack);
     rethrow;
@@ -90,11 +84,11 @@ Future<void> main() async {
             talker: talker,
             settings: const TalkerRiverpodLoggerSettings(
               enabled: true,
-              printProviderAdded: true,
-              printProviderUpdated: true,
-              printProviderDisposed: true,
+              printProviderAdded: false,
+              printProviderUpdated: false,
+              printProviderDisposed: false,
               printProviderFailed: true,
-              printStateFullData: true,
+              printStateFullData: false,
             ),
           ),
         ],

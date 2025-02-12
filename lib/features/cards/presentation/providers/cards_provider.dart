@@ -7,98 +7,60 @@ import 'package:fftcg_companion/core/utils/logger.dart';
 
 part 'cards_provider.g.dart';
 
-@riverpod
-class SortingProgress extends _$SortingProgress {
-  @override
-  bool build() => false;
-
-  void start() => state = true;
-  void complete() => state = false;
-}
-
+/// Manages the card list state and filtering operations
 @Riverpod(keepAlive: true)
 class CardsNotifier extends _$CardsNotifier {
   CardFilters? _currentFilters;
-  final _loadedCards = <models.Card>[];
 
   @override
-  Future<List<models.Card>> build() async {
-    // Wait for CardRepository to initialize
-    await ref.read(cardRepositoryProvider.future);
-
+  FutureOr<List<models.Card>> build() async {
     // Set default sort to Card Number (Ascending)
     _currentFilters = const CardFilters(
       sortField: 'number',
       sortDescending: false,
     );
 
-    return _loadInitialBatch();
+    // Get initial cards from repository
+    final cards = await ref.watch(cardRepositoryProvider.future);
+    return cards;
   }
 
-  Future<List<models.Card>> _loadInitialBatch() async {
+  Future<void> loadInitialCards() async {
+    state = const AsyncLoading();
     try {
       final repository = ref.read(cardRepositoryProvider.notifier);
-      var cards = await repository.getCards(filters: _currentFilters);
-
-      _loadedCards.clear();
-      _loadedCards.addAll(cards);
-
-      talker.debug('Loaded ${cards.length} cards');
-      return cards;
-    } catch (error, stack) {
-      talker.error('Error loading cards', error, stack);
-      rethrow;
+      await repository.loadCards();
+      final cards = await repository.getCards(filters: _currentFilters);
+      state = AsyncData(cards);
+    } catch (e, stack) {
+      talker.error('Error loading initial cards', e, stack);
+      state = AsyncError(e, stack);
     }
   }
 
+  /// Apply new filters to the card list
   Future<void> applyFilters(CardFilters filters) async {
-    // Check if only reapplying the same sort
-    final isSameSort = _currentFilters?.sortField == filters.sortField &&
-        _currentFilters?.sortDescending == filters.sortDescending;
-    final onlySortChanged = _currentFilters != null &&
-        _currentFilters!.copyWith(
-              sortField: filters.sortField,
-              sortDescending: filters.sortDescending,
-            ) ==
-            filters;
-
-    // If it's the exact same filters, do nothing
     if (_currentFilters == filters) return;
 
-    // If only reapplying the same sort, don't reload
-    if (isSameSort && onlySortChanged && state.hasValue) {
-      _currentFilters = filters;
-      return;
-    }
-
-    ref.read(sortingProgressProvider.notifier).start();
-    state = const AsyncValue.loading();
+    state = const AsyncLoading();
 
     try {
       _currentFilters = filters;
       final repository = ref.read(cardRepositoryProvider.notifier);
-      final filteredCards = await repository.getFilteredCards(filters);
-
-      _loadedCards.clear();
-      _loadedCards.addAll(filteredCards);
-
-      state = AsyncValue.data(filteredCards);
-      talker.debug(
-          'Applied filters successfully. Found ${filteredCards.length} cards');
+      final cards = await repository.getFilteredCards(filters);
+      state = AsyncData(cards);
     } catch (e, stack) {
       talker.error('Error applying filters', e, stack);
-      state = AsyncValue.error(e, stack);
-    } finally {
-      ref.read(sortingProgressProvider.notifier).complete();
+      state = AsyncError(e, stack);
     }
   }
 
+  /// Refresh the card list from the repository
   Future<void> refresh() async {
-    state = const AsyncValue.loading();
-    _loadedCards.clear();
+    state = const AsyncLoading();
 
     try {
-      // Reset to default sort (Card Number Ascending)
+      // Reset to default sort
       _currentFilters = const CardFilters(
         sortField: 'number',
         sortDescending: false,
@@ -106,14 +68,10 @@ class CardsNotifier extends _$CardsNotifier {
 
       final repository = ref.read(cardRepositoryProvider.notifier);
       final cards = await repository.getCards(filters: _currentFilters);
-
-      _loadedCards.clear();
-      _loadedCards.addAll(cards);
-
-      state = AsyncValue.data(cards);
+      state = AsyncData(cards);
     } catch (error, stack) {
       talker.error('Error refreshing cards', error, stack);
-      state = AsyncValue.error(error, stack);
+      state = AsyncError(error, stack);
     }
   }
 }

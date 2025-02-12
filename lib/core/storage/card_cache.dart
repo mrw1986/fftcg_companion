@@ -20,7 +20,6 @@ class CardCache {
       // Open boxes with new types
       _cardsBox = await Hive.openBox<Map>(_cardsBoxName);
       _searchCacheBox = await Hive.openBox<List>(_searchCacheBoxName);
-      talker.debug('Initialized card cache boxes');
     } catch (e, stack) {
       talker.error('Failed to initialize card cache boxes', e, stack);
       rethrow;
@@ -41,7 +40,6 @@ class CardCache {
         batch[card.productId.toString()] = card.toJson();
       }
       await _cardsBox!.putAll(batch);
-      talker.debug('Cached ${cards.length} cards');
     } catch (e, stack) {
       talker.error('Failed to cache cards', e, stack);
       rethrow;
@@ -115,7 +113,6 @@ class CardCache {
     try {
       await _cardsBox?.clear();
       await _searchCacheBox?.clear();
-      talker.debug('Cleared card cache');
     } catch (e, stack) {
       talker.error('Failed to clear card cache', e, stack);
     }

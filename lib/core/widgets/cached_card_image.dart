@@ -6,34 +6,44 @@ import 'package:fftcg_companion/core/widgets/flipping_card_image.dart';
 
 class CardImageCacheManager {
   static const key = 'cardImageCache';
-  static const maxMemCacheSize = 50 * 1024 * 1024; // 50MB
+  static const maxMemCacheSize = 100 * 1024 * 1024; // 100MB
+  static const maxAgeCacheObject = Duration(days: 60);
+  static const maxNrOfCacheObjects = 2000;
+  static const maxDiskCacheSize = 500 * 1024 * 1024; // 500MB
 
-  static final _instance = DefaultCacheManager();
-  static DefaultCacheManager get instance => _instance;
+  static CacheManager? _instance;
+  static CacheManager get instance {
+    _instance ??= CacheManager(
+      Config(
+        key,
+        stalePeriod: maxAgeCacheObject,
+        maxNrOfCacheObjects: maxNrOfCacheObjects,
+        repo: JsonCacheInfoRepository(databaseName: key),
+        fileSystem: IOFileSystem(key),
+        fileService: HttpFileService(),
+      ),
+    );
+    return _instance!;
+  }
 
   // Track which images have already been animated
   static final _animatedImages = <String>{};
   static final _loadedImages = <String>{};
 
-  static bool hasBeenAnimated(String url) {
-    return _animatedImages.contains(url);
-  }
-
-  static bool isImageLoaded(String url) {
-    return _loadedImages.contains(url);
-  }
-
-  static void markAsAnimated(String url) {
-    _animatedImages.add(url);
-  }
-
-  static void markAsLoaded(String url) {
-    _loadedImages.add(url);
-  }
+  static bool hasBeenAnimated(String url) => _animatedImages.contains(url);
+  static bool isImageLoaded(String url) => _loadedImages.contains(url);
+  static void markAsAnimated(String url) => _animatedImages.add(url);
+  static void markAsLoaded(String url) => _loadedImages.add(url);
 
   static void initCache() {
     PaintingBinding.instance.imageCache.maximumSize = 200;
     PaintingBinding.instance.imageCache.maximumSizeBytes = maxMemCacheSize;
+    _animatedImages.clear();
+    _loadedImages.clear();
+  }
+
+  static Future<void> cleanCache() async {
+    await instance.emptyCache();
     _animatedImages.clear();
     _loadedImages.clear();
   }
@@ -118,6 +128,7 @@ class _CachedCardImageState extends State<CachedCardImage>
         return CachedNetworkImage(
           imageUrl: widget.imageUrl!,
           cacheManager: CardImageCacheManager.instance,
+          cacheKey: Uri.parse(widget.imageUrl!).path,
           progressIndicatorBuilder: (context, url, progress) {
             return _buildCachedImage(context, imageUrl: lowQualityUrl);
           },
@@ -151,45 +162,22 @@ class _CachedCardImageState extends State<CachedCardImage>
       return widget.errorWidget ?? _buildErrorWidget(context);
     }
 
-    final cacheKey = Uri.parse(targetUrl).pathSegments.lastOrNull ?? targetUrl;
-
-    // Calculate optimal cache dimensions based on device pixel ratio
-    final pixelRatio = MediaQuery.of(context).devicePixelRatio;
-
-    // Safely calculate target dimensions, handling null, infinity, and NaN cases
-    int? safeTargetWidth;
-    int? safeTargetHeight;
-
-    if (widget.width != null &&
-        widget.width!.isFinite &&
-        !widget.width!.isNaN &&
-        widget.width! > 0) {
-      final targetWidth = (widget.width! * pixelRatio).toInt();
-      safeTargetWidth = targetWidth.clamp(1, 4096); // Max texture size 4096
-    }
-
-    if (widget.height != null &&
-        widget.height!.isFinite &&
-        !widget.height!.isNaN &&
-        widget.height! > 0) {
-      final targetHeight = (widget.height! * pixelRatio).toInt();
-      safeTargetHeight = targetHeight.clamp(1, 4096);
-    }
-
     return ClipRRect(
       borderRadius: widget.borderRadius ?? BorderRadius.zero,
       child: CachedNetworkImage(
-        key: ValueKey('cached_$cacheKey'),
+        key: ValueKey(targetUrl),
         imageUrl: targetUrl,
         cacheManager: CardImageCacheManager.instance,
+        // Use base URL as cache key to share cached images between views
+        cacheKey: Uri.parse(targetUrl).path,
         fit: widget.fit,
         width: widget.width,
         height: widget.height,
-        memCacheWidth: safeTargetWidth,
-        memCacheHeight: safeTargetHeight,
-        maxWidthDiskCache: safeTargetWidth,
-        maxHeightDiskCache: safeTargetHeight,
-        cacheKey: cacheKey,
+        // Let Flutter handle resizing internally
+        memCacheWidth: null,
+        memCacheHeight: null,
+        maxWidthDiskCache: null,
+        maxHeightDiskCache: null,
         fadeInDuration: const Duration(milliseconds: 150),
         placeholder: (context, url) {
           if (_isLoaded) {
@@ -212,8 +200,6 @@ class _CachedCardImageState extends State<CachedCardImage>
           if (!_isLoaded) {
             _isLoaded = true;
             CardImageCacheManager.markAsLoaded(targetUrl);
-            talker.debug(
-                'CachedCardImage: Image loaded successfully: $targetUrl');
           }
 
           // Keep the image in memory cache
@@ -228,16 +214,14 @@ class _CachedCardImageState extends State<CachedCardImage>
 
           if (!widget.animate ||
               CardImageCacheManager.hasBeenAnimated(targetUrl)) {
-            talker.debug('CachedCardImage: Skipping animation for $targetUrl');
             return imageWidget;
           }
 
           // Mark this URL as animated before starting the animation
           CardImageCacheManager.markAsAnimated(targetUrl);
 
-          talker.debug('CachedCardImage: Starting flip animation');
           return FlippingCardImage(
-            key: ValueKey(cacheKey),
+            key: ValueKey('flip_$targetUrl'),
             frontWidget: Image.asset(
               'assets/images/card-back.jpeg',
               fit: widget.fit,
@@ -300,10 +284,10 @@ class _CachedCardImageState extends State<CachedCardImage>
 
 class CardImageUtils {
   static Future<bool> isImageCached(String? url) async {
-    if (url == null || url.isEmpty || !Uri.parse(url).hasAuthority)
+    if (url == null || url.isEmpty || !Uri.parse(url).hasAuthority) {
       return false;
-    final fileKey = Uri.parse(url).pathSegments.lastOrNull ?? url;
-    final file = await CardImageCacheManager.instance.getFileFromCache(fileKey);
+    }
+    final file = await CardImageCacheManager.instance.getFileFromCache(url);
     return file != null;
   }
 
@@ -315,7 +299,6 @@ class CardImageUtils {
 
     try {
       await CardImageCacheManager.instance.downloadFile(url);
-      talker.debug('Prefetched image: $url');
     } catch (e, stack) {
       talker.error('Error prefetching image: $url', e, stack);
     }

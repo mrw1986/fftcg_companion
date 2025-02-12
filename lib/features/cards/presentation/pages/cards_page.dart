@@ -9,6 +9,7 @@ import 'package:fftcg_companion/features/cards/presentation/providers/cards_prov
 import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart';
+import 'package:fftcg_companion/features/cards/presentation/widgets/sort_bottom_sheet.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
 
@@ -28,8 +29,12 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   bool _isSearching = false;
 
   @override
-  void dispose() {
-    super.dispose();
+  void initState() {
+    super.initState();
+    // Load cards after the widget is mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(cardsNotifierProvider.notifier).loadInitialCards();
+    });
   }
 
   void _showSortBottomSheet(BuildContext context) {
@@ -92,16 +97,14 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                           ],
                         );
                       },
-                      loading: () => const Center(
-                        child: CircularProgressIndicator(),
-                      ),
+                      loading: () => const SizedBox.shrink(),
                       error: (error, stack) => ErrorView(
                         message: error.toString(),
                         onRetry: () => ref
                             .refresh(cardSearchProvider(searchController.text)),
                       ),
                     ) ??
-                    const Center(child: CircularProgressIndicator())
+                    const SizedBox.shrink()
             : cards.when(
                 data: (cardList) {
                   if (cardList.isEmpty) {
@@ -118,23 +121,50 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                     ],
                   );
                 },
-                loading: () => const Center(
-                  child: CircularProgressIndicator(),
-                ),
+                loading: () => const SizedBox.shrink(),
                 error: (error, stack) => ErrorView(
                   message: error.toString(),
                   onRetry: () => ref.refresh(cardsNotifierProvider),
                 ),
               ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showSortBottomSheet(context),
-        icon: const Icon(Icons.sort),
-        label: const Text('Sort'),
-        tooltip: 'Sort cards',
-        elevation: 4,
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+      floatingActionButton: Consumer(
+        builder: (context, ref, child) {
+          final cardsState = ref.watch(cardsNotifierProvider);
+          final colorScheme = Theme.of(context).colorScheme;
+          final isLoading = cardsState.isLoading;
+
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              FloatingActionButton.extended(
+                onPressed:
+                    isLoading ? null : () => _showSortBottomSheet(context),
+                icon: const Icon(Icons.sort),
+                label: const Text('Sort'),
+                tooltip: isLoading ? 'Loading...' : 'Sort cards',
+                elevation: isLoading ? 0 : 4,
+                backgroundColor: isLoading
+                    ? colorScheme.surfaceContainerHighest
+                    : colorScheme.primaryContainer,
+                foregroundColor: isLoading
+                    ? colorScheme.onSurfaceVariant
+                    : colorScheme.onPrimaryContainer,
+              ),
+              if (isLoading)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      colorScheme.primary,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -375,15 +405,8 @@ class _CardGridItemState extends State<CardGridItem>
 
     try {
       _isPreloading = true;
-      // Prefetch both medium and high quality images
-      await Future.wait([
-        CardImageUtils.prefetchImage(
-          widget.card.getImageUrl(quality: models.ImageQuality.medium),
-        ),
-        CardImageUtils.prefetchImage(
-          widget.card.getImageUrl(quality: models.ImageQuality.high),
-        ),
-      ]);
+      // Prefetch the best quality image
+      await CardImageUtils.prefetchImage(widget.card.getBestImageUrl());
     } catch (e, stack) {
       talker.error('Failed to preload images', e, stack);
     } finally {
@@ -447,9 +470,7 @@ class _CardGridItemState extends State<CardGridItem>
               ClipRRect(
                 borderRadius: BorderRadius.circular(imageRadius),
                 child: CachedCardImage(
-                  imageUrl: widget.card.getImageUrl(
-                    quality: models.ImageQuality.medium,
-                  ),
+                  imageUrl: widget.card.getBestImageUrl(),
                   width: double.infinity,
                   height: double.infinity,
                   fit: BoxFit.cover,
@@ -540,15 +561,8 @@ class _CardListItemState extends State<CardListItem>
 
   void _preloadImages() async {
     try {
-      // Prefetch both medium and high quality images
-      await Future.wait([
-        CardImageUtils.prefetchImage(
-          widget.card.getImageUrl(quality: models.ImageQuality.medium),
-        ),
-        CardImageUtils.prefetchImage(
-          widget.card.getImageUrl(quality: models.ImageQuality.high),
-        ),
-      ]);
+      // Prefetch the best quality image
+      await CardImageUtils.prefetchImage(widget.card.getBestImageUrl());
     } catch (e, stack) {
       talker.error('Failed to preload images', e, stack);
     }
@@ -617,9 +631,7 @@ class _CardListItemState extends State<CardListItem>
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(3),
                       child: CachedCardImage(
-                        imageUrl: widget.card.getImageUrl(
-                          quality: models.ImageQuality.medium,
-                        ),
+                        imageUrl: widget.card.getBestImageUrl(),
                         fit: BoxFit.contain,
                         width: imageWidth,
                         height: height,
@@ -803,142 +815,5 @@ class ErrorView extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class SortBottomSheet extends ConsumerWidget {
-  const SortBottomSheet({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final filters = ref.watch(filterProvider);
-    final textTheme = Theme.of(context).textTheme;
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: Text(
-                'Sort Cards',
-                style: textTheme.titleLarge,
-              ),
-            ),
-            _buildSortOption(
-              context: context,
-              title: 'Name',
-              subtitle: 'Sort by card name',
-              icon: Icons.sort_by_alpha,
-              isSelected: filters.sortField == 'name',
-              onTap: () => _updateSort(ref, 'name', filters),
-              showOrderIcon: filters.sortField == 'name',
-              isDescending: filters.sortDescending,
-            ),
-            _buildSortOption(
-              context: context,
-              title: 'Number',
-              subtitle: 'Sort by card number',
-              icon: Icons.format_list_numbered,
-              isSelected: filters.sortField == 'number',
-              onTap: () => _updateSort(ref, 'number', filters),
-              showOrderIcon: filters.sortField == 'number',
-              isDescending: filters.sortDescending,
-            ),
-            _buildSortOption(
-              context: context,
-              title: 'Cost',
-              subtitle: 'Sort by CP cost',
-              icon: Icons.monetization_on,
-              isSelected: filters.sortField == 'cost',
-              onTap: () => _updateSort(ref, 'cost', filters),
-              showOrderIcon: filters.sortField == 'cost',
-              isDescending: filters.sortDescending,
-            ),
-            _buildSortOption(
-              context: context,
-              title: 'Power',
-              subtitle: 'Sort by card power',
-              icon: Icons.flash_on,
-              isSelected: filters.sortField == 'power',
-              onTap: () => _updateSort(ref, 'power', filters),
-              showOrderIcon: filters.sortField == 'power',
-              isDescending: filters.sortDescending,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSortOption({
-    required BuildContext context,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required bool showOrderIcon,
-    required bool isDescending,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Material(
-      color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
-      borderRadius: BorderRadius.circular(8),
-      child: ListTile(
-        leading: Icon(
-          icon,
-          color: isSelected
-              ? colorScheme.onSecondaryContainer
-              : colorScheme.onSurfaceVariant,
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isSelected
-                ? colorScheme.onSecondaryContainer
-                : colorScheme.onSurface,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(
-            color: isSelected
-                ? colorScheme.onSecondaryContainer
-                : colorScheme.onSurfaceVariant,
-          ),
-        ),
-        trailing: showOrderIcon
-            ? Icon(
-                isDescending ? Icons.arrow_downward : Icons.arrow_upward,
-                color: isSelected
-                    ? colorScheme.onSecondaryContainer
-                    : colorScheme.primary,
-              )
-            : null,
-        selected: isSelected,
-        onTap: onTap,
-      ),
-    );
-  }
-
-  void _updateSort(WidgetRef ref, String field, CardFilters currentFilters) {
-    final isCurrentField = currentFilters.sortField == field;
-    ref.read(filterProvider.notifier).setSorting(
-          field,
-          isCurrentField ? !currentFilters.sortDescending : false,
-        );
-
-    // Apply the filters immediately
-    ref.read(cardsNotifierProvider.notifier).applyFilters(
-          ref.read(filterProvider),
-        );
-
-    // Close the bottom sheet
-    Navigator.pop(ref.context);
   }
 }

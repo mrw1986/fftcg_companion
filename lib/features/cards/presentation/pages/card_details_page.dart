@@ -65,8 +65,7 @@ class CardDetailsPage extends StatelessWidget {
                     child: AspectRatio(
                       aspectRatio: 223 / 311,
                       child: CachedCardImage(
-                        imageUrl:
-                            card.getImageUrl(quality: models.ImageQuality.high),
+                        imageUrl: card.getBestImageUrl(),
                         fit: BoxFit.cover,
                         borderRadius: BorderRadius.circular(3.0),
                         placeholder: Image.asset(
@@ -122,8 +121,7 @@ class CardDetailsPage extends StatelessWidget {
                     child: AspectRatio(
                       aspectRatio: 223 / 311,
                       child: CachedCardImage(
-                        imageUrl: card.getImageUrl(
-                            quality: models.ImageQuality.medium),
+                        imageUrl: card.getBestImageUrl(),
                         fit: BoxFit.cover,
                         borderRadius: BorderRadius.circular(3.0),
                         placeholder: Image.asset(

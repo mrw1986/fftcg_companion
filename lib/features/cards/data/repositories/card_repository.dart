@@ -1,20 +1,64 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:math' as math;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/core/services/firestore_provider.dart';
 import 'package:fftcg_companion/features/models.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/providers/card_cache_provider.dart';
+import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
 
 part 'card_repository.g.dart';
 
+/// Provides access to card data with caching support
 @Riverpod(keepAlive: true)
 class CardRepository extends _$CardRepository {
   @override
-  FutureOr<void> build() async {
-    // Initialize card cache
-    await ref.read(cardCacheNotifierProvider.future);
-    return;
+  FutureOr<List<Card>> build() async {
+    // Start with an empty list - cards will be loaded when needed
+    return const [];
+  }
+
+  /// Initialize the repository by loading cards from cache or Firestore
+  Future<void> initialize() async {
+    // No need to load all cards at startup
+    state = const AsyncData([]);
+  }
+
+  /// Load cards only when needed
+  Future<void> loadCards() async {
+    if (state.value?.isNotEmpty ?? false) return;
+
+    state = const AsyncLoading();
+    try {
+      final cache = await ref.read(cardCacheNotifierProvider.future);
+      final cachedCards = await cache.getCachedCards();
+
+      if (cachedCards.isNotEmpty) {
+        state = AsyncData(cachedCards);
+        return;
+      }
+
+      final firestoreService = ref.read(firestoreServiceProvider);
+      final snapshot = await firestoreService.cardsCollection.get();
+      final cards =
+          snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
+
+      await cache.cacheCards(cards);
+      state = AsyncData(cards);
+
+      // Prefetch images for the first batch of cards
+      for (var i = 0; i < math.min(20, cards.length); i++) {
+        final card = cards[i];
+        final imageUrl = card.getBestImageUrl();
+        if (imageUrl != null) {
+          CardImageUtils.prefetchImage(imageUrl);
+        }
+      }
+    } catch (e, stack) {
+      talker.error('Error loading cards', e, stack);
+      state = AsyncError(e, stack);
+      rethrow;
+    }
   }
 
   Future<List<Card>> searchCards(String searchTerm) async {
@@ -183,169 +227,149 @@ class CardRepository extends _$CardRepository {
     }
   }
 
-  Future<List<Card>> getCards({
-    String? startAfterId,
-    CardFilters? filters,
-    bool forceRefresh = false,
-  }) async {
-    // Apply default sorting if no filters provided
-    filters = filters ??
-        const CardFilters(sortField: 'number', sortDescending: false);
-    try {
-      final cache = await ref.read(cardCacheNotifierProvider.future);
-
-      // Check cache first if not forcing refresh
-      if (!forceRefresh) {
-        final cachedCards = await cache.getCachedCards();
-        if (cachedCards.isNotEmpty) {
-          var filteredCards = cachedCards;
-
-          // Apply filters if needed
-          if (filters != null) {
-            filteredCards = _applyLocalFilters(filteredCards, filters);
-          }
-
-          return filteredCards;
-        }
-      }
-
-      // Fetch from Firestore
-      final firestoreService = ref.read(firestoreServiceProvider);
-      Query<Map<String, dynamic>> query = firestoreService.cardsCollection;
-
-      // Apply non-card filter first
-      if (!filters.showSealedProducts ||
-          filters.sortField == 'number' ||
-          filters.sortField == 'cost' ||
-          filters.sortField == 'power') {
-        query = query.where('isNonCard', isEqualTo: false);
-      }
-
-      // Due to Firestore limitations with array queries, we'll fetch all cards
-      // and filter locally when array filters are present
-      if (filters.elements.isNotEmpty || filters.sets.isNotEmpty) {
-        final snapshot = await query.get();
-        var cards =
-            snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
-        return _applyLocalFilters(cards, filters);
-      }
-
-      // Apply non-array filters in Firestore
-      if (filters.types.isNotEmpty) {
-        query = query.where('cardType', whereIn: filters.types.toList());
-      }
-      if (filters.rarities.isNotEmpty) {
-        query = query.where('rarity', whereIn: filters.rarities.toList());
-      }
-
-      final snapshot = await query.get();
-      var cards =
-          snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
-
-      // Apply array filters locally since Firestore has limitations
-      if (filters != null) {
-        cards = _applyLocalFilters(cards, filters);
-      }
-
-      // Cache the results
-      if (cards.isNotEmpty) {
-        await cache.cacheCards(cards);
-      }
-
-      return cards;
-    } catch (e, stack) {
-      talker.error('Error fetching cards from Firestore', e, stack);
-      rethrow;
-    }
-  }
-
   Future<List<Card>> getFilteredCards(CardFilters filters) async {
     try {
-      final cache = await ref.read(cardCacheNotifierProvider.future);
-      final cachedCards = await cache.getCachedCards();
-
-      // If we have cached cards, apply filters locally
-      if (cachedCards.isNotEmpty) {
-        return _applyLocalFilters(cachedCards, filters);
+      // Ensure cards are loaded
+      if (state.value?.isEmpty ?? true) {
+        await loadCards();
       }
 
-      // Otherwise fetch from Firestore
-      return getCards(filters: filters);
+      final cards = state.value ?? [];
+      return applyLocalFilters(cards, filters);
     } catch (e, stack) {
       talker.error('Error applying filters', e, stack);
       rethrow;
     }
   }
 
-  List<Card> _applyLocalFilters(List<Card> cards, CardFilters filters) {
-    var filteredCards = cards.where((card) {
-      if (!filters.showSealedProducts && card.isNonCard) return false;
+  Future<List<Card>> getCards({
+    CardFilters? filters,
+    bool forceRefresh = false,
+  }) async {
+    try {
+      // Force refresh if requested
+      if (forceRefresh) {
+        state = const AsyncLoading();
+        await loadCards();
+      }
+      // Load cards if not already loaded
+      else if (state.value?.isEmpty ?? true) {
+        await loadCards();
+      }
+
+      final cards = state.value ?? [];
+
+      // Apply default sorting if no filters provided
+      filters = filters ??
+          const CardFilters(sortField: 'number', sortDescending: false);
+
+      return applyLocalFilters(cards, filters);
+    } catch (e, stack) {
+      talker.error('Error fetching cards', e, stack);
+      rethrow;
+    }
+  }
+
+  /// Apply filters to a list of cards locally
+  List<Card> applyLocalFilters(List<Card> cards, CardFilters filters) {
+    // Create a list of indices that match the filters
+    final indices = <int>[];
+    for (var i = 0; i < cards.length; i++) {
+      final card = cards[i];
+
+      // For number, cost, and power sorts, always hide non-cards
+      if (filters.sortField == 'number' ||
+          filters.sortField == 'cost' ||
+          filters.sortField == 'power') {
+        if (card.isNonCard) continue;
+      } else if (!filters.showSealedProducts && card.isNonCard) {
+        // For other sorts, respect showSealedProducts flag
+        continue;
+      }
 
       // Apply element filter
       if (filters.elements.isNotEmpty) {
         if (!card.elements.any((e) => filters.elements.contains(e))) {
-          return false;
+          continue;
         }
       }
 
       // Apply type filter
       if (filters.types.isNotEmpty) {
         if (!filters.types.contains(card.cardType)) {
-          return false;
+          continue;
         }
       }
 
       // Apply set filter
       if (filters.sets.isNotEmpty) {
         if (!card.set.any((s) => filters.sets.contains(s))) {
-          return false;
+          continue;
         }
       }
 
       // Apply rarity filter
       if (filters.rarities.isNotEmpty) {
-        if (!filters.rarities.contains(card.rarity)) {
-          return false;
+        if (card.rarity == null || !filters.rarities.contains(card.rarity)) {
+          continue;
         }
       }
 
       // Apply cost filter
       if (filters.minCost != null &&
           (card.cost == null || card.cost! < filters.minCost!)) {
-        return false;
+        continue;
       }
       if (filters.maxCost != null &&
           (card.cost == null || card.cost! > filters.maxCost!)) {
-        return false;
+        continue;
       }
 
       // Apply power filter
       if (filters.minPower != null &&
           (card.power == null || card.power! < filters.minPower!)) {
-        return false;
+        continue;
       }
       if (filters.maxPower != null &&
           (card.power == null || card.power! > filters.maxPower!)) {
-        return false;
+        continue;
       }
 
-      return true;
-    }).toList();
+      indices.add(i);
+    }
 
-    // Apply sorting
+    // Sort indices if needed
     if (filters.sortField != null) {
-      filteredCards.sort((a, b) {
+      indices.sort((a, b) {
+        final cardA = cards[a];
+        final cardB = cards[b];
+
+        // Check if either card is a crystal card
+        final aIsCrystal = cardA.number?.startsWith('C-') ?? false;
+        final bIsCrystal = cardB.number?.startsWith('C-') ?? false;
+
+        // If one is crystal and other isn't, crystal comes after
+        if (aIsCrystal != bIsCrystal) {
+          return aIsCrystal ? 1 : -1;
+        }
+
+        // If both are crystal or both are not, use normal sorting
         final comparison = switch (filters.sortField) {
-          'number' => a.compareByNumber(b),
-          'name' => a.compareByName(b),
-          'cost' => a.compareByCost(b),
-          'power' => a.compareByPower(b),
+          'number' => cardA.compareByNumber(cardB),
+          'name' => cardA.compareByName(cardB),
+          'cost' => cardA.compareByCost(cardB) != 0
+              ? cardA.compareByCost(cardB)
+              : cardA.compareByNumber(cardB),
+          'power' => cardA.compareByPower(cardB) != 0
+              ? cardA.compareByPower(cardB)
+              : cardA.compareByNumber(cardB),
           _ => 0,
         };
         return filters.sortDescending ? -comparison : comparison;
       });
     }
 
-    return filteredCards;
+    // Create and return filtered list using sorted indices
+    return indices.map((i) => cards[i]).toList();
   }
 }

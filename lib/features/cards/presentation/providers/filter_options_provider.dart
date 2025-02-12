@@ -54,7 +54,14 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
           'Dark'
         },
         types: const {'Forward', 'Backup', 'Summon', 'Monster'},
-        rarities: const {'C', 'R', 'H', 'L', 'S', 'P'},
+        rarities: const {
+          'Common',
+          'Rare',
+          'Hero',
+          'Legend',
+          'Starter',
+          'Promo'
+        },
         sets: _setInfo.keys.toSet(),
         costRange: _costRange,
         powerRange: _powerRange,
@@ -75,7 +82,7 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
         },
         types: {'Forward', 'Backup', 'Summon', 'Monster'},
         sets: {},
-        rarities: {'C', 'R', 'H', 'L', 'S', 'P'},
+        rarities: {'Common', 'Rare', 'Hero', 'Legend', 'Starter', 'Promo'},
         costRange: (0, 10),
         powerRange: (0, 10000),
       );

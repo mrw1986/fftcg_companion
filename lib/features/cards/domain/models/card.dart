@@ -1,6 +1,5 @@
 // lib/features/cards/domain/models/card.dart
 
-import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/utils/soundex.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -146,7 +145,24 @@ class Card with _$Card {
       return thisNum.compareTo(otherNum);
     }
 
-    // Check if first parts are numeric
+    // Handle crystal cards (C-001, etc.) - they should be sorted after regular cards
+    final thisIsCrystal = thisParts[0] == 'C';
+    final otherIsCrystal = otherParts[0] == 'C';
+
+    // If one is crystal and other isn't, crystal comes after
+    if (thisIsCrystal && !otherIsCrystal) return 1;
+    if (!thisIsCrystal && otherIsCrystal) return -1;
+
+    // If both are crystal or both are regular cards, proceed with normal comparison
+    if (thisIsCrystal && otherIsCrystal) {
+      // For crystal cards, compare second part
+      if (thisParts.length > 1 && otherParts.length > 1) {
+        return thisParts[1].compareTo(otherParts[1]);
+      }
+      return thisNum.compareTo(otherNum);
+    }
+
+    // For regular cards, check if first parts are numeric
     final thisFirstIsNumeric = RegExp(r'^\d+$').hasMatch(thisParts[0]);
     final otherFirstIsNumeric = RegExp(r'^\d+$').hasMatch(otherParts[0]);
 
@@ -211,17 +227,18 @@ class Card with _$Card {
   }
 
   // URL helpers
-  String? getImageUrl({ImageQuality quality = ImageQuality.high}) {
-    final url = switch (quality) {
-      ImageQuality.low => lowResUrl.isEmpty ? null : lowResUrl,
-      ImageQuality.medium => highResUrl.isEmpty ? null : highResUrl,
-      ImageQuality.high => fullResUrl.isEmpty ? null : fullResUrl,
-    };
-
-    if (url != null) {
-      talker.debug('Getting image URL: $url for quality: $quality');
+  String? getBestImageUrl() {
+    // Try URLs in priority order: full -> high -> low
+    if (fullResUrl.isNotEmpty) {
+      return fullResUrl;
     }
-    return url;
+    if (highResUrl.isNotEmpty) {
+      return highResUrl;
+    }
+    if (lowResUrl.isNotEmpty) {
+      return lowResUrl;
+    }
+    return null;
   }
 }
 

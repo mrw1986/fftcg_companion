@@ -1,7 +1,23 @@
 // lib/core/utils/logger.dart
 import 'package:talker_flutter/talker_flutter.dart';
 
-final talker = TalkerFlutter.init();
+// Create a custom filter that only allows error logs in production
+class ProductionLogFilter extends TalkerFilter {
+  @override
+  bool filter(TalkerData item) {
+    return !const bool.fromEnvironment('dart.vm.product') ||
+        item.logLevel == LogLevel.error;
+  }
+}
+
+final talker = TalkerFlutter.init(
+  settings: TalkerSettings(
+    enabled: true,
+    useConsoleLogs: true,
+    maxHistoryItems: 100,
+  ),
+  filter: ProductionLogFilter(),
+);
 
 extension TalkerLoggerExtension on Talker {
   void logInfo(String message) {

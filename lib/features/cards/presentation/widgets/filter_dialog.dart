@@ -2,83 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_options_provider.dart';
-import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/set_card_count_provider.dart';
-
-final filterProvider =
-    StateNotifierProvider<FilterNotifier, CardFilters>((ref) {
-  return FilterNotifier();
-});
-
-class FilterNotifier extends StateNotifier<CardFilters> {
-  FilterNotifier() : super(const CardFilters());
-
-  void toggleElement(String element) {
-    final elements = Set<String>.from(state.elements);
-    if (elements.contains(element)) {
-      elements.remove(element);
-    } else {
-      elements.add(element);
-    }
-    state = state.copyWith(elements: elements);
-    talker.debug('Filter updated - Elements: $elements');
-  }
-
-  void toggleType(String type) {
-    final types = Set<String>.from(state.types);
-    if (types.contains(type)) {
-      types.remove(type);
-    } else {
-      types.add(type);
-    }
-    state = state.copyWith(types: types);
-  }
-
-  void setCostRange(int? min, int? max) {
-    state = state.copyWith(minCost: min, maxCost: max);
-  }
-
-  void setPowerRange(int? min, int? max) {
-    state = state.copyWith(minPower: min, maxPower: max);
-  }
-
-  void toggleRarity(String rarity) {
-    final rarities = Set<String>.from(state.rarities);
-    if (rarities.contains(rarity)) {
-      rarities.remove(rarity);
-    } else {
-      rarities.add(rarity);
-    }
-    state = state.copyWith(rarities: rarities);
-  }
-
-  void toggleSet(String set) {
-    final sets = Set<String>.from(state.sets);
-    if (sets.contains(set)) {
-      sets.remove(set);
-    } else {
-      sets.add(set);
-    }
-    state = state.copyWith(sets: sets);
-  }
-
-  void toggleShowSealedProducts() {
-    state = state.copyWith(showSealedProducts: !state.showSealedProducts);
-  }
-
-  void reset() {
-    state = const CardFilters();
-  }
-
-  void setSorting(String field, bool descending) {
-    state = state.copyWith(
-      sortField: field,
-      sortDescending: descending,
-    );
-  }
-}
 
 class FilterDialog extends ConsumerWidget {
   const FilterDialog({super.key});
@@ -149,14 +75,7 @@ class FilterDialog extends ConsumerWidget {
                           (rarity) => ref
                               .read(filterProvider.notifier)
                               .toggleRarity(rarity),
-                          displayNames: const {
-                            'P': 'Promo',
-                            'S': 'Starter',
-                            'L': 'Legend',
-                            'H': 'Hero',
-                            'R': 'Rare',
-                            'C': 'Common'
-                          },
+                          // No need for display names since we're using full names
                         ).animate().slideX().fadeIn(delay: 300.ms),
                         Divider(color: colorScheme.outlineVariant),
                         _buildGroupedSetsSection(
@@ -365,7 +284,8 @@ class FilterDialog extends ConsumerWidget {
           itemBuilder: (context, index) {
             final setId = sets[index];
             final setName = filterOptionsNotifier.getSetName(setId);
-            final cardCount = ref.watch(setCardCountCacheProvider(setId));
+            final cardCount =
+                ref.watch(filteredSetCardCountCacheProvider(setId));
 
             return FilterChip(
               label: Row(
@@ -445,29 +365,63 @@ class FilterDialog extends ConsumerWidget {
     double? currentMax,
     void Function(double?, double?) onChanged,
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final effectiveMin = currentMin ?? min;
+    final effectiveMax = currentMax ?? max;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: textTheme.titleMedium,
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    title == 'Power'
+                        ? '${(effectiveMin / 1000).toInt()}k - ${(effectiveMax / 1000).toInt()}k'
+                        : '${effectiveMin.toInt()} - ${effectiveMax.toInt()}',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         RangeSlider(
-          values: RangeValues(
-            currentMin ?? min,
-            currentMax ?? max,
-          ),
+          values: RangeValues(effectiveMin, effectiveMax),
           min: min,
           max: max,
           divisions: title == 'Power'
               ? ((max - min) / 1000).toInt()
               : (max - min).toInt(),
           labels: RangeLabels(
-            (currentMin ?? min).toInt().toString(),
-            (currentMax ?? max).toInt().toString(),
+            title == 'Power'
+                ? '${(effectiveMin / 1000).toInt()}k'
+                : effectiveMin.toInt().toString(),
+            title == 'Power'
+                ? '${(effectiveMax / 1000).toInt()}k'
+                : effectiveMax.toInt().toString(),
           ),
           onChanged: (RangeValues values) {
             onChanged(values.start, values.end);

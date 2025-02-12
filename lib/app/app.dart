@@ -5,6 +5,7 @@ import 'package:fftcg_companion/app/theme/theme_provider.dart';
 import 'package:fftcg_companion/core/routing/app_router.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'package:fftcg_companion/app/loading_wrapper.dart';
 
 class FFTCGCompanionApp extends ConsumerWidget {
   const FFTCGCompanionApp({super.key});
@@ -32,7 +33,9 @@ class FFTCGCompanionApp extends ConsumerWidget {
                 child: CustomErrorWidget(details: details),
               );
             };
-            return child!;
+            return Material(
+              child: LoadingWrapper(child: child!),
+            );
           },
         );
       },
