@@ -2,7 +2,6 @@
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:fftcg_companion/core/utils/logger.dart';
 
 class FlippingCardImage extends StatefulWidget {
   final Widget frontWidget;
@@ -54,11 +53,9 @@ class _FlippingCardImageState extends State<FlippingCardImage>
     _animation.addStatusListener((status) {
       if (status == AnimationStatus.forward) {
         _isAnimating = true;
-        talker.debug('FlippingCardImage: Animation starting forward');
       } else if (status == AnimationStatus.completed) {
         _isAnimating = false;
         _hasAnimated = true;
-        talker.debug('FlippingCardImage: Animation completed');
         widget.onAnimationComplete?.call();
       }
     });
@@ -67,7 +64,6 @@ class _FlippingCardImageState extends State<FlippingCardImage>
       if (_animation.value <= math.pi / 2 && _showFrontSide && _isAnimating) {
         setState(() {
           _showFrontSide = false;
-          talker.debug('FlippingCardImage: Switching to front side');
         });
       }
     });

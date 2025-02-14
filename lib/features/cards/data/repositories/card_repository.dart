@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/core/services/firestore_provider.dart';
 import 'package:fftcg_companion/features/models.dart';
@@ -14,28 +13,12 @@ part 'card_repository.g.dart';
 class CardRepository extends _$CardRepository {
   @override
   FutureOr<List<Card>> build() async {
-    // Start with an empty list - cards will be loaded when needed
-    return const [];
-  }
-
-  /// Initialize the repository by loading cards from cache or Firestore
-  Future<void> initialize() async {
-    // No need to load all cards at startup
-    state = const AsyncData([]);
-  }
-
-  /// Load cards only when needed
-  Future<void> loadCards() async {
-    if (state.value?.isNotEmpty ?? false) return;
-
-    state = const AsyncLoading();
     try {
       final cache = await ref.read(cardCacheNotifierProvider.future);
       final cachedCards = await cache.getCachedCards();
 
       if (cachedCards.isNotEmpty) {
-        state = AsyncData(cachedCards);
-        return;
+        return cachedCards;
       }
 
       final firestoreService = ref.read(firestoreServiceProvider);
@@ -43,12 +26,20 @@ class CardRepository extends _$CardRepository {
       final cards =
           snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
 
+      // Clear filter options cache before caching new cards
+      await cache.clearCache();
       await cache.cacheCards(cards);
-      state = AsyncData(cards);
+      return cards;
+    } catch (e, stack) {
+      talker.error('Error loading cards', e, stack);
+      rethrow;
+    }
+  }
 
-      // Prefetch images for the first batch of cards
-      for (var i = 0; i < math.min(20, cards.length); i++) {
-        final card = cards[i];
+  /// Prefetch images for visible cards to improve performance
+  Future<void> prefetchVisibleCardImages(List<Card> visibleCards) async {
+    try {
+      for (final card in visibleCards.take(20)) {
         final imageUrl = card.getBestImageUrl();
         if (imageUrl != null) {
           CardImageUtils.prefetchImage(imageUrl);
@@ -56,7 +47,6 @@ class CardRepository extends _$CardRepository {
       }
     } catch (e, stack) {
       talker.error('Error loading cards', e, stack);
-      state = AsyncError(e, stack);
       rethrow;
     }
   }
@@ -231,10 +221,10 @@ class CardRepository extends _$CardRepository {
     try {
       // Ensure cards are loaded
       if (state.value?.isEmpty ?? true) {
-        await loadCards();
+        ref.invalidateSelf();
       }
 
-      final cards = state.value ?? [];
+      final cards = await future;
       return applyLocalFilters(cards, filters);
     } catch (e, stack) {
       talker.error('Error applying filters', e, stack);
@@ -249,15 +239,13 @@ class CardRepository extends _$CardRepository {
     try {
       // Force refresh if requested
       if (forceRefresh) {
-        state = const AsyncLoading();
-        await loadCards();
-      }
-      // Load cards if not already loaded
-      else if (state.value?.isEmpty ?? true) {
-        await loadCards();
+        ref.invalidateSelf();
+        // Clear filter options cache on force refresh
+        final cache = await ref.read(cardCacheNotifierProvider.future);
+        await cache.clearCache();
       }
 
-      final cards = state.value ?? [];
+      final cards = await future;
 
       // Apply default sorting if no filters provided
       filters = filters ??

@@ -13,7 +13,6 @@ import 'package:fftcg_companion/app/app.dart';
 import 'package:fftcg_companion/firebase_options.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
-import 'package:fftcg_companion/features/cards/presentation/providers/initialization_provider.dart';
 import 'package:fftcg_companion/core/storage/cache_persistence.dart';
 
 final _container = ProviderContainer();
@@ -54,11 +53,9 @@ Future<void> initializeApp() async {
 // Initialize image cache
     CardImageCacheManager.initCache();
 
-// Start app initialization
-    await _container.read(initializationProvider.future);
-    talker.debug('App initialization completed');
+    talker.debug('Basic initialization completed');
   } catch (e, stack) {
-    talker.error('Error during initialization', e, stack);
+    talker.error('Error during basic initialization', e, stack);
     rethrow;
   }
 }

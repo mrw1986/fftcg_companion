@@ -14,28 +14,14 @@ class CardsNotifier extends _$CardsNotifier {
 
   @override
   FutureOr<List<models.Card>> build() async {
-    // Set default sort to Card Number (Ascending)
     _currentFilters = const CardFilters(
       sortField: 'number',
       sortDescending: false,
     );
 
-    // Get initial cards from repository
-    final cards = await ref.watch(cardRepositoryProvider.future);
+    final repository = ref.read(cardRepositoryProvider.notifier);
+    final cards = await repository.getCards(filters: _currentFilters);
     return cards;
-  }
-
-  Future<void> loadInitialCards() async {
-    state = const AsyncLoading();
-    try {
-      final repository = ref.read(cardRepositoryProvider.notifier);
-      await repository.loadCards();
-      final cards = await repository.getCards(filters: _currentFilters);
-      state = AsyncData(cards);
-    } catch (e, stack) {
-      talker.error('Error loading initial cards', e, stack);
-      state = AsyncError(e, stack);
-    }
   }
 
   /// Apply new filters to the card list

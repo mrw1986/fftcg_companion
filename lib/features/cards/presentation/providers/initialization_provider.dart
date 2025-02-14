@@ -9,7 +9,7 @@ Future<void> initialization(ref) async {
   // Initialize cache first
   await ref.read(cardCacheNotifierProvider.future);
 
-  // Then initialize repository and load cards
+  // Then initialize repository
   final repository = ref.read(cardRepositoryProvider.notifier);
   await repository.initialize();
 }

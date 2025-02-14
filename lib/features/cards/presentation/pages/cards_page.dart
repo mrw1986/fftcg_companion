@@ -6,12 +6,16 @@ import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
+import 'package:fftcg_companion/features/cards/data/repositories/card_repository.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/sort_bottom_sheet.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/active_filters_provider.dart';
+import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 
 final searchControllerProvider =
     StateProvider.autoDispose<TextEditingController>(
@@ -31,35 +35,19 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   @override
   void initState() {
     super.initState();
-    // Load cards after the widget is mounted
+    // Cards will be loaded automatically by the provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(cardsNotifierProvider.notifier).loadInitialCards();
+      _prefetchInitialImages();
     });
   }
 
-  void _showSortBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black54,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        child: TweenAnimationBuilder<double>(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-          tween: Tween(begin: 1.0, end: 0.0),
-          builder: (context, value, child) => Transform.translate(
-            offset: Offset(0, 200 * value),
-            child: child,
-          ),
-          child: const SortBottomSheet(),
-        ),
-      ),
-    );
+  void _prefetchInitialImages() async {
+    final cards = ref.read(cardsNotifierProvider).value;
+    if (cards != null && cards.isNotEmpty) {
+      await ref
+          .read(cardRepositoryProvider.notifier)
+          .prefetchVisibleCardImages(cards.take(20).toList());
+    }
   }
 
   @override
@@ -97,7 +85,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                           ],
                         );
                       },
-                      loading: () => const SizedBox.shrink(),
+                      loading: () => const LoadingIndicator(),
                       error: (error, stack) => ErrorView(
                         message: error.toString(),
                         onRetry: () => ref
@@ -121,7 +109,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                     ],
                   );
                 },
-                loading: () => const SizedBox.shrink(),
+                loading: () => const LoadingIndicator(),
                 error: (error, stack) => ErrorView(
                   message: error.toString(),
                   onRetry: () => ref.refresh(cardsNotifierProvider),
@@ -169,6 +157,31 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     );
   }
 
+  void _showSortBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          tween: Tween(begin: 1.0, end: 0.0),
+          builder: (context, value, child) => Transform.translate(
+            offset: Offset(0, 200 * value),
+            child: child,
+          ),
+          child: const SortBottomSheet(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAppBarTitle(TextEditingController searchController) {
     if (!_isSearching) {
       return const Text('Card Database');
@@ -205,7 +218,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         hintText: 'Search cards...',
         border: InputBorder.none,
         suffixIcon: IconButton(
-          icon: const Icon(Icons.clear),
+          icon: const Icon(
+            Icons.backspace_outlined,
+          ),
           onPressed: () => controller.clear(),
         ),
       ),
@@ -227,7 +242,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     // Search action
     actions.add(
       IconButton(
-        icon: Icon(_isSearching ? Icons.cancel : Icons.search),
+        icon: Icon(_isSearching ? Icons.close_outlined : Icons.search),
         onPressed: () {
           setState(() => _isSearching = !_isSearching);
           if (!_isSearching) ref.read(searchControllerProvider).clear();
@@ -274,9 +289,61 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             ),
           ],
         ),
-        IconButton(
-          icon: const Icon(Icons.filter_list),
-          onPressed: () => _showFilterDialog(context),
+        Consumer(
+          builder: (context, ref, _) {
+            final filters = ref.watch(filterProvider);
+            final filterCount = ref.watch(activeFilterCountProvider(filters));
+            final colorScheme = Theme.of(context).colorScheme;
+
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.filter_list),
+                  onPressed: () => _showFilterDialog(context),
+                ),
+                if (filterCount > 0)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        filterCount.toString(),
+                        style: TextStyle(
+                          color: colorScheme.onPrimary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+        Consumer(
+          builder: (context, ref, _) {
+            final filters = ref.watch(filterProvider);
+            final filterCount = ref.watch(activeFilterCountProvider(filters));
+            if (filterCount > 0) {
+              return IconButton(
+                icon: const Icon(Icons.clear_all),
+                tooltip: 'Clear all filters',
+                onPressed: () {
+                  ref.read(filterProvider.notifier).reset();
+                  ref.read(cardsNotifierProvider.notifier).applyFilters(
+                        const CardFilters(),
+                      );
+                },
+              );
+            }
+            return const SizedBox.shrink();
+          },
         ),
       ]);
     }
@@ -391,30 +458,6 @@ class _CardGridItemState extends State<CardGridItem>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-
-  @override
-  void initState() {
-    super.initState();
-    _preloadImages();
-  }
-
-  bool _isPreloading = false;
-
-  void _preloadImages() async {
-    if (_isPreloading) return;
-
-    try {
-      _isPreloading = true;
-      // Prefetch the best quality image
-      await CardImageUtils.prefetchImage(widget.card.getBestImageUrl());
-    } catch (e, stack) {
-      talker.error('Failed to preload images', e, stack);
-    } finally {
-      if (mounted) {
-        setState(() => _isPreloading = false);
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -553,26 +596,11 @@ class _CardListItemState extends State<CardListItem>
   @override
   bool get wantKeepAlive => true;
 
-  @override
-  void initState() {
-    super.initState();
-    _preloadImages();
-  }
-
-  void _preloadImages() async {
-    try {
-      // Prefetch the best quality image
-      await CardImageUtils.prefetchImage(widget.card.getBestImageUrl());
-    } catch (e, stack) {
-      talker.error('Failed to preload images', e, stack);
-    }
-  }
-
   String? getExtendedValue(String key) {
     switch (key) {
       case 'Element':
         return widget.card.elements.isNotEmpty
-            ? widget.card.elements.first
+            ? widget.card.elements.join(', ')
             : null;
       case 'Type':
         return widget.card.cardType;
@@ -689,12 +717,19 @@ class _CardListItemState extends State<CardListItem>
                         ),
                       if (widget.viewSize == ViewSize.large) ...[
                         const SizedBox(height: 8),
-                        _buildMetadataChips(context, colorScheme),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildMetadataChips(context, colorScheme),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildCostIndicator(colorScheme, textTheme),
+                          ],
+                        ),
                       ],
                     ],
                   ),
                 ),
-                _buildCostIndicator(colorScheme, textTheme),
               ],
             ),
           ),
@@ -704,29 +739,49 @@ class _CardListItemState extends State<CardListItem>
   }
 
   Widget _buildMetadataChips(BuildContext context, ColorScheme colorScheme) {
-    final elementValue = getExtendedValue('Element');
+    final elements = widget.card.elements;
     final typeValue = getExtendedValue('Type');
+    final jobValue = getExtendedValue('Job');
+    final categoryValue = getExtendedValue('Category');
 
-    if (elementValue == null && typeValue == null) {
+    if (elements.isEmpty &&
+        typeValue == null &&
+        jobValue == null &&
+        categoryValue == null) {
       return const SizedBox.shrink();
     }
 
-    return Row(
+    return Wrap(
+      spacing: 2,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        if (elementValue != null)
-          _buildChip(
-            context,
-            elementValue,
-            colorScheme.primaryContainer,
-            colorScheme.onPrimaryContainer,
-          ),
-        if (elementValue != null && typeValue != null) const SizedBox(width: 8),
+        ...elements.map((element) => _buildChip(
+              context,
+              element,
+              colorScheme.primaryContainer,
+              colorScheme.onPrimaryContainer,
+            )),
         if (typeValue != null)
           _buildChip(
             context,
             typeValue,
             colorScheme.secondaryContainer,
             colorScheme.onSecondaryContainer,
+          ),
+        if (jobValue != null)
+          _buildChip(
+            context,
+            jobValue,
+            colorScheme.tertiaryContainer,
+            colorScheme.onTertiaryContainer,
+          ),
+        if (categoryValue != null)
+          _buildChip(
+            context,
+            categoryValue,
+            colorScheme.surfaceVariant,
+            colorScheme.onSurfaceVariant,
           ),
       ],
     );
@@ -738,34 +793,33 @@ class _CardListItemState extends State<CardListItem>
       return const SizedBox.shrink();
     }
 
-    final size = switch (widget.viewSize) {
-      ViewSize.small => 32.0,
-      ViewSize.normal => 40.0,
-      ViewSize.large => 48.0,
+    return _buildChip(
+      context,
+      costValue,
+      colorScheme.primary,
+      colorScheme.onPrimary,
+    );
+  }
+
+  String? _getElementImagePath(String element) {
+    // Only return image paths for actual elements
+    final validElements = {
+      'Fire',
+      'Ice',
+      'Wind',
+      'Earth',
+      'Lightning',
+      'Water',
+      'Light',
+      'Dark'
     };
 
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: colorScheme.primary,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Center(
-        child: Text(
-          costValue,
-          style: (switch (widget.viewSize) {
-            ViewSize.small => textTheme.titleSmall,
-            ViewSize.normal => textTheme.titleMedium,
-            ViewSize.large => textTheme.titleLarge,
-          })
-              ?.copyWith(
-            color: colorScheme.onPrimary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
+    if (!validElements.contains(element)) {
+      return null;
+    }
+
+    final elementName = element.toLowerCase();
+    return 'assets/images/elements/$elementName.png';
   }
 
   Widget _buildChip(
@@ -774,19 +828,29 @@ class _CardListItemState extends State<CardListItem>
     Color backgroundColor,
     Color textColor,
   ) {
+    // Check if this is an element chip
+    final elementImagePath = _getElementImagePath(label);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: elementImagePath != null ? Colors.transparent : backgroundColor,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: textColor,
-              fontWeight: FontWeight.bold,
+      child: elementImagePath != null
+          ? Image.asset(
+              elementImagePath,
+              width: 22,
+              height: 22,
+              alignment: Alignment.center,
+            )
+          : Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
-      ),
     );
   }
 }

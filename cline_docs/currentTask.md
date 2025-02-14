@@ -2,48 +2,65 @@
 
 ## Objective
 
-Improve card sorting functionality and fix related issues
+Improve app initialization, loading states, and splash screen implementation
 
 ## Context
 
-The card sorting system needed improvements to handle:
+The app was experiencing issues with:
 
-1. Crystal cards appearing in the correct order
-2. Non-card items visibility in different sort modes
-3. Secondary sorting by number for cost and power sorts
+1. Provider initialization conflicts during startup
+2. Complex loading screen implementation
+3. Lack of a proper splash screen
+4. Need for a simpler loading indicator
 
 ## Changes Made
 
-### Card Repository
+### Loading and Initialization
 
-- Updated sorting logic to always place crystal cards at the end of the list
-- Modified filtering logic to hide non-card items for number, cost, and power sorts
-- Added secondary number sorting for cost and power sorts
-- Improved crystal card handling for all sort types (name, number, cost, power)
+- Removed LoadingWrapper in favor of page-level loading states
+- Created a simplified LoadingIndicator widget
+- Added flutter_native_splash for better app launch experience
+- Fixed provider initialization conflicts
 
 ### Code Organization
 
-- Moved SortBottomSheet to dedicated widget file
-- Updated cards_page.dart to use new SortBottomSheet widget
+- Created shared/widgets/loading_indicator.dart for reusable loading UI
+- Updated cards_page.dart to handle loading states directly
 - Improved state management with Riverpod
+- Simplified CardRepository initialization flow
+
+### UI/UX Improvements
+
+- Added branded splash screen with app logo
+- Implemented consistent loading indicator across the app
+- Improved error handling during initialization
+- Enhanced loading state transitions
 
 ## Current Status
 
-- [x] Fixed crystal card sorting to always appear at end
-- [x] Implemented proper non-card item filtering
-- [x] Added secondary number sorting
-- [x] Refactored code organization
+- [x] Fixed provider initialization conflicts
+- [x] Implemented native splash screen
+- [x] Created simplified loading indicator
 - [x] Updated documentation
-- [x] Improved sorting consistency across all sort types
+- [x] Improved initialization flow
+- [x] Enhanced loading state management
+- [x] Optimized caching with version tracking
+- [x] Improved logging system
+- [x] Enhanced image loading performance
+- [x] Fixed code quality issues
 
 ## Next Steps
 
-1. Monitor sorting performance with large datasets
-2. Consider adding additional sorting options if needed
-3. Add unit tests for sorting logic
+1. Monitor app initialization performance
+2. Consider adding loading progress indicators where appropriate
+3. Add unit tests for initialization logic
+4. Consider additional caching optimizations
+5. Monitor logging performance in production
+6. Consider implementing lazy image loading for off-screen cards
 
 ## Related Tasks from Roadmap
 
-- [x] Sort by name, number, cost, power
-- [x] Handle crystal cards and sealed products properly
-- [x] Advanced filtering system
+- [x] Improve app initialization
+- [x] Enhance loading states
+- [x] Add splash screen
+- [x] Optimize startup performance

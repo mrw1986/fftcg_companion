@@ -2,12 +2,16 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:fftcg_companion/features/repositories.dart'; // Update this import
+import 'package:fftcg_companion/features/repositories.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card_filter_options.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:fftcg_companion/core/providers/card_cache_provider.dart';
 
 part 'filter_options_provider.g.dart';
 part 'filter_options_provider.freezed.dart';
+
+// Generated provider
+final cardCacheProvider = cardCacheNotifierProvider;
 
 enum SetCategory {
   promotional,
@@ -40,7 +44,86 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
   @override
   Future<CardFilterOptions> build() async {
     try {
+      // Try to get cached filter options first
+      final cardCache = await ref.read(cardCacheProvider.future);
+      final cachedOptions = await cardCache.getCachedFilterOptions();
+
+      if (cachedOptions != null) {
+        talker.debug('Using cached filter options');
+        _setInfo.clear();
+        _setInfo.addAll(Map<String, SetInfo>.from(
+          (cachedOptions['setInfo'] as Map).map(
+            (key, value) => MapEntry(
+              key as String,
+              SetInfo(
+                id: value['id'] as String,
+                name: value['name'] as String,
+                abbreviation: value['abbreviation'] as String?,
+                category: SetCategory.values.firstWhere(
+                  (e) => e.name == value['category'] as String,
+                ),
+                publishedDate: DateTime.parse(value['publishedDate'] as String),
+                sortOrder: value['sortOrder'] as int,
+              ),
+            ),
+          ),
+        ));
+        _costRange = (
+          cachedOptions['minCost'] as int,
+          cachedOptions['maxCost'] as int,
+        );
+        _powerRange = (
+          cachedOptions['minPower'] as int,
+          cachedOptions['maxPower'] as int,
+        );
+
+        return CardFilterOptions(
+          elements: Set<String>.from(cachedOptions['elements'] as List),
+          types: Set<String>.from(cachedOptions['types'] as List),
+          rarities: Set<String>.from(cachedOptions['rarities'] as List),
+          sets: _setInfo.keys.toSet(),
+          costRange: _costRange,
+          powerRange: _powerRange,
+        );
+      }
+
+      // If no cache or cache expired, fetch from Firestore
       await _prefetchSetInfo();
+
+      // Cache the new filter options
+      await (await ref.read(cardCacheProvider.future)).cacheFilterOptions({
+        'elements': const [
+          'Fire',
+          'Ice',
+          'Wind',
+          'Earth',
+          'Lightning',
+          'Water',
+          'Light',
+          'Dark'
+        ],
+        'types': const ['Forward', 'Backup', 'Summon', 'Monster'],
+        'rarities': const [
+          'Common',
+          'Rare',
+          'Hero',
+          'Legend',
+          'Starter',
+          'Promo'
+        ],
+        'setInfo': _setInfo.map((key, value) => MapEntry(key, {
+              'id': value.id,
+              'name': value.name,
+              'abbreviation': value.abbreviation,
+              'category': value.category.name,
+              'publishedDate': value.publishedDate.toIso8601String(),
+              'sortOrder': value.sortOrder,
+            })),
+        'minCost': _costRange.$1,
+        'maxCost': _costRange.$2,
+        'minPower': _powerRange.$1,
+        'maxPower': _powerRange.$2,
+      });
 
       return CardFilterOptions(
         elements: const {

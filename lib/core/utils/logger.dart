@@ -5,8 +5,12 @@ import 'package:talker_flutter/talker_flutter.dart';
 class ProductionLogFilter extends TalkerFilter {
   @override
   bool filter(TalkerData item) {
-    return !const bool.fromEnvironment('dart.vm.product') ||
-        item.logLevel == LogLevel.error;
+    // In production, only show errors
+    if (const bool.fromEnvironment('dart.vm.product')) {
+      return item.logLevel == LogLevel.error;
+    }
+    // In debug mode, only show warnings and errors
+    return item.logLevel == LogLevel.error || item.logLevel == LogLevel.warning;
   }
 }
 

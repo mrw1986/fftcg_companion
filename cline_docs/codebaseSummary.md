@@ -27,7 +27,10 @@
   - Theme configuration
   - App initialization
   - Route management
-  - Loading states
+  - Native splash screen
+- `/lib/shared/`
+  - Common widgets (loading indicators)
+  - Utility components
 
 ## Data Flow
 
@@ -46,6 +49,14 @@
 - StateNotifier for mutable state
 - Consumer widgets for UI updates
 
+### Loading and Initialization
+
+1. Native splash screen during app launch
+2. Efficient provider initialization
+3. Page-level loading states
+4. Consistent loading indicators
+5. Error handling and recovery
+
 ## External Dependencies
 
 ### Key Components
@@ -55,8 +66,17 @@
 - Riverpod for state management
 - GoRouter for navigation
 - Freezed for immutable models
+- flutter_native_splash for launch screen
 
 ## Recent Changes
+
+### Loading System Improvements
+
+- Implemented native splash screen
+- Created simplified LoadingIndicator widget
+- Removed LoadingWrapper complexity
+- Enhanced provider initialization
+- Improved error handling
 
 ### Card Sorting Improvements
 
@@ -71,22 +91,60 @@
 - Improved provider structure
 - Enhanced error handling
 - Better state management
+- New shared widgets directory
 
 ### Performance Optimizations
 
 - Efficient filtering algorithms
 - Improved image caching
+  - Deferred image prefetching
+  - Limited to visible cards
+  - Memory-efficient loading
 - Better state updates
+- Optimized initialization flow
+  - Version-based cache management
+  - Reduced logging overhead
+  - Improved code quality
+  - Removed unnecessary operations
 
 ## User Feedback Integration
 
-- Improved sorting behavior
-- Better handling of special cards
-- Enhanced filtering options
+- Improved loading experience
+- Better error handling
+- Enhanced initialization flow
+- Consistent loading indicators
 
 ## Known Issues
 
 - None currently tracked
+
+## Recent Performance Improvements
+
+### Caching System
+
+- Added version tracking to prevent unnecessary cache clearing
+- Optimized cache initialization
+- Improved cache hit rates
+
+### Image Loading
+
+- Deferred prefetching until after initial render
+- Limited prefetching to first 20 visible cards
+- Removed redundant image preloading
+
+### Logging System
+
+- Reduced logging verbosity
+- Filtered out debug logs
+- Removed excessive animation logging
+- Cleaned up unnecessary logging code
+
+### Code Quality
+
+- Removed duplicate catch clauses
+- Cleaned up unused imports
+- Removed unnecessary overrides
+- Enhanced code organization
 
 ## Development Guidelines
 
@@ -95,3 +153,5 @@
 - Comprehensive documentation
 - Regular testing
 - Performance monitoring
+- Consistent loading states
+- Error handling best practices

@@ -5,21 +5,35 @@ import 'package:fftcg_companion/core/utils/logger.dart';
 class CardCache {
   static const String _cardsBoxName = 'cards';
   static const String _searchCacheBoxName = 'search_cache';
+  static const String _filterOptionsBoxName = 'filter_options';
+  static const String _metaBoxName = 'cache_meta';
+  static const int _currentVersion =
+      1; // Increment when cache structure changes
+
   Box<Map>? _cardsBox;
   Box<List>? _searchCacheBox;
+  Box<Map>? _filterOptionsBox;
+  Box<dynamic>? _metaBox;
 
   Future<void> initialize() async {
     try {
-      // Close any existing boxes
-      await Hive.close();
+      // Open meta box first to check version
+      _metaBox = await Hive.openBox(_metaBoxName);
+      final cachedVersion = _metaBox?.get('version') as int?;
 
-      // Delete existing boxes to change their type
-      await Hive.deleteBoxFromDisk(_cardsBoxName);
-      await Hive.deleteBoxFromDisk(_searchCacheBoxName);
+      // If version mismatch or no version, clear cache
+      if (cachedVersion != _currentVersion) {
+        talker.warning('Cache version mismatch, clearing cache');
+        await Hive.deleteBoxFromDisk(_cardsBoxName);
+        await Hive.deleteBoxFromDisk(_searchCacheBoxName);
+        await Hive.deleteBoxFromDisk(_filterOptionsBoxName);
+        await _metaBox?.put('version', _currentVersion);
+      }
 
-      // Open boxes with new types
+      // Open boxes
       _cardsBox = await Hive.openBox<Map>(_cardsBoxName);
       _searchCacheBox = await Hive.openBox<List>(_searchCacheBoxName);
+      _filterOptionsBox = await Hive.openBox<Map>(_filterOptionsBoxName);
     } catch (e, stack) {
       talker.error('Failed to initialize card cache boxes', e, stack);
       rethrow;
@@ -29,6 +43,7 @@ class CardCache {
   Future<void> dispose() async {
     await _cardsBox?.close();
     await _searchCacheBox?.close();
+    await _filterOptionsBox?.close();
   }
 
   Future<void> cacheCards(List<models.Card> cards) async {
@@ -113,8 +128,44 @@ class CardCache {
     try {
       await _cardsBox?.clear();
       await _searchCacheBox?.clear();
+      await _filterOptionsBox?.clear();
     } catch (e, stack) {
       talker.error('Failed to clear card cache', e, stack);
+    }
+  }
+
+  // Filter options caching
+  Future<void> cacheFilterOptions(Map<String, dynamic> options) async {
+    if (_filterOptionsBox == null) return;
+
+    try {
+      await _filterOptionsBox!.put('filter_options', {
+        'timestamp': DateTime.now().toIso8601String(),
+        'data': options,
+      });
+    } catch (e, stack) {
+      talker.error('Failed to cache filter options', e, stack);
+    }
+  }
+
+  Future<Map<String, dynamic>?> getCachedFilterOptions() async {
+    if (_filterOptionsBox == null) return null;
+
+    try {
+      final cached = _filterOptionsBox!.get('filter_options');
+      if (cached == null) return null;
+
+      final timestamp = DateTime.parse(cached['timestamp'] as String);
+      // Cache for 24 hours since filter options change less frequently
+      if (DateTime.now().difference(timestamp) > const Duration(hours: 24)) {
+        await _filterOptionsBox!.delete('filter_options');
+        return null;
+      }
+
+      return Map<String, dynamic>.from(cached['data'] as Map);
+    } catch (e, stack) {
+      talker.error('Failed to get cached filter options', e, stack);
+      return null;
     }
   }
 }

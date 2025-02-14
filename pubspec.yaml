@@ -81,6 +81,7 @@ dev_dependencies:
   # Development Tools
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.4
 
 flutter:
   uses-material-design: true
@@ -101,3 +102,12 @@ flutter_launcher_icons:
     generate: false
   macos:
     generate: false
+
+flutter_native_splash:
+  color: "#1E1E1E"
+  image: assets/images/fftcg_companion_logo.png
+  android_12:
+    image: assets/images/fftcg_companion_logo.png
+    color: "#1E1E1E"
+  ios: true
+  web: false
