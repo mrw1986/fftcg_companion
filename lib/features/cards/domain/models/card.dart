@@ -117,6 +117,7 @@ class Card with _$Card {
   // Display helpers
   String? get displayNumber => isNonCard ? null : number;
   String get displayRarity => isNonCard ? 'Sealed Product' : (rarity ?? '');
+  String? get displayCategory => category?.replaceAll('&middot;', ' · ');
 
   // Rarity helpers
   bool get isCommon => !isNonCard && rarity?.toLowerCase() == 'c';

@@ -124,7 +124,7 @@ class _CardListItemState extends State<CardListItem>
                       const SizedBox(height: 4),
                       if (widget.card.displayNumber != null)
                         Text(
-                          '${widget.card.displayNumber} \u00B7 ${widget.card.set.join(' \u00B7 ')}',
+                          '${widget.card.displayNumber} · ${widget.card.set.join(' · ')}',
                           style: (switch (widget.viewSize) {
                             ViewSize.small => textTheme.bodySmall,
                             ViewSize.normal => textTheme.bodyMedium,

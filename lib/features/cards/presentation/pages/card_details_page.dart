@@ -1,4 +1,5 @@
 // lib/features/cards/presentation/pages/card_details_page.dart
+import 'package:fftcg_companion/core/utils/html_parser.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
 import 'package:flutter/material.dart';
@@ -197,11 +198,11 @@ class CardDetailsPage extends StatelessWidget {
             if (card.power != null)
               _buildInfoRow('Power', card.power.toString(), textTheme),
             // Category
-            if (card.category != null)
-              _buildInfoRow('Category', card.category!, textTheme),
+            if (card.displayCategory != null)
+              _buildInfoRow('Category', card.displayCategory!, textTheme),
             // Set
             if (card.set.isNotEmpty)
-              _buildInfoRow('Set', card.set.join(', '), textTheme),
+              _buildInfoRow('Set', card.set.join(' · '), textTheme),
             // Description (if exists)
             if (card.description != null) ...[
               const Divider(height: 24),
@@ -213,10 +214,14 @@ class CardDetailsPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                card.description!,
-                style: textTheme.bodyLarge?.copyWith(
-                  color: colorScheme.onSurface,
+              RichText(
+                text: TextSpan(
+                  children: HtmlParser.parseHtml(
+                    card.description!,
+                    textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
                 ),
               ),
             ],

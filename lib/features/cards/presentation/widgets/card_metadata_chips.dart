@@ -84,7 +84,7 @@ class CardMetadataChips extends StatelessWidget {
     final elements = card.elements;
     final typeValue = card.cardType;
     final jobValue = card.job;
-    final categoryValue = card.category;
+    final categoryValue = card.displayCategory; // Use displayCategory getter
     final costValue = card.cost?.toString();
 
     if (elements.isEmpty &&
