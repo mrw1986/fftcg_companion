@@ -291,13 +291,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             );
           },
         ),
-        IconButton(
-          icon: Icon(
-            viewPrefs.type == ViewType.grid ? Icons.view_list : Icons.grid_view,
-          ),
-          onPressed: () =>
-              ref.read(viewPreferencesProvider.notifier).toggleViewType(),
-        ),
         PopupMenuButton<ViewSize>(
           icon: const Icon(Icons.format_size),
           initialValue: viewPrefs.type == ViewType.grid
@@ -324,6 +317,13 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               child: Text('Large'),
             ),
           ],
+        ),
+        IconButton(
+          icon: Icon(
+            viewPrefs.type == ViewType.grid ? Icons.view_list : Icons.grid_view,
+          ),
+          onPressed: () =>
+              ref.read(viewPreferencesProvider.notifier).toggleViewType(),
         ),
         Consumer(
           builder: (context, ref, _) {
