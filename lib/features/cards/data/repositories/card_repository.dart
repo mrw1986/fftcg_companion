@@ -104,6 +104,10 @@ class CardRepository extends _$CardRepository {
         // If it's just a number (potential set number), add variations
         else if (RegExp(r'^\d+$').hasMatch(normalizedQuery)) {
           searchTerms.add('$normalizedQuery-');
+          // Also add variations for partial number matches
+          for (int i = 1; i <= normalizedQuery.length; i++) {
+            searchTerms.add(normalizedQuery.substring(0, i));
+          }
         }
       }
 
@@ -137,13 +141,17 @@ class CardRepository extends _$CardRepository {
         if (name == normalizedQuery ||
             number == normalizedQuery ||
             cardNumbers.contains(normalizedQuery)) {
+          return 7;
+        }
+
+        // Card number starts with query gets very high priority
+        if (cardNumbers.any((n) => n.startsWith(normalizedQuery))) {
           return 6;
         }
 
-        // Starts with query term gets high priority
+        // Name or primary number starts with query gets high priority
         if (name.startsWith(normalizedQuery) ||
-            number.startsWith(normalizedQuery) ||
-            cardNumbers.any((n) => n.startsWith(normalizedQuery))) {
+            number.startsWith(normalizedQuery)) {
           return 5;
         }
 

@@ -47,7 +47,7 @@ class CardSearchBar extends ConsumerWidget {
       controller: controller,
       autofocus: true,
       decoration: InputDecoration(
-        hintText: 'Search cards...',
+        hintText: "Search (e.g., 'Auron' or '1-001H')...",
         border: InputBorder.none,
         suffixIcon: IconButton(
           icon: const Icon(Icons.backspace_outlined),
