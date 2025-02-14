@@ -1,7 +1,7 @@
 // lib/features/cards/presentation/pages/card_details_page.dart
-import 'package:fftcg_companion/core/utils/html_parser.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
+import 'package:fftcg_companion/features/cards/presentation/widgets/card_description_text.dart';
 import 'package:flutter/material.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 
@@ -214,14 +214,10 @@ class CardDetailsPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              RichText(
-                text: TextSpan(
-                  children: HtmlParser.parseHtml(
-                    card.description!,
-                    textTheme.bodyLarge?.copyWith(
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
+              CardDescriptionText(
+                text: card.description!,
+                baseStyle: textTheme.bodyLarge?.copyWith(
+                  color: colorScheme.onSurface,
                 ),
               ),
             ],

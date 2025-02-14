@@ -4,6 +4,7 @@ import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
 import 'package:fftcg_companion/features/cards/data/repositories/card_repository.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/search_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/sort_bottom_sheet.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
@@ -12,11 +13,6 @@ import 'package:fftcg_companion/features/cards/presentation/widgets/card_search_
 import 'package:fftcg_companion/features/cards/presentation/widgets/card_app_bar_actions.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/card_content.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/error_view.dart';
-
-final searchControllerProvider =
-    StateProvider.autoDispose<TextEditingController>(
-  (ref) => TextEditingController(),
-);
 
 class CardsPage extends ConsumerStatefulWidget {
   const CardsPage({super.key});
@@ -86,9 +82,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   Widget build(BuildContext context) {
     final viewPrefs = ref.watch(viewPreferencesProvider);
     final searchController = ref.watch(searchControllerProvider);
+    final searchQuery = ref.watch(searchQueryProvider);
     final cards = ref.watch(cardsNotifierProvider);
-    final searchResults = _isSearching && searchController.text.isNotEmpty
-        ? ref.watch(cardSearchProvider(searchController.text))
+    final searchResults = _isSearching && searchQuery.isNotEmpty
+        ? ref.watch(cardSearchProvider(searchQuery))
         : null;
 
     return Scaffold(
@@ -98,7 +95,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           isSearching: _isSearching,
           onSearchToggle: () {
             setState(() => _isSearching = !_isSearching);
-            if (!_isSearching) ref.read(searchControllerProvider).clear();
+            if (!_isSearching) {
+              searchController.clear();
+              ref.read(searchQueryProvider.notifier).state = '';
+            }
           },
         ),
         actions: [
@@ -106,7 +106,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             isSearching: _isSearching,
             onSearchToggle: () {
               setState(() => _isSearching = !_isSearching);
-              if (!_isSearching) ref.read(searchControllerProvider).clear();
+              if (!_isSearching) {
+                searchController.clear();
+                ref.read(searchQueryProvider.notifier).state = '';
+              }
             },
             onFilterTap: _showFilterDialog,
           ),
@@ -115,7 +118,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       body: RefreshIndicator(
         onRefresh: () => ref.read(cardsNotifierProvider.notifier).refresh(),
         child: _isSearching
-            ? searchController.text.isEmpty
+            ? searchQuery.isEmpty
                 ? const SizedBox.shrink()
                 : searchResults?.when(
                       data: (searchedCards) {
@@ -132,8 +135,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                       loading: () => const LoadingIndicator(),
                       error: (error, stack) => ErrorView(
                         message: error.toString(),
-                        onRetry: () => ref
-                            .refresh(cardSearchProvider(searchController.text)),
+                        onRetry: () =>
+                            ref.refresh(cardSearchProvider(searchQuery)),
                       ),
                     ) ??
                     const SizedBox.shrink()

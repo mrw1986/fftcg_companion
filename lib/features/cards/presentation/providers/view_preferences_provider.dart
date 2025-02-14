@@ -24,6 +24,12 @@ enum ViewSize {
   normal,
   large;
 
+  ViewSize get next => switch (this) {
+        ViewSize.small => ViewSize.normal,
+        ViewSize.normal => ViewSize.large,
+        ViewSize.large => ViewSize.small,
+      };
+
   double get gridPadding => switch (this) {
         ViewSize.small => 4.0,
         ViewSize.normal => 8.0,
@@ -135,26 +141,27 @@ class ViewPreferences extends _$ViewPreferences {
     );
   }
 
-  Future<void> setGridSize(ViewSize size) async {
+  Future<void> cycleSize() async {
     final box = await _openBox();
-    await box.put(_gridSizeKey, size.name);
-    state = (
-      type: state.type,
-      gridSize: size,
-      listSize: state.listSize,
-      showLabels: state.showLabels,
-    );
-  }
-
-  Future<void> setListSize(ViewSize size) async {
-    final box = await _openBox();
-    await box.put(_listSizeKey, size.name);
-    state = (
-      type: state.type,
-      gridSize: state.gridSize,
-      listSize: size,
-      showLabels: state.showLabels,
-    );
+    if (state.type == ViewType.grid) {
+      final newSize = state.gridSize.next;
+      await box.put(_gridSizeKey, newSize.name);
+      state = (
+        type: state.type,
+        gridSize: newSize,
+        listSize: state.listSize,
+        showLabels: state.showLabels,
+      );
+    } else {
+      final newSize = state.listSize.next;
+      await box.put(_listSizeKey, newSize.name);
+      state = (
+        type: state.type,
+        gridSize: state.gridSize,
+        listSize: newSize,
+        showLabels: state.showLabels,
+      );
+    }
   }
 
   Future<void> toggleLabels() async {

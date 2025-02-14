@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/search_provider.dart';
 
 class CardSearchBar extends ConsumerWidget {
   final TextEditingController controller;
@@ -27,12 +28,12 @@ class CardSearchBar extends ConsumerWidget {
         return Row(
           children: [
             if (isSmallScreen)
-              Expanded(child: _buildSearchField())
+              Expanded(child: _buildSearchField(ref))
             else
               Flexible(
                 child: SizedBox(
                   width: size.width * 0.4,
-                  child: _buildSearchField(),
+                  child: _buildSearchField(ref),
                 ),
               ),
           ],
@@ -41,7 +42,7 @@ class CardSearchBar extends ConsumerWidget {
     );
   }
 
-  Widget _buildSearchField() {
+  Widget _buildSearchField(WidgetRef ref) {
     return TextField(
       controller: controller,
       autofocus: true,
@@ -50,10 +51,15 @@ class CardSearchBar extends ConsumerWidget {
         border: InputBorder.none,
         suffixIcon: IconButton(
           icon: const Icon(Icons.backspace_outlined),
-          onPressed: () => controller.clear(),
+          onPressed: () {
+            controller.clear();
+            ref.read(searchQueryProvider.notifier).state = '';
+          },
         ),
       ),
-      onChanged: (_) {},
+      onChanged: (value) {
+        ref.read(searchQueryProvider.notifier).state = value;
+      },
     );
   }
 }
