@@ -36,30 +36,45 @@ class CardMetadataChips extends StatelessWidget {
     BuildContext context,
     String label,
     Color backgroundColor,
-    Color textColor,
-  ) {
+    Color textColor, {
+    bool forceBackground = false,
+  }) {
     // Check if this is an element chip
     final elementImagePath = _getElementImagePath(label);
+    final textStyle = Theme.of(context).textTheme.labelMedium;
+    final fontSize = textStyle?.fontSize ?? 12.0;
+
+    // Scale padding with font size
+    final horizontalPadding = fontSize * 0.75; // More horizontal breathing room
+    final verticalPadding = fontSize * 0.25;
+
+    // Scale element size with font size
+    final elementSize = fontSize * 2; // Double the font size for elements
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: elementImagePath != null ? Colors.transparent : backgroundColor,
-        borderRadius: BorderRadius.circular(12),
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: verticalPadding,
       ),
-      child: elementImagePath != null
+      decoration: BoxDecoration(
+        color: elementImagePath != null && !forceBackground
+            ? Colors.transparent
+            : backgroundColor,
+        borderRadius: BorderRadius.circular(fontSize),
+      ),
+      child: elementImagePath != null && !forceBackground
           ? Image.asset(
               elementImagePath,
-              width: 24,
-              height: 24,
+              width: elementSize,
+              height: elementSize,
               alignment: Alignment.center,
             )
           : Text(
               label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: textColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: textStyle?.copyWith(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
     );
   }
@@ -80,9 +95,12 @@ class CardMetadataChips extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    // Get font size for spacing calculation
+    final fontSize = Theme.of(context).textTheme.labelMedium?.fontSize ?? 12.0;
+
     return Wrap(
-      spacing: 2,
-      runSpacing: 2,
+      spacing: fontSize * 0.5, // Scale spacing with font size
+      runSpacing: fontSize * 0.5,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         ...elements.map((element) => _buildChip(
@@ -118,6 +136,7 @@ class CardMetadataChips extends StatelessWidget {
             categoryValue,
             colorScheme.surfaceContainerHighest,
             colorScheme.onSurfaceVariant,
+            forceBackground: true, // Force background for category
           ),
       ],
     );

@@ -32,15 +32,25 @@ class _CardListItemState extends State<CardListItem>
     super.build(context);
 
     final double height = switch (widget.viewSize) {
-      ViewSize.small => widget.isSmallScreen ? 70.0 : 80.0,
-      ViewSize.normal => widget.isSmallScreen ? 90.0 : 100.0,
-      ViewSize.large => widget.isSmallScreen ? 110.0 : 120.0,
+      ViewSize.small =>
+        widget.isSmallScreen ? 100.0 : 110.0, // Increased for better spacing
+      ViewSize.normal =>
+        widget.isSmallScreen ? 120.0 : 130.0, // Increased for better spacing
+      ViewSize.large =>
+        widget.isSmallScreen ? 140.0 : 150.0, // Increased for better spacing
     };
 
     final double imageWidth = height * (223 / 311);
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
     final colorScheme = theme.colorScheme;
+
+    // Scale label text size based on view size
+    final TextStyle labelStyle = switch (widget.viewSize) {
+      ViewSize.small => textTheme.labelSmall ?? const TextStyle(fontSize: 10),
+      ViewSize.normal => textTheme.labelMedium ?? const TextStyle(fontSize: 12),
+      ViewSize.large => textTheme.labelLarge ?? const TextStyle(fontSize: 14),
+    };
 
     return Material(
       child: InkWell(
@@ -85,7 +95,8 @@ class _CardListItemState extends State<CardListItem>
                     ),
                   ),
                 ),
-                SizedBox(width: widget.isSmallScreen ? 8 : 16),
+                SizedBox(
+                    width: widget.isSmallScreen ? 12 : 20), // Increased spacing
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,13 +134,18 @@ class _CardListItemState extends State<CardListItem>
                             color: colorScheme.onSurface,
                           ),
                         ),
-                      if (widget.viewSize == ViewSize.large) ...[
-                        const SizedBox(height: 8),
-                        CardMetadataChips(
+                      const SizedBox(height: 12), // Increased spacing
+                      Theme(
+                        data: Theme.of(context).copyWith(
+                          textTheme: Theme.of(context).textTheme.copyWith(
+                                labelMedium: labelStyle,
+                              ),
+                        ),
+                        child: CardMetadataChips(
                           card: widget.card,
                           colorScheme: colorScheme,
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 ),
