@@ -10,23 +10,27 @@ class CardCache {
   static const int _currentVersion =
       1; // Increment when cache structure changes
 
+  // Disk cache
   Box<Map>? _cardsBox;
   Box<List>? _searchCacheBox;
   Box<Map>? _filterOptionsBox;
   Box<dynamic>? _metaBox;
 
+  // Memory cache (cleared when app closes)
+  final Map<String, List<models.Card>> _memorySearchCache = {};
+  final Map<String, dynamic> _memoryFilterOptions = {};
+  List<models.Card>? _memoryCards;
+
   Future<void> initialize() async {
+    talker.debug('Initializing card cache');
     try {
       // Open meta box first to check version
       _metaBox = await Hive.openBox(_metaBoxName);
       final cachedVersion = _metaBox?.get('version') as int?;
 
-      // If version mismatch or no version, clear cache
+      // If version mismatch or no version, update version but keep cache
       if (cachedVersion != _currentVersion) {
-        talker.warning('Cache version mismatch, clearing cache');
-        await Hive.deleteBoxFromDisk(_cardsBoxName);
-        await Hive.deleteBoxFromDisk(_searchCacheBoxName);
-        await Hive.deleteBoxFromDisk(_filterOptionsBoxName);
+        talker.warning('Cache version updated to $_currentVersion');
         await _metaBox?.put('version', _currentVersion);
       }
 
@@ -41,6 +45,12 @@ class CardCache {
   }
 
   Future<void> dispose() async {
+    // Clear memory cache
+    _memorySearchCache.clear();
+    _memoryFilterOptions.clear();
+    _memoryCards = null;
+
+    // Close disk cache boxes
     await _cardsBox?.close();
     await _searchCacheBox?.close();
     await _filterOptionsBox?.close();
@@ -50,6 +60,10 @@ class CardCache {
     if (_cardsBox == null) return;
 
     try {
+      // Update memory cache
+      _memoryCards = cards;
+
+      // Update disk cache
       final batch = <String, Map>{};
       for (final card in cards) {
         batch[card.productId.toString()] = card.toJson();
@@ -65,9 +79,21 @@ class CardCache {
     if (_cardsBox == null) return [];
 
     try {
-      return _cardsBox!.values
+      // Check memory cache first
+      if (_memoryCards != null) {
+        talker.debug('Using in-memory card cache');
+        return _memoryCards!;
+      }
+
+      // Fall back to disk cache
+      talker.debug('Using disk card cache');
+      final cards = _cardsBox!.values
           .map((data) => models.Card.fromJson(Map<String, dynamic>.from(data)))
           .toList();
+
+      // Update memory cache
+      _memoryCards = cards;
+      return cards;
     } catch (e, stack) {
       talker.error('Failed to get cached cards', e, stack);
       return [];
@@ -79,21 +105,15 @@ class CardCache {
     if (_searchCacheBox == null) return;
 
     try {
-      // Store results as a list with timestamp as first element
+      // Update memory cache
+      _memorySearchCache[query] = results;
+
+      // Update disk cache with timestamp for debugging
       final cacheData = [
         DateTime.now().toIso8601String(),
         ...results.map((card) => card.toJson())
       ];
       await _searchCacheBox!.put(query, cacheData);
-
-      // Clear old cache entries if cache gets too large
-      if (_searchCacheBox!.length > 50) {
-        final oldestKeys = _searchCacheBox!.keys
-            .take(_searchCacheBox!.length - 50)
-            .toList()
-            .cast<String>();
-        await _searchCacheBox!.deleteAll(oldestKeys);
-      }
     } catch (e, stack) {
       talker.error('Failed to cache search results', e, stack);
     }
@@ -103,35 +123,36 @@ class CardCache {
     if (_searchCacheBox == null) return null;
 
     try {
+      // Check memory cache first
+      if (_memorySearchCache.containsKey(query)) {
+        talker.debug('Using in-memory search cache for query: $query');
+        return _memorySearchCache[query];
+      }
+
+      // Fall back to disk cache
       final cached = _searchCacheBox!.get(query);
       if (cached == null || cached.isEmpty) return null;
 
-      // First element is timestamp
-      final timestamp = DateTime.parse(cached[0] as String);
-      if (DateTime.now().difference(timestamp) > const Duration(minutes: 30)) {
-        await _searchCacheBox!.delete(query);
-        return null;
-      }
-
-      // Rest of elements are card data
-      return cached.skip(1).map((data) {
+      // Rest of elements are card data (skip timestamp)
+      final results = cached.skip(1).map((data) {
         final cardData = Map<String, dynamic>.from(data as Map);
         return models.Card.fromJson(cardData);
       }).toList();
+
+      // Update memory cache
+      _memorySearchCache[query] = results;
+      return results;
     } catch (e, stack) {
       talker.error('Failed to get cached search results', e, stack);
       return null;
     }
   }
 
-  Future<void> clearCache() async {
-    try {
-      await _cardsBox?.clear();
-      await _searchCacheBox?.clear();
-      await _filterOptionsBox?.clear();
-    } catch (e, stack) {
-      talker.error('Failed to clear card cache', e, stack);
-    }
+  Future<void> clearMemoryCache() async {
+    // Only clear memory cache
+    _memoryCards = null;
+    _memorySearchCache.clear();
+    _memoryFilterOptions.clear();
   }
 
   // Filter options caching
@@ -139,6 +160,11 @@ class CardCache {
     if (_filterOptionsBox == null) return;
 
     try {
+      // Update memory cache
+      _memoryFilterOptions.clear();
+      _memoryFilterOptions.addAll(options);
+
+      // Update disk cache with timestamp for debugging
       await _filterOptionsBox!.put('filter_options', {
         'timestamp': DateTime.now().toIso8601String(),
         'data': options,
@@ -152,17 +178,21 @@ class CardCache {
     if (_filterOptionsBox == null) return null;
 
     try {
+      // Check memory cache first
+      if (_memoryFilterOptions.isNotEmpty) {
+        talker.debug('Using in-memory filter options cache');
+        return Map<String, dynamic>.from(_memoryFilterOptions);
+      }
+
+      // Fall back to disk cache
       final cached = _filterOptionsBox!.get('filter_options');
       if (cached == null) return null;
 
-      final timestamp = DateTime.parse(cached['timestamp'] as String);
-      // Cache for 24 hours since filter options change less frequently
-      if (DateTime.now().difference(timestamp) > const Duration(hours: 24)) {
-        await _filterOptionsBox!.delete('filter_options');
-        return null;
-      }
+      final options = Map<String, dynamic>.from(cached['data'] as Map);
 
-      return Map<String, dynamic>.from(cached['data'] as Map);
+      // Update memory cache
+      _memoryFilterOptions.addAll(options);
+      return options;
     } catch (e, stack) {
       talker.error('Failed to get cached filter options', e, stack);
       return null;

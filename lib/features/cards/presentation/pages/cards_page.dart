@@ -189,9 +189,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final mediaQuery = MediaQuery.of(context);
-        final screenWidth = mediaQuery.size.width;
-        final isSmallScreen = screenWidth <= mediaQuery.size.shortestSide;
+        final size = MediaQuery.sizeOf(context);
+        final isSmallScreen = size.width <= size.shortestSide;
 
         return Row(
           children: [
@@ -200,7 +199,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             else
               Flexible(
                 child: SizedBox(
-                  width: screenWidth * 0.4,
+                  width: size.width * 0.4,
                   child: _buildSearchField(searchController),
                 ),
               ),
@@ -252,9 +251,46 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 
     // Only show additional actions if not searching or on a wide screen
     if (!_isSearching ||
-        MediaQuery.of(context).size.width >
-            MediaQuery.of(context).size.shortestSide) {
+        MediaQuery.sizeOf(context).width >
+            MediaQuery.sizeOf(context).shortestSide) {
       actions.addAll([
+        Consumer(
+          builder: (context, ref, _) {
+            final filters = ref.watch(filterProvider);
+            final filterCount = ref.watch(activeFilterCountProvider(filters));
+            final colorScheme = Theme.of(context).colorScheme;
+
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.filter_alt_outlined),
+                  onPressed: () => _showFilterDialog(context),
+                ),
+                if (filterCount > 0)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        filterCount.toString(),
+                        style: TextStyle(
+                          color: colorScheme.onPrimary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
         IconButton(
           icon: Icon(
             viewPrefs.type == ViewType.grid ? Icons.view_list : Icons.grid_view,
@@ -288,43 +324,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               child: Text('Large'),
             ),
           ],
-        ),
-        Consumer(
-          builder: (context, ref, _) {
-            final filters = ref.watch(filterProvider);
-            final filterCount = ref.watch(activeFilterCountProvider(filters));
-            final colorScheme = Theme.of(context).colorScheme;
-
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.filter_list),
-                  onPressed: () => _showFilterDialog(context),
-                ),
-                if (filterCount > 0)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        filterCount.toString(),
-                        style: TextStyle(
-                          color: colorScheme.onPrimary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
         ),
         Consumer(
           builder: (context, ref, _) {
@@ -372,9 +371,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     }) viewPrefs,
   ) {
     final double spacing = 8.0;
-    final mediaQuery = MediaQuery.of(context);
-    final screenWidth = mediaQuery.size.width;
-    final isSmallScreen = screenWidth <= mediaQuery.size.shortestSide;
+    final size = MediaQuery.sizeOf(context);
+    final isSmallScreen = size.width <= size.shortestSide;
 
     final int desiredColumns = switch (viewPrefs.gridSize) {
       ViewSize.small => isSmallScreen ? 4 : 6,
@@ -409,9 +407,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   }
 
   Widget _buildSliverList(List<models.Card> cards, ViewSize viewSize) {
-    final mediaQuery = MediaQuery.of(context);
-    final screenWidth = mediaQuery.size.width;
-    final isSmallScreen = screenWidth <= mediaQuery.size.shortestSide;
+    final size = MediaQuery.sizeOf(context);
+    final isSmallScreen = size.width <= size.shortestSide;
 
     final double horizontalPadding = isSmallScreen ? 8.0 : 16.0;
     final double verticalPadding = isSmallScreen ? 4.0 : 8.0;
@@ -717,15 +714,7 @@ class _CardListItemState extends State<CardListItem>
                         ),
                       if (widget.viewSize == ViewSize.large) ...[
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildMetadataChips(context, colorScheme),
-                            ),
-                            const SizedBox(width: 8),
-                            _buildCostIndicator(colorScheme, textTheme),
-                          ],
-                        ),
+                        _buildMetadataChips(context, colorScheme),
                       ],
                     ],
                   ),
@@ -743,11 +732,13 @@ class _CardListItemState extends State<CardListItem>
     final typeValue = getExtendedValue('Type');
     final jobValue = getExtendedValue('Job');
     final categoryValue = getExtendedValue('Category');
+    final costValue = getExtendedValue('Cost');
 
     if (elements.isEmpty &&
         typeValue == null &&
         jobValue == null &&
-        categoryValue == null) {
+        categoryValue == null &&
+        costValue == null) {
       return const SizedBox.shrink();
     }
 
@@ -762,6 +753,13 @@ class _CardListItemState extends State<CardListItem>
               colorScheme.primaryContainer,
               colorScheme.onPrimaryContainer,
             )),
+        if (costValue != null)
+          _buildChip(
+            context,
+            costValue,
+            colorScheme.primary,
+            colorScheme.onPrimary,
+          ),
         if (typeValue != null)
           _buildChip(
             context,
@@ -780,24 +778,10 @@ class _CardListItemState extends State<CardListItem>
           _buildChip(
             context,
             categoryValue,
-            colorScheme.surfaceVariant,
-            colorScheme.onSurfaceVariant,
+            colorScheme.surface,
+            colorScheme.onSurface,
           ),
       ],
-    );
-  }
-
-  Widget _buildCostIndicator(ColorScheme colorScheme, TextTheme textTheme) {
-    final costValue = getExtendedValue('Cost');
-    if (costValue == null) {
-      return const SizedBox.shrink();
-    }
-
-    return _buildChip(
-      context,
-      costValue,
-      colorScheme.primary,
-      colorScheme.onPrimary,
     );
   }
 
@@ -832,7 +816,7 @@ class _CardListItemState extends State<CardListItem>
     final elementImagePath = _getElementImagePath(label);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         color: elementImagePath != null ? Colors.transparent : backgroundColor,
         borderRadius: BorderRadius.circular(12),
@@ -840,8 +824,8 @@ class _CardListItemState extends State<CardListItem>
       child: elementImagePath != null
           ? Image.asset(
               elementImagePath,
-              width: 22,
-              height: 22,
+              width: 24,
+              height: 24,
               alignment: Alignment.center,
             )
           : Text(

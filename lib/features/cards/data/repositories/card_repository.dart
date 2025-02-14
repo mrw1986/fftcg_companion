@@ -26,8 +26,13 @@ class CardRepository extends _$CardRepository {
       final cards =
           snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
 
-      // Clear filter options cache before caching new cards
-      await cache.clearCache();
+      // Only clear memory cache if card count has changed
+      final cachedCardCount = (await cache.getCachedCards()).length;
+      if (cachedCardCount != cards.length) {
+        talker.debug('Card count changed, clearing memory cache');
+        await cache.clearMemoryCache();
+      }
+
       await cache.cacheCards(cards);
       return cards;
     } catch (e, stack) {
@@ -240,9 +245,9 @@ class CardRepository extends _$CardRepository {
       // Force refresh if requested
       if (forceRefresh) {
         ref.invalidateSelf();
-        // Clear filter options cache on force refresh
+        // Only clear memory cache on force refresh
         final cache = await ref.read(cardCacheNotifierProvider.future);
-        await cache.clearCache();
+        await cache.clearMemoryCache();
       }
 
       final cards = await future;

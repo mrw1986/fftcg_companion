@@ -4,6 +4,7 @@ import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
 import 'package:fftcg_companion/features/cards/data/repositories/card_repository.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:fftcg_companion/core/providers/card_cache_provider.dart';
 
 part 'cards_provider.g.dart';
 
@@ -62,7 +63,6 @@ class CardsNotifier extends _$CardsNotifier {
   }
 }
 
-final _searchCache = <String, List<models.Card>>{};
 Timer? _searchDebounceTimer;
 Object? _searchDebounceKey;
 
@@ -70,28 +70,28 @@ Object? _searchDebounceKey;
 Future<List<models.Card>> cardSearch(ref, String query) async {
   if (query.isEmpty) return [];
 
-  // Check cache first
-  if (_searchCache.containsKey(query)) {
-    return _searchCache[query]!;
-  }
-
-  // Create a unique key for this search request
-  final searchKey = Object();
-  ref.keepAlive();
-
-  // Set this as the current search request
-  _searchDebounceKey = searchKey;
-
-  // Debounce the search
-  _searchDebounceTimer?.cancel();
-  await Future.delayed(const Duration(milliseconds: 300));
-
-  // If this is no longer the current search request, cancel it
-  if (searchKey != _searchDebounceKey) {
-    return [];
-  }
-
   try {
+    // Check cache first before any debouncing
+    final cardCache = await ref.read(cardCacheNotifierProvider.future);
+    final cachedResults = await cardCache.getCachedSearchResults(query);
+    if (cachedResults != null) {
+      talker.debug('Using cached search results for query: $query');
+      return cachedResults;
+    }
+
+    // Only debounce network requests
+    final searchKey = Object();
+    ref.keepAlive();
+    _searchDebounceKey = searchKey;
+
+    _searchDebounceTimer?.cancel();
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // If this is no longer the current search request, cancel it
+    if (searchKey != _searchDebounceKey) {
+      return [];
+    }
+
     final results =
         await ref.read(cardRepositoryProvider.notifier).searchCards(query);
 
@@ -100,16 +100,25 @@ Future<List<models.Card>> cardSearch(ref, String query) async {
       return [];
     }
 
-    // Cache the results
+    // Cache the results and all progressive substrings
     if (results.isNotEmpty) {
-      _searchCache[query] = results;
+      await cardCache.cacheSearchResults(query, results);
 
-      // Clear old cache entries if cache gets too large
-      if (_searchCache.length > 50) {
-        final oldestKeys =
-            _searchCache.keys.take(_searchCache.length - 50).toList();
-        for (final key in oldestKeys) {
-          _searchCache.remove(key);
+      // Cache progressive substrings for better partial matching
+      if (query.length > 1) {
+        for (int i = 1; i < query.length; i++) {
+          final substring = query.substring(0, i);
+          final substringResults = results.where((card) {
+            final name = card.name.toLowerCase();
+            final number = card.number?.toLowerCase() ?? '';
+            return name.startsWith(substring) ||
+                number.startsWith(substring) ||
+                card.cardNumbers
+                    .any((n) => n.toLowerCase().startsWith(substring));
+          }).toList();
+          if (substringResults.isNotEmpty) {
+            await cardCache.cacheSearchResults(substring, substringResults);
+          }
         }
       }
     }
