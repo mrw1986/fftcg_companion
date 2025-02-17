@@ -18,7 +18,7 @@ int activeFilterCount(ref, CardFilters filters) {
   if (filters.rarities.isNotEmpty) count++;
 
   // Count active set filters
-  if (filters.sets.isNotEmpty) count++;
+  if (filters.set.isNotEmpty) count++;
 
   // Count active cost range filter
   if (filters.minCost != null || filters.maxCost != null) count++;

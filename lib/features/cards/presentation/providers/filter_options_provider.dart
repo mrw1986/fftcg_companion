@@ -81,7 +81,7 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
           elements: Set<String>.from(cachedOptions['elements'] as List),
           types: Set<String>.from(cachedOptions['types'] as List),
           rarities: Set<String>.from(cachedOptions['rarities'] as List),
-          sets: _setInfo.keys.toSet(),
+          set: _setInfo.keys.toSet(),
           costRange: _costRange,
           powerRange: _powerRange,
         );
@@ -145,7 +145,7 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
           'Starter',
           'Promo'
         },
-        sets: _setInfo.keys.toSet(),
+        set: _setInfo.keys.toSet(),
         costRange: _costRange,
         powerRange: _powerRange,
       );
@@ -164,7 +164,7 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
           'Dark'
         },
         types: {'Forward', 'Backup', 'Summon', 'Monster'},
-        sets: {},
+        set: {},
         rarities: {'Common', 'Rare', 'Hero', 'Legend', 'Starter', 'Promo'},
         costRange: (0, 10),
         powerRange: (0, 10000),

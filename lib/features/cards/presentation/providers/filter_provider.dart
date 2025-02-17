@@ -49,14 +49,14 @@ class FilterNotifier extends StateNotifier<CardFilters> {
     state = state.copyWith(rarities: rarities);
   }
 
-  void toggleSet(String set) {
-    final sets = Set<String>.from(state.sets);
-    if (sets.contains(set)) {
-      sets.remove(set);
+  void toggleSet(String setId) {
+    final set = Set<String>.from(state.set);
+    if (set.contains(setId)) {
+      set.remove(setId);
     } else {
-      sets.add(set);
+      set.add(setId);
     }
-    state = state.copyWith(sets: sets);
+    state = state.copyWith(set: set);
   }
 
   void toggleShowSealedProducts() {

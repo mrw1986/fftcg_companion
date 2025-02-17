@@ -23,6 +23,7 @@ class Card with _$Card {
     @Default(false) bool isNonCard,
     String? cardType,
     String? category,
+    @Default([]) List<String> categories,
     int? cost,
     String? description,
     @Default([]) List<String> elements,
@@ -45,6 +46,8 @@ class Card with _$Card {
     // Get search terms array
     final searchTerms =
         (data['searchTerms'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    final categories =
+        (data['categories'] as List?)?.map((e) => e.toString()).toList() ?? [];
 
     return Card(
       productId: data['productId'] as int? ?? 0,
@@ -60,6 +63,7 @@ class Card with _$Card {
       isNonCard: data['isNonCard'] as bool? ?? false,
       cardType: data['cardType'] as String?,
       category: data['category'] as String?,
+      categories: categories,
       cost: data['cost'] as int?,
       description: data['description'] as String?,
       elements:
@@ -88,6 +92,7 @@ class Card with _$Card {
       'cardNumbers': cardNumbers,
       'searchTerms': searchTerms,
       'set': set,
+      'categories': categories,
     };
 
     // Add optional fields

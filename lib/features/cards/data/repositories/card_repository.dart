@@ -303,8 +303,8 @@ class CardRepository extends _$CardRepository {
       }
 
       // Apply set filter
-      if (filters.sets.isNotEmpty) {
-        if (!card.set.any((s) => filters.sets.contains(s))) {
+      if (filters.set.isNotEmpty) {
+        if (!card.set.any((s) => filters.set.contains(s))) {
           continue;
         }
       }
@@ -334,6 +334,13 @@ class CardRepository extends _$CardRepository {
       if (filters.maxPower != null &&
           (card.power == null || card.power! > filters.maxPower!)) {
         continue;
+      }
+
+      // Apply category filter
+      if (filters.categories.isNotEmpty) {
+        if (!card.categories.any((c) => filters.categories.contains(c))) {
+          continue;
+        }
       }
 
       indices.add(i);

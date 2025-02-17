@@ -80,8 +80,8 @@ class FilterDialog extends ConsumerWidget {
                         Divider(color: colorScheme.outlineVariant),
                         _buildGroupedSetsSection(
                           context,
-                          options.sets,
-                          filters.sets,
+                          options.set,
+                          filters.set,
                           ref,
                           colorScheme,
                         ).animate().slideX().fadeIn(delay: 400.ms),
