@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fftcg_companion/core/utils/html_parser.dart';
 
 class CardDescriptionText extends StatelessWidget {
   final String text;
@@ -12,14 +13,48 @@ class CardDescriptionText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get the current theme's text color
+    final defaultTextColor = Theme.of(context).colorScheme.onSurface;
+
+    // Create a base style that ensures text is visible in both themes
+    final effectiveBaseStyle = (baseStyle ?? const TextStyle()).copyWith(
+      color: defaultTextColor,
+      height: 1.5,
+    );
+
     return RichText(
       text: TextSpan(
-        children: _parseDescription(context),
+        children: _parseDescription(context, effectiveBaseStyle),
       ),
     );
   }
 
-  List<InlineSpan> _parseDescription(BuildContext context) {
+  List<InlineSpan> _parseDescription(
+      BuildContext context, TextStyle baseStyle) {
+    // First, parse HTML tags
+    final htmlSpans = HtmlParser.parseHtml(text, baseStyle);
+
+    // Then process special tokens within each text span
+    final List<InlineSpan> finalSpans = [];
+
+    for (final span in htmlSpans) {
+      if (span is TextSpan) {
+        // Ensure the text color is preserved when processing special tokens
+        final spanStyle = (span.style ?? baseStyle).copyWith(
+          color: span.style?.color ?? baseStyle.color,
+        );
+        finalSpans
+            .addAll(_processSpecialTokens(context, span.text ?? '', spanStyle));
+      } else {
+        finalSpans.add(span);
+      }
+    }
+
+    return finalSpans;
+  }
+
+  List<InlineSpan> _processSpecialTokens(
+      BuildContext context, String text, TextStyle? style) {
     final List<InlineSpan> spans = [];
     final RegExp tokenPattern = RegExp(r'\[([^\]]+)\]|EX BURST|([^[]+)');
     String pendingSpecialAbility = '';
@@ -35,7 +70,7 @@ class CardDescriptionText extends StatelessWidget {
               fontWeight: FontWeight.bold,
               fontSize: 20,
               fontStyle: FontStyle.italic,
-              height: 1.1, // For better vertical alignment
+              height: 1.1,
               shadows: [
                 Shadow(
                   color: Colors.white,
@@ -66,7 +101,7 @@ class CardDescriptionText extends StatelessWidget {
               fontSize: 20,
               fontStyle: FontStyle.italic,
               fontFamily: 'Arial Black',
-              height: 1.1, // For better vertical alignment
+              height: 1.1,
               shadows: [
                 Shadow(
                   color: Colors.white,
@@ -76,12 +111,11 @@ class CardDescriptionText extends StatelessWidget {
             ),
           ),
         );
-        spans.add(const TextSpan(text: ' ')); // Add space after EX BURST
+        spans.add(const TextSpan(text: ' '));
       } else if (token.startsWith('[') && token.endsWith(']')) {
         final content = token.substring(1, token.length - 1);
 
         if (content == 'S') {
-          // If we find [S], the previous text was a special ability
           addSpecialAbility();
           spans.add(
             WidgetSpan(
@@ -92,7 +126,8 @@ class CardDescriptionText extends StatelessWidget {
                 margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: const Color(0xFF111111),
+                    color:
+                        style?.color ?? Theme.of(context).colorScheme.onSurface,
                     width: 1,
                   ),
                   borderRadius: BorderRadius.circular(12.5),
@@ -104,14 +139,14 @@ class CardDescriptionText extends StatelessWidget {
                       color: Colors.red,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      height: 1.1, // For better vertical alignment
+                      height: 1.1,
                     ),
                   ),
                 ),
               ),
             ),
           );
-          spans.add(const TextSpan(text: ' ')); // Add space after [S]
+          spans.add(const TextSpan(text: ' '));
         } else if (content == 'Dull') {
           addSpecialAbility();
           spans.add(
@@ -119,15 +154,21 @@ class CardDescriptionText extends StatelessWidget {
               alignment: PlaceholderAlignment.middle,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: Image.asset(
-                  'assets/images/description/dull.png',
-                  width: 25,
-                  height: 25,
+                child: ColorFiltered(
+                  colorFilter: ColorFilter.mode(
+                    style?.color ?? Theme.of(context).colorScheme.onSurface,
+                    BlendMode.srcIn,
+                  ),
+                  child: Image.asset(
+                    'assets/images/description/dull.png',
+                    width: 25,
+                    height: 25,
+                  ),
                 ),
               ),
             ),
           );
-          spans.add(const TextSpan(text: ' ')); // Add space after [Dull]
+          spans.add(const TextSpan(text: ' '));
         } else if (content == 'C') {
           addSpecialAbility();
           spans.add(
@@ -143,7 +184,7 @@ class CardDescriptionText extends StatelessWidget {
               ),
             ),
           );
-          spans.add(const TextSpan(text: ' ')); // Add space after [C]
+          spans.add(const TextSpan(text: ' '));
         } else if (RegExp(r'^[RIGYPUX]$').hasMatch(content)) {
           addSpecialAbility();
           final element = switch (content) {
@@ -153,7 +194,7 @@ class CardDescriptionText extends StatelessWidget {
             'Y' => 'earth',
             'P' => 'lightning',
             'U' => 'water',
-            _ => 'fire', // Default to fire, shouldn't happen
+            _ => 'fire',
           };
           spans.add(
             WidgetSpan(
@@ -168,7 +209,7 @@ class CardDescriptionText extends StatelessWidget {
               ),
             ),
           );
-          spans.add(const TextSpan(text: ' ')); // Add space after element
+          spans.add(const TextSpan(text: ' '));
         } else if (RegExp(r'^[0-9X]$').hasMatch(content)) {
           addSpecialAbility();
           spans.add(
@@ -180,7 +221,8 @@ class CardDescriptionText extends StatelessWidget {
                 margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: const Color(0xFF111111),
+                    color:
+                        style?.color ?? Theme.of(context).colorScheme.onSurface,
                     width: 1,
                   ),
                   borderRadius: BorderRadius.circular(12.5),
@@ -188,39 +230,35 @@ class CardDescriptionText extends StatelessWidget {
                 child: Center(
                   child: Text(
                     content,
-                    style: const TextStyle(
-                      color: Color(0xFF111111),
+                    style: TextStyle(
+                      color: style?.color ??
+                          Theme.of(context).colorScheme.onSurface,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      height: 1.1, // For better vertical alignment
+                      height: 1.1,
                     ),
                   ),
                 ),
               ),
             ),
           );
-          spans.add(const TextSpan(text: ' ')); // Add space after number
+          spans.add(const TextSpan(text: ' '));
         }
       } else {
-        // Regular text
         if (hasSpecialAbility) {
-          // If we're collecting a special ability, keep adding to it
           pendingSpecialAbility += token;
         } else {
-          // Check if this text is followed by [S]
           final nextMatch =
               matches.skipWhile((m) => m != match).skip(1).firstOrNull;
           if (nextMatch != null && nextMatch.group(0) == '[S]') {
-            // This text is a special ability
             hasSpecialAbility = true;
             pendingSpecialAbility = token;
           } else {
-            // Regular text
             addSpecialAbility();
             spans.add(
               TextSpan(
                 text: token,
-                style: baseStyle?.copyWith(height: 1.5), // Increased line height for readability
+                style: style,
               ),
             );
           }
@@ -228,9 +266,7 @@ class CardDescriptionText extends StatelessWidget {
       }
     }
 
-    // Add any remaining special ability
     addSpecialAbility();
-
     return spans;
   }
 }

@@ -6,6 +6,7 @@ class HtmlParser {
     final List<InlineSpan> spans = [];
     String currentText = '';
     bool isEmphasized = false;
+    bool isBold = false;
 
     void addCurrentText() {
       if (currentText.isNotEmpty) {
@@ -14,7 +15,7 @@ class HtmlParser {
             text: currentText,
             style: baseStyle?.copyWith(
               fontStyle: isEmphasized ? FontStyle.italic : null,
-              fontWeight: isEmphasized ? FontWeight.bold : null,
+              fontWeight: isBold ? FontWeight.bold : null,
             ),
           ),
         );
@@ -44,6 +45,10 @@ class HtmlParser {
           isEmphasized = true;
         } else if (tag == '/em') {
           isEmphasized = false;
+        } else if (tag == 'b') {
+          isBold = true;
+        } else if (tag == '/b') {
+          isBold = false;
         }
 
         i = tagEnd + 1;

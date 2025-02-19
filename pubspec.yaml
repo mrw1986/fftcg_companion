@@ -63,6 +63,7 @@ dependencies:
   csv: ^6.0.0
   google_fonts: ^6.2.1
   crypto: ^3.0.6
+  flutter_html: ^3.0.0-beta.2
 
 dev_dependencies:
   flutter_test:
@@ -89,6 +90,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/elements/
+    - assets/images/description/
 
 flutter_launcher_icons:
   android: "ic_launcher"
