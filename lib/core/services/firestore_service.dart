@@ -6,11 +6,9 @@ import 'package:fftcg_companion/core/utils/logger.dart';
 class FirestoreService {
   final FirebaseFirestore _firestore;
   static const int _batchSize = 50;
-  static const Duration _cacheDuration = Duration(minutes: 30);
-  static const int maxQueryLimit = 1000; // Changed to public
+  static const int maxQueryLimit = 1000;
 
   final _documentCache = <String, DocumentSnapshot<Map<String, dynamic>>>{};
-  final _queryCacheTimestamps = <String, DateTime>{};
   final _queryCache = <String, QuerySnapshot<Map<String, dynamic>>>{};
 
   FirestoreService(this._firestore) {
@@ -25,11 +23,14 @@ class FirestoreService {
   }
 
   // Collection References
-  CollectionReference<Map<String, dynamic>> get cardsCollection =>
-      _firestore.collection('cards').withConverter<Map<String, dynamic>>(
+  CollectionReference<Map<String, dynamic>> collection(String name) =>
+      _firestore.collection(name).withConverter<Map<String, dynamic>>(
             fromFirestore: (snapshot, _) => snapshot.data()!,
             toFirestore: (data, _) => data,
           );
+
+  CollectionReference<Map<String, dynamic>> get cardsCollection =>
+      collection('cards');
 
   CollectionReference<Map<String, dynamic>> get pricesCollection =>
       _firestore.collection('prices').withConverter<Map<String, dynamic>>(
@@ -69,10 +70,7 @@ class FirestoreService {
     try {
       final uncachedIds = cardIds.where((id) {
         final cacheKey = 'price_$id';
-        final timestamp = _queryCacheTimestamps[cacheKey];
-        return !_documentCache.containsKey(cacheKey) ||
-            timestamp == null ||
-            DateTime.now().difference(timestamp) > _cacheDuration;
+        return !_documentCache.containsKey(cacheKey);
       }).toList();
 
       if (uncachedIds.isEmpty) return;
@@ -86,7 +84,6 @@ class FirestoreService {
         for (var doc in snapshot.docs) {
           final cacheKey = 'price_${doc.id}';
           _documentCache[cacheKey] = doc;
-          _queryCacheTimestamps[cacheKey] = DateTime.now();
         }
       }
     } catch (e, stack) {
@@ -97,7 +94,6 @@ class FirestoreService {
   // Cache management
   void clearCache() {
     _documentCache.clear();
-    _queryCacheTimestamps.clear();
     _queryCache.clear();
     talker.debug('Cleared all caches');
   }

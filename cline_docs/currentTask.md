@@ -2,65 +2,105 @@
 
 ## Objective
 
-Improve app initialization, loading states, and splash screen implementation
+Improve card text processing and filtering functionality
 
 ## Context
 
-The app was experiencing issues with:
+Several issues have been identified with text processing and filtering:
 
-1. Provider initialization conflicts during startup
-2. Complex loading screen implementation
-3. Lack of a proper splash screen
-4. Need for a simpler loading indicator
+1. Case-sensitive "EX Burst" processing
+2. Limited HTML tag support in card descriptions
+3. Text being stripped from descriptions (specifically card name references)
+4. Special ability name formatting issues
+5. Filter collection usage optimization
 
-## Changes Made
+## Implementation Plan
 
-### Loading and Initialization
+### 1. Case-Insensitive EX Burst Processing
 
-- Removed LoadingWrapper in favor of page-level loading states
-- Created a simplified LoadingIndicator widget
-- Added flutter_native_splash for better app launch experience
-- Fixed provider initialization conflicts
+- Location: lib/features/cards/presentation/widgets/card_description_text.dart
+- Current: Using exact match 'EX BURST'
+- Change: Update RegExp pattern to be case-insensitive
+- Impact: More reliable EX Burst styling across all cards
 
-### Code Organization
+### 2. Enhanced HTML Tag Support
 
-- Created shared/widgets/loading_indicator.dart for reusable loading UI
-- Updated cards_page.dart to handle loading states directly
-- Improved state management with Riverpod
-- Simplified CardRepository initialization flow
+- Location: lib/core/utils/html_parser.dart
+- Current: Limited support for em, b, br tags
+- Changes:
+  - Add support for `<strong>` tags
+  - Add support for `<em>` tags
+  - Ensure proper handling of `<br>` tags
+  - Add support for nested tags
+- Impact: More accurate rendering of card text formatting
 
-### UI/UX Improvements
+### 3. Card Name Reference Fix
 
-- Added branded splash screen with app logo
-- Implemented consistent loading indicator across the app
-- Improved error handling during initialization
-- Enhanced loading state transitions
+- Location: lib/features/cards/presentation/widgets/card_description_text.dart
+- Current: Card name references being stripped
+- Changes:
+  - Update text processing to preserve [Card Name (X)] format
+  - Ensure proper styling of card name references
+- Impact: Complete and accurate card text display
 
-## Current Status
+### 4. Special Ability Name Formatting
 
-- [x] Fixed provider initialization conflicts
-- [x] Implemented native splash screen
-- [x] Created simplified loading indicator
-- [x] Updated documentation
-- [x] Improved initialization flow
-- [x] Enhanced loading state management
-- [x] Optimized caching with version tracking
-- [x] Improved logging system
-- [x] Enhanced image loading performance
-- [x] Fixed code quality issues
+- Location: lib/features/cards/presentation/widgets/card_description_text.dart
+- Current: Inconsistent special ability formatting
+- Changes:
+  - Enhance detection of special abilities before [S]
+  - Apply consistent styling:
+    - Color: #f80
+    - Margin: 0 3px 0 0
+    - Font weight: 700
+    - Font size: 20px
+    - Font style: italic
+    - Text shadow: 0 0 2px #fff
+- Impact: Consistent and visually appealing special ability display
+
+### 5. Filter Collection Optimization
+
+- Location: Multiple files
+  - lib/features/cards/presentation/providers/filter_provider.dart
+  - lib/features/cards/presentation/widgets/filter_dialog.dart
+- Current: Mixed usage of card documents and filter collection
+- Changes:
+  - Update filter dialog to use new filters collection
+  - Maintain card document fields for actual filtering
+  - Implement new filter documents structure:
+    - filters.cardType
+    - filters.category
+    - filters.cost
+    - filters.elements
+    - filters.power
+    - filters.rarity
+    - filters.set
+- Impact: More efficient and maintainable filtering system
 
 ## Next Steps
 
-1. Monitor app initialization performance
-2. Consider adding loading progress indicators where appropriate
-3. Add unit tests for initialization logic
-4. Consider additional caching optimizations
-5. Monitor logging performance in production
-6. Consider implementing lazy image loading for off-screen cards
+1. Implement case-insensitive EX Burst processing
+2. Enhance HTML parser with additional tag support
+3. Fix card name reference preservation
+4. Update special ability formatting
+5. Optimize filter collection usage
 
 ## Related Tasks from Roadmap
 
-- [x] Improve app initialization
-- [x] Enhance loading states
-- [x] Add splash screen
-- [x] Optimize startup performance
+- [x] Card database with sorting options
+- [x] Advanced filtering system
+- [ ] Improve text processing and display
+
+## Testing Strategy
+
+1. Test HTML parsing with various tag combinations
+2. Verify case-insensitive EX Burst detection
+3. Confirm card name references are preserved
+4. Check special ability formatting consistency
+5. Validate filter collection changes
+
+## Future Considerations
+
+- Monitor performance impact of enhanced text processing
+- Consider caching processed text for frequently viewed cards
+- Plan for additional HTML tag support if needed

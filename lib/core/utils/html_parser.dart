@@ -5,8 +5,15 @@ class HtmlParser {
   static List<InlineSpan> parseHtml(String html, TextStyle? baseStyle) {
     final List<InlineSpan> spans = [];
     String currentText = '';
-    bool isEmphasized = false;
-    bool isBold = false;
+    final List<String> styleStack = [];
+
+    bool isEmphasized() {
+      return styleStack.contains('em') || styleStack.contains('i');
+    }
+
+    bool isBold() {
+      return styleStack.contains('b') || styleStack.contains('strong');
+    }
 
     void addCurrentText() {
       if (currentText.isNotEmpty) {
@@ -14,8 +21,8 @@ class HtmlParser {
           TextSpan(
             text: currentText,
             style: baseStyle?.copyWith(
-              fontStyle: isEmphasized ? FontStyle.italic : null,
-              fontWeight: isBold ? FontWeight.bold : null,
+              fontStyle: isEmphasized() ? FontStyle.italic : null,
+              fontWeight: isBold() ? FontWeight.bold : null,
             ),
           ),
         );
@@ -38,17 +45,21 @@ class HtmlParser {
           continue;
         }
 
-        final tag = html.substring(i + 1, tagEnd).toLowerCase();
+        final tag = html.substring(i + 1, tagEnd).toLowerCase().trim();
         if (tag == 'br' || tag == 'br/' || tag == 'br /') {
           spans.add(const TextSpan(text: '\n'));
-        } else if (tag == 'em') {
-          isEmphasized = true;
-        } else if (tag == '/em') {
-          isEmphasized = false;
-        } else if (tag == 'b') {
-          isBold = true;
-        } else if (tag == '/b') {
-          isBold = false;
+        } else if (tag.startsWith('/')) {
+          // Closing tag
+          final tagName = tag.substring(1);
+          if (styleStack.contains(tagName)) {
+            styleStack.remove(tagName);
+          }
+        } else {
+          // Opening tag
+          final tagName = tag.split(' ')[0]; // Handle tags with attributes
+          if (['em', 'i', 'b', 'strong'].contains(tagName)) {
+            styleStack.add(tagName);
+          }
         }
 
         i = tagEnd + 1;

@@ -12,7 +12,6 @@ class CachePersistence {
   static const String _queryCacheBox = 'query_cache';
   static const String _sortCacheBox = 'sort_cache';
   static const String _lastUpdateKey = 'last_update';
-  static const Duration _cacheValidity = Duration(hours: 24);
 
   static Future<void> initialize() async {
     try {
@@ -76,17 +75,11 @@ class CachePersistence {
   static Future<void> cacheQuery(
     String key,
     List<Card> cards,
-    Duration validity,
   ) async {
     final box = Hive.box<Map>(_queryCacheBox);
-    final timestamp = DateTime.now();
-
     await box.put(key, {
-      'timestamp': timestamp.toIso8601String(),
-      'validity': validity.inSeconds,
       'cards': cards.map((card) => card.toJson()).toList(),
     });
-
     talker.debug('Cached query result for key: $key');
   }
 
@@ -95,14 +88,6 @@ class CachePersistence {
     final cached = box.get(key);
 
     if (cached == null) return null;
-
-    final timestamp = DateTime.parse(cached['timestamp'] as String);
-    final validity = Duration(seconds: cached['validity'] as int);
-
-    if (DateTime.now().difference(timestamp) > validity) {
-      await box.delete(key);
-      return null;
-    }
 
     try {
       final cardsList = (cached['cards'] as List)
@@ -124,12 +109,9 @@ class CachePersistence {
     List<Card> cards,
   ) async {
     final box = Hive.box<Map>(_sortCacheBox);
-
     await box.put(key, {
-      'timestamp': DateTime.now().toIso8601String(),
       'cards': cards.map((card) => card.toJson()).toList(),
     });
-
     talker.debug('Cached sorted results for key: $key');
   }
 
@@ -138,12 +120,6 @@ class CachePersistence {
     final cached = box.get(key);
 
     if (cached == null) return null;
-
-    final timestamp = DateTime.parse(cached['timestamp'] as String);
-    if (DateTime.now().difference(timestamp) > _cacheValidity) {
-      await box.delete(key);
-      return null;
-    }
 
     try {
       final cardsList = (cached['cards'] as List)

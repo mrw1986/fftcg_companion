@@ -4,15 +4,15 @@ import 'package:fftcg_companion/features/models.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 class CacheManager {
-  static const cacheValidityDuration = Duration(hours: 24);
-
-  static Future<bool> isCacheValid(String key) async {
+  static Future<DateTime?> getLastUpdate(String key) async {
     final metadataBox = Hive.box('cache_metadata');
     final lastUpdate = metadataBox.get(key) as DateTime?;
+    return lastUpdate;
+  }
 
-    if (lastUpdate == null) return false;
-
-    return DateTime.now().difference(lastUpdate) < cacheValidityDuration;
+  static Future<void> updateLastModified(String key) async {
+    final metadataBox = Hive.box('cache_metadata');
+    await metadataBox.put(key, DateTime.now());
   }
 
   static Future<void> clearAllCaches() async {

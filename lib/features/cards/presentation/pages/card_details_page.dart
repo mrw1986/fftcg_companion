@@ -214,12 +214,16 @@ class CardDetailsPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              CardDescriptionText(
-                text: card.description!,
-                baseStyle: textTheme.bodyLarge?.copyWith(
-                  color: colorScheme.onSurface,
+              if (card.description != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: CardDescriptionText(
+                    text: card.description!,
+                    baseStyle: textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
                 ),
-              ),
             ],
           ],
         ),
