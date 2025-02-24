@@ -9,8 +9,22 @@ class CardDescriptionText extends StatelessWidget {
   static const double _roundedSquareBorderRadius = 4.0;
   static const double _circularBorderRadius = 12.5;
   static const double _iconSize = 25.0;
-  static const double _iconMarginH = 3.0;
-  static const double _iconMarginV = 2.0;
+  // Icon spacing constants
+  static const double _iconMarginH = 1.0; // Minimal margin for tight spacing
+  static const double _iconMarginV = 1.0;
+  static const double _iconSpacing = 2.0; // Tighter spacing between icons
+
+  // Text size constants
+  static const double _baseFontSize = 14.0;
+  static const double _specialFontSize = 16.0;
+  static const double _minScaleFactor = 0.8;
+  static const double _maxScaleFactor = 1.2;
+
+  double _getScaleFactor(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final scaleFactor = width / 400; // Base width for scaling
+    return scaleFactor.clamp(_minScaleFactor, _maxScaleFactor);
+  }
 
   const CardDescriptionText({
     super.key,
@@ -47,61 +61,30 @@ class CardDescriptionText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final defaultTextColor = Theme.of(context).colorScheme.onSurface;
+    final scaleFactor = _getScaleFactor(context);
     final effectiveBaseStyle = (baseStyle ?? const TextStyle()).copyWith(
       color: defaultTextColor,
       height: 1.5,
+      fontSize: _baseFontSize * scaleFactor,
     );
 
     return Text.rich(
       TextSpan(
-        children: _parseDescription(context, effectiveBaseStyle),
+        children: _parseDescription(context, effectiveBaseStyle, scaleFactor),
       ),
       softWrap: true,
     );
   }
 
   List<InlineSpan> _parseDescription(
-      BuildContext context, TextStyle baseStyle) {
+      BuildContext context, TextStyle baseStyle, double scaleFactor) {
     final List<InlineSpan> spans = [];
     String currentText = '';
     bool inBrackets = false;
-    bool hasSpecialAbility = false;
-    String pendingSpecialAbility = '';
-
     void addCurrentText() {
       if (currentText.isNotEmpty) {
-        if (hasSpecialAbility) {
-          pendingSpecialAbility += currentText;
-        } else {
-          spans.addAll(HtmlParser.parseHtml(currentText, baseStyle));
-        }
+        spans.addAll(HtmlParser.parseHtml(currentText, baseStyle));
         currentText = '';
-      }
-    }
-
-    void addSpecialAbility() {
-      if (pendingSpecialAbility.isNotEmpty) {
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 3),
-              child: Text(
-                pendingSpecialAbility.trim(),
-                style: const TextStyle(
-                  color: Color(0xFFFF8800),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  fontStyle: FontStyle.italic,
-                  height: 1.1,
-                  shadows: [Shadow(color: Colors.white, blurRadius: 2)],
-                ),
-              ),
-            ),
-          ),
-        );
-        pendingSpecialAbility = '';
-        hasSpecialAbility = false;
       }
     }
 
@@ -120,10 +103,25 @@ class CardDescriptionText extends StatelessWidget {
 
         // Handle special ability [S] tag
         if (content == 'S') {
-          if (i + 1 < text.length) {
-            hasSpecialAbility = true;
+          // Get the text before [S] tag for special ability name
+          final abilityName = text.substring(0, i - currentText.length).trim();
+          if (abilityName.isNotEmpty) {
+            spans.add(WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Text(
+                abilityName,
+                style: TextStyle(
+                  color: const Color(0xFFFF8800),
+                  fontWeight: FontWeight.bold,
+                  fontSize: _specialFontSize * scaleFactor,
+                  fontStyle: FontStyle.italic,
+                  height: 1.1,
+                  shadows: const [Shadow(color: Colors.white, blurRadius: 2)],
+                ),
+              ),
+            ));
+            currentText = '';
           }
-          addSpecialAbility();
           spans.add(WidgetSpan(
             alignment: PlaceholderAlignment.middle,
             child: Container(
@@ -145,9 +143,9 @@ class CardDescriptionText extends StatelessWidget {
                   'S',
                   style: TextStyle(
                     color: Colors.red,
-                    fontSize: 14,
+                    fontSize: _baseFontSize * scaleFactor,
                     fontWeight: FontWeight.bold,
-                    height: 22 / 14, // line-height: 22px
+                    height: 1.0, // Better centering in container
                   ),
                 ),
               ),
@@ -163,11 +161,12 @@ class CardDescriptionText extends StatelessWidget {
               color: const Color(0xFF332A9D),
             ),
           ));
-          spans.add(const TextSpan(text: ' '));
+          spans.add(WidgetSpan(
+            child: SizedBox(width: _iconSpacing),
+          ));
         }
         // Handle dull icon
         else if (content == 'Dull') {
-          addSpecialAbility();
           spans.add(WidgetSpan(
             alignment: PlaceholderAlignment.middle,
             child: Container(
@@ -197,11 +196,12 @@ class CardDescriptionText extends StatelessWidget {
               ),
             ),
           ));
-          spans.add(const TextSpan(text: ' '));
+          spans.add(WidgetSpan(
+            child: SizedBox(width: _iconSpacing),
+          ));
         }
         // Handle CP cost ([1], [2], [X], etc.)
         else if (RegExp(r'^\d+$').hasMatch(content) || content == 'X') {
-          addSpecialAbility();
           spans.add(WidgetSpan(
             alignment: PlaceholderAlignment.middle,
             child: Container(
@@ -219,25 +219,30 @@ class CardDescriptionText extends StatelessWidget {
                 borderRadius: BorderRadius.circular(_circularBorderRadius),
               ),
               child: Center(
-                child: Text(
-                  content,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    height: 22 / 14, // line-height: 22px
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                      top: 1), // Fine-tune vertical centering
+                  child: Text(
+                    content,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: _baseFontSize * scaleFactor,
+                      fontWeight: FontWeight.bold,
+                      height: 1.0,
+                    ),
                   ),
                 ),
               ),
             ),
           ));
-          spans.add(const TextSpan(text: ' '));
+          spans.add(WidgetSpan(
+            child: SizedBox(width: _iconSpacing),
+          ));
         }
         // Handle element icons
         else {
           final elementPath = _getElementImagePath(content);
           if (elementPath != null) {
-            addSpecialAbility();
             spans.add(WidgetSpan(
               alignment: PlaceholderAlignment.middle,
               child: Container(
@@ -261,7 +266,9 @@ class CardDescriptionText extends StatelessWidget {
                 ),
               ),
             ));
-            spans.add(const TextSpan(text: ' '));
+            spans.add(WidgetSpan(
+              child: SizedBox(width: _iconSpacing),
+            ));
           }
         }
         currentText = '';
@@ -275,14 +282,16 @@ class CardDescriptionText extends StatelessWidget {
               padding: const EdgeInsets.only(left: 3, right: 10),
               child: Text(
                 'EX BURST',
-                style: const TextStyle(
-                  color: Color(0xFF332A9D),
+                style: TextStyle(
+                  color: const Color(0xFF332A9D),
                   fontWeight: FontWeight.bold,
-                  fontSize: 20,
+                  fontSize: _baseFontSize *
+                      1.2 *
+                      scaleFactor, // Slightly larger than base
                   fontStyle: FontStyle.italic,
                   fontFamily: 'Arial Black',
                   height: 1.1,
-                  shadows: [Shadow(color: Colors.white, blurRadius: 2)],
+                  shadows: const [Shadow(color: Colors.white, blurRadius: 2)],
                 ),
               ),
             ),
@@ -295,7 +304,6 @@ class CardDescriptionText extends StatelessWidget {
     }
 
     addCurrentText();
-    addSpecialAbility();
     return spans;
   }
 }
