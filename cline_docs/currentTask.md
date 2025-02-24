@@ -2,108 +2,177 @@
 
 ## Objective
 
-Monitor and optimize text processing and filtering system performance
+Update text processing in card description display to match official style guide
 
 ## Context
 
-Recent improvements have been implemented:
+A comprehensive style guide has been provided detailing exact specifications for:
 
-1. Case-insensitive EX BURST processing ✓
-2. Enhanced HTML tag support ✓
-3. Fixed card name reference preservation ✓
-4. Improved special ability formatting ✓
-5. Optimized filter collection usage ✓
-
-Now we need to monitor performance and make further optimizations.
+- Element mappings
+- Cost icons
+- Special ability formatting
+- EX BURST styling
 
 ## Implementation Plan
 
-### 1. Text Processing Performance Monitoring
+### 1. Element Icon Mappings
 
-- Location: lib/features/cards/presentation/widgets/card_description_text.dart
-- Current: New text processing system implemented
-- Next Steps:
-  - Add performance metrics
-  - Monitor memory usage
-  - Track render times
-  - Identify optimization opportunities
-- Impact: Better understanding of text processing overhead
+Location: lib/features/cards/presentation/widgets/card_description_text.dart
 
-### 2. Filter System Performance Analysis
+Current Issue:
 
-- Location: Multiple files
-  - lib/features/cards/presentation/providers/filter_provider.dart
-  - lib/features/cards/presentation/widgets/filter_dialog.dart
-- Current: New filter collection structure implemented
-- Next Steps:
-  - Monitor query performance
-  - Analyze filter combination efficiency
-  - Track UI responsiveness
-  - Measure memory impact
-- Impact: Insights for further optimization
+- Element handling expects full names instead of single letters
+- Missing Crystal element support
 
-### 3. Text Caching Consideration
+Solution:
 
-- Location: lib/core/storage/cache_manager.dart
-- Current: No specific text processing caching
-- Evaluate:
-  - Processed text caching strategy
-  - Memory vs performance tradeoffs
-  - Cache invalidation approach
-  - Storage requirements
-- Impact: Potential performance improvement for frequently viewed cards
+```dart
+Map<String, String> elementMappings = {
+  'R': 'Fire',
+  'I': 'Ice',
+  'G': 'Wind',
+  'Y': 'Earth',
+  'P': 'Lightning',
+  'U': 'Water',
+  'C': 'Crystal'
+};
+```
 
-### 4. Filter Collection Optimization
+Impact:
 
-- Location: Multiple files
-- Current: Basic filter collection structure
-- Consider:
-  - Index optimization
-  - Query pattern analysis
-  - Cache strategy refinement
-  - Memory usage optimization
-- Impact: Better filtering performance
+- Correct element icon mapping
+- Support for Crystal element
+- Consistent icon display
 
-## Next Steps
+### 2. Cost Icon Styling ([#] or [X])
 
-1. Implement performance monitoring
-2. Gather baseline metrics
-3. Identify optimization targets
-4. Plan caching strategy
-5. Consider additional optimizations
+Location: lib/features/cards/presentation/widgets/card_description_text.dart
 
-## Related Tasks from Roadmap
+Current Issue:
 
-- [x] Card database with sorting options
-- [x] Advanced filtering system
-- [x] Improve text processing and display
-- [ ] Performance optimization and monitoring
+- Styling doesn't match specification
+- Border and text colors need adjustment
+
+Solution:
+Update Container styling:
+
+```dart
+Container(
+  width: 25,
+  height: 25,
+  margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+  decoration: BoxDecoration(
+    border: Border.all(color: const Color(0xFF111111), width: 1),
+    borderRadius: BorderRadius.circular(12.5),
+  ),
+  child: Center(
+    child: Text(
+      content,
+      style: const TextStyle(
+        color: Color(0xFF111111),
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+        height: 22/14, // line-height: 22px
+      ),
+    ),
+  ),
+)
+```
+
+### 3. Special [S] Icon Styling
+
+Location: lib/features/cards/presentation/widgets/card_description_text.dart
+
+Current Issue:
+
+- Border color and styling needs adjustment
+- Text alignment needs refinement
+
+Solution:
+Update Container styling to match specification:
+
+- Border color: #111
+- Perfect circle border radius
+- Consistent 22px line height
+- Red text color
+
+### 4. Special Ability Text Styling
+
+Location: lib/features/cards/presentation/widgets/card_description_text.dart
+
+Current Issue:
+
+- Margins need adjustment
+- Border should be removed
+- Width should be auto
+
+Solution:
+Update TextStyle:
+
+```dart
+const TextStyle(
+  color: Color(0xFFFF8800),
+  fontWeight: FontWeight.bold,
+  fontSize: 20,
+  fontStyle: FontStyle.italic,
+  height: 1.1,
+  shadows: [Shadow(color: Colors.white, blurRadius: 2)],
+)
+```
+
+Add margin: EdgeInsets.only(right: 3)
+
+### 5. EX BURST Styling
+
+Location: lib/features/cards/presentation/widgets/card_description_text.dart
+
+Current Issue:
+
+- Margins need adjustment
+- Font family needs to be explicitly set
+
+Solution:
+Update TextStyle:
+
+```dart
+const TextStyle(
+  color: Color(0xFF332A9D),
+  fontWeight: FontWeight.bold,
+  fontSize: 20,
+  fontStyle: FontStyle.italic,
+  fontFamily: 'Arial Black',
+  height: 1.1,
+  shadows: [Shadow(color: Colors.white, blurRadius: 2)],
+)
+```
+
+Add margin: EdgeInsets.only(left: 3, right: 10)
 
 ## Testing Strategy
 
-1. Performance testing
-   - Text processing speed
-   - Memory usage patterns
-   - Render time analysis
-   - Filter query performance
+1. Visual Testing
+   - Element icon rendering
+   - Cost icon styling
+   - Special ability text formatting
+   - EX BURST appearance
+   - Icon alignment and spacing
 
-2. Load testing
-   - Large card sets
-   - Complex filter combinations
-   - Multiple rapid filter changes
-   - Concurrent operations
+2. Edge Cases
+   - Multiple elements in text
+   - Combined special abilities and costs
+   - Various text lengths
 
-3. Memory testing
-   - Long-term memory patterns
-   - Cache effectiveness
-   - Resource cleanup
-   - Memory leak detection
+## Success Criteria
 
-## Future Considerations
+- All icons render according to style guide
+- Text styling matches specifications exactly
+- Proper spacing and alignment throughout
+- Consistent rendering across different card types
 
-- Consider text processing worker threads
-- Evaluate WebAssembly for text processing
-- Plan for internationalization
-- Consider accessibility improvements
-- Monitor Firebase query costs
-- Plan for scaling filter system
+## Next Steps
+
+1. Update element mapping implementation
+2. Adjust cost icon styling
+3. Refine special ability formatting
+4. Update EX BURST styling
+5. Test with various card texts
