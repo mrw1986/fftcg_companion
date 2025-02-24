@@ -103,25 +103,54 @@ class CardDescriptionText extends StatelessWidget {
 
         // Handle special ability [S] tag
         if (content == 'S') {
-          // Get the text before [S] tag for special ability name
-          final abilityName = text.substring(0, i - currentText.length).trim();
-          if (abilityName.isNotEmpty) {
-            spans.add(WidgetSpan(
-              alignment: PlaceholderAlignment.middle,
-              child: Text(
-                abilityName,
-                style: TextStyle(
-                  color: const Color(0xFFFF8800),
-                  fontWeight: FontWeight.bold,
-                  fontSize: _specialFontSize * scaleFactor,
-                  fontStyle: FontStyle.italic,
-                  height: 1.1,
-                  shadows: const [Shadow(color: Colors.white, blurRadius: 2)],
-                ),
+          // We need to handle the text differently to avoid duplication
+          // Find the last <br> tag before [S]
+          final int lastBrIndex =
+              text.lastIndexOf('<br>', i - currentText.length);
+
+          if (lastBrIndex != -1) {
+            // Get the text before the <br> tag
+            final String textBeforeBr = text.substring(0, lastBrIndex);
+
+            // Get the special ability name (between <br> and [S])
+            final String specialAbilityName =
+                text.substring(lastBrIndex + 4, i - currentText.length).trim();
+
+            // Clear all spans to avoid duplication
+            spans.clear();
+
+            // Add the text before the <br> with normal styling
+            spans.addAll(HtmlParser.parseHtml(textBeforeBr, baseStyle));
+
+            // Add the line break
+            spans.add(const TextSpan(text: '\n'));
+
+            // Add the special ability name with orange styling
+            spans.addAll(HtmlParser.parseHtml(
+              specialAbilityName,
+              TextStyle(
+                color: const Color(0xFFFF8800),
+                fontWeight: FontWeight.bold,
+                fontSize: _specialFontSize * scaleFactor,
+                fontStyle: FontStyle.italic,
+                height: 1.1,
+                shadows: const [Shadow(color: Colors.white, blurRadius: 2)],
               ),
             ));
-            currentText = '';
+
+            // Add a space after the special ability name
+            spans.add(const TextSpan(text: ' '));
+          } else {
+            // If there's no <br> tag, just style the text before [S]
+            final textBeforeS = text.substring(0, i - currentText.length);
+            spans.clear();
+            spans.addAll(HtmlParser.parseHtml(textBeforeS, baseStyle));
+            spans.add(const TextSpan(text: ' '));
           }
+
+          currentText = '';
+
+          // Add the [S] icon
           spans.add(WidgetSpan(
             alignment: PlaceholderAlignment.middle,
             child: Container(
@@ -150,6 +179,11 @@ class CardDescriptionText extends StatelessWidget {
                 ),
               ),
             ),
+          ));
+
+          // Add spacing after the [S] icon
+          spans.add(WidgetSpan(
+            child: SizedBox(width: _iconSpacing),
           ));
         }
         // Handle card name references
