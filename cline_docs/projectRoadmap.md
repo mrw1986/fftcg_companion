@@ -14,6 +14,7 @@
   - [x] Sort by name, number, cost, power
   - [x] Handle crystal cards and sealed products properly
   - [x] Advanced filtering system
+  - [x] Rich text processing
 - [x] App initialization and loading
   - [x] Native splash screen
   - [x] Efficient provider initialization
@@ -27,6 +28,7 @@
 ## Completion Criteria
 
 - Robust card database with proper sorting and filtering
+- Accurate text processing and display
 - Intuitive user interface
 - Efficient data caching and offline support
 - Reliable card scanning functionality
@@ -52,12 +54,18 @@
 - Improved logging system
 - Enhanced code quality
 - Implemented deferred image prefetching
+- Enhanced HTML tag support
+- Improved text processing system
+- Implemented case-insensitive EX BURST handling
+- Fixed card name reference preservation
+- Updated special ability formatting
+- Optimized filter collection structure
 
 ### In Progress
 
-- Monitoring initialization performance
-- Evaluating logging performance in production
-- Considering lazy image loading optimizations
+- Monitoring text processing performance
+- Evaluating filter system efficiency
+- Considering text caching optimizations
 
 ### Future Tasks
 
@@ -78,3 +86,5 @@
 - Loading state optimization
 - Error tracking and analytics
 - Initialization performance monitoring
+- Text processing optimization
+- Filter system scalability

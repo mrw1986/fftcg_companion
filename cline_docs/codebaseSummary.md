@@ -7,7 +7,7 @@
 - `/lib/core/`
   - Services (Firestore, caching)
   - Widgets (shared UI components)
-  - Utils (helper functions)
+  - Utils (helper functions, HTML parsing)
   - Storage (local data persistence)
   - Providers (app-wide state management)
 
@@ -17,6 +17,7 @@
   - Data layer (repositories)
   - Domain layer (models, business logic)
   - Presentation layer (pages, providers, widgets)
+  - Filter collection system
 - `/lib/features/prices/` (planned)
 - `/lib/features/collection/` (planned)
 - `/lib/features/decks/` (planned)
@@ -41,6 +42,15 @@
 3. Repository layer for data access
 4. Providers for state management
 5. UI components for display
+
+### Filter System
+
+1. Filter collection in Firestore
+   - Separate documents for each filter type
+   - Optimized for UI presentation
+2. Card document fields for filtering
+   - Maintains efficient query performance
+   - Supports complex filter combinations
 
 ### State Management
 
@@ -69,6 +79,24 @@
 - flutter_native_splash for launch screen
 
 ## Recent Changes
+
+### Text Processing Improvements
+
+- Enhanced HTML tag support (<strong>, <em>, <br>)
+- Case-insensitive EX BURST handling
+- Preserved card name references
+- Improved special ability formatting
+- Optimized text rendering performance
+
+### Filter System Enhancements
+
+- New filter collection structure
+  - Separate documents by filter type
+  - Optimized value arrays
+  - Improved maintainability
+- Enhanced filter dialog UI
+- Better filter combination handling
+- Preserved filtering performance
 
 ### Loading System Improvements
 
@@ -113,12 +141,20 @@
 - Better error handling
 - Enhanced initialization flow
 - Consistent loading indicators
+- More accurate card text display
 
 ## Known Issues
 
 - None currently tracked
 
 ## Recent Performance Improvements
+
+### Text Processing
+
+- Optimized HTML parsing
+- Efficient special token handling
+- Improved text style application
+- Better memory management
 
 ### Caching System
 
