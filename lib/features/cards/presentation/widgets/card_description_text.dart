@@ -8,7 +8,7 @@ class CardDescriptionText extends StatelessWidget {
   // Border radius constants
   static const double _roundedSquareBorderRadius = 4.0;
   static const double _circularBorderRadius = 12.5;
-  static const double _iconSize = 25.0;
+  static const double _iconSize = 22.0; // Reduced from 25.0
   // Icon spacing constants
   static const double _iconMarginH = 1.0; // Minimal margin for tight spacing
   static const double _iconMarginV = 1.0;
@@ -16,13 +16,16 @@ class CardDescriptionText extends StatelessWidget {
 
   // Text size constants
   static const double _baseFontSize = 14.0;
-  static const double _specialFontSize = 16.0;
+  static const double _specialFontSize = 15.0; // Reduced from 16.0
   static const double _minScaleFactor = 0.8;
   static const double _maxScaleFactor = 1.2;
 
   double _getScaleFactor(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final scaleFactor = width / 400; // Base width for scaling
+    // More responsive scaling based on device width
+    // Use a smaller base width for better scaling on smaller devices
+    final scaleFactor = width /
+        375; // Adjusted from 400 to 375 for better scaling on smaller devices
     return scaleFactor.clamp(_minScaleFactor, _maxScaleFactor);
   }
 
@@ -73,6 +76,8 @@ class CardDescriptionText extends StatelessWidget {
         children: _parseDescription(context, effectiveBaseStyle, scaleFactor),
       ),
       softWrap: true,
+      overflow: TextOverflow.visible, // Ensure text doesn't get cut off
+      textScaleFactor: 1.0, // Use our custom scaling instead of system scaling
     );
   }
 
