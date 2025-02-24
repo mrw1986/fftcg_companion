@@ -1,6 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 
+// Custom painter for crystal/gem shape with proper border
+class CrystalBorderPainter extends CustomPainter {
+  final Color backgroundColor;
+  final Color borderColor;
+
+  CrystalBorderPainter({
+    required this.backgroundColor,
+    required this.borderColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final width = size.width;
+    final height = size.height;
+
+    // Create the crystal path
+    final path = Path();
+    path.moveTo(width * 0.5, 0); // Top center point
+    path.lineTo(width, height * 0.15); // Top right corner - more acute angle
+    path.lineTo(width, height * 0.85); // Bottom right corner - more acute angle
+    path.lineTo(width * 0.5, height); // Bottom center point
+    path.lineTo(0, height * 0.85); // Bottom left corner - more acute angle
+    path.lineTo(0, height * 0.15); // Top left corner - more acute angle
+    path.close();
+
+    // Fill with background color
+    final paint = Paint()
+      ..color = backgroundColor
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(path, paint);
+
+    // Draw border
+    final borderPaint = Paint()
+      ..color = borderColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5; // Slightly thicker for better visibility
+    canvas.drawPath(path, borderPaint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
+}
+
 // Custom clipper for crystal/gem shape
 class CostClipPath extends CustomClipper<Path> {
   @override
@@ -9,15 +52,14 @@ class CostClipPath extends CustomClipper<Path> {
     final width = size.width;
     final height = size.height;
 
-    // Create a crystal/gem shape that matches the reference image
-    path.moveTo(width * 0.5, 0); // Top point
-    path.lineTo(width * 0.8, height * 0.2); // Top right corner
-    path.lineTo(width * 0.95, height * 0.5); // Middle right point
-    path.lineTo(width * 0.8, height * 0.8); // Bottom right corner
-    path.lineTo(width * 0.5, height); // Bottom point
-    path.lineTo(width * 0.2, height * 0.8); // Bottom left corner
-    path.lineTo(width * 0.05, height * 0.5); // Middle left point
-    path.lineTo(width * 0.2, height * 0.2); // Top left corner
+    // Create a 6-sided crystal shape with longer vertical sides
+    // and more acute angles at top and bottom
+    path.moveTo(width * 0.5, 0); // Top center point
+    path.lineTo(width, height * 0.15); // Top right corner - more acute angle
+    path.lineTo(width, height * 0.85); // Bottom right corner - more acute angle
+    path.lineTo(width * 0.5, height); // Bottom center point
+    path.lineTo(0, height * 0.85); // Bottom left corner - more acute angle
+    path.lineTo(0, height * 0.15); // Top left corner - more acute angle
     path.close();
 
     return path;
@@ -109,41 +151,38 @@ class CardMetadataChips extends StatelessWidget {
       );
     } else if (isCost) {
       // Cost chip with crystal/gem shape
+      final width = elementSize * 1.0;
+      final height = elementSize * 1.8;
+
       return Container(
         margin: const EdgeInsets.symmetric(
           horizontal: _iconMarginH,
           vertical: _iconMarginV,
         ),
+        width: width,
+        height: height,
         child: Stack(
           children: [
-            // Outer border with clipper
-            ClipPath(
-              clipper: CostClipPath(),
-              child: Container(
-                width: elementSize * 1.3, // Wider for better proportions
-                height: elementSize * 1.5, // Taller to match reference image
-                decoration: BoxDecoration(
-                  color: Colors
-                      .purple.shade800, // Purple background to match reference
-                  border: Border.all(
-                    color: colorScheme.onSurface,
-                    width: 1,
-                  ),
-                ),
+            // Background and border using CustomPaint
+            CustomPaint(
+              painter: CrystalBorderPainter(
+                backgroundColor: Colors.purple.shade800,
+                borderColor: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white // White border in dark mode
+                    : Colors.black, // Black border in light mode
               ),
+              size: Size(width, height),
             ),
             // Text centered on the shape
-            Positioned.fill(
-              child: Center(
-                child: Text(
-                  label,
-                  style: textStyle?.copyWith(
-                    color: Colors.white, // White text to match reference
-                    fontWeight: FontWeight.bold,
-                    fontSize: elementSize * 0.6, // Larger text
-                    height: 1.0, // Better vertical centering
-                    // No shadows to eliminate blur
-                  ),
+            Center(
+              child: Text(
+                label,
+                style: textStyle?.copyWith(
+                  color: Colors.white, // White text to match reference
+                  fontWeight: FontWeight.bold,
+                  fontSize: elementSize * 0.6, // Larger text
+                  height: 1.0, // Better vertical centering
+                  // No shadows to eliminate blur
                 ),
               ),
             ),
