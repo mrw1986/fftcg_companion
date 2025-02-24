@@ -32,6 +32,14 @@ class CardMetadataChips extends StatelessWidget {
     return 'assets/images/elements/$elementName.png';
   }
 
+  // Constants matching card_description_text.dart
+  static const double _roundedSquareBorderRadius = 4.0;
+  static const double _circularBorderRadius = 12.5;
+  static const double _iconSize = 22.0;
+  static const double _iconMarginH = 1.0;
+  static const double _iconMarginV = 1.0;
+  static const double _iconSpacing = 2.0;
+
   Widget _buildChip(
     BuildContext context,
     String label,
@@ -42,41 +50,68 @@ class CardMetadataChips extends StatelessWidget {
     // Check if this is an element chip
     final elementImagePath = _getElementImagePath(label);
     final textStyle = Theme.of(context).textTheme.labelMedium;
-    final fontSize = textStyle?.fontSize ?? 12.0;
 
-    // Scale padding with font size
-    final horizontalPadding = fontSize * 0.75; // More horizontal breathing room
-    final verticalPadding = fontSize * 0.25;
+    // Use consistent sizing with card_description_text.dart
+    final elementSize = _iconSize;
+    final borderRadius = elementImagePath != null && !forceBackground
+        ? _circularBorderRadius
+        : _roundedSquareBorderRadius;
 
-    // Scale element size with font size
-    final elementSize = fontSize * 2; // Double the font size for elements
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: horizontalPadding,
-        vertical: verticalPadding,
-      ),
-      decoration: BoxDecoration(
-        color: elementImagePath != null && !forceBackground
-            ? Colors.transparent
-            : backgroundColor,
-        borderRadius: BorderRadius.circular(fontSize),
-      ),
-      child: elementImagePath != null && !forceBackground
-          ? Image.asset(
-              elementImagePath,
-              width: elementSize,
-              height: elementSize,
-              alignment: Alignment.center,
-            )
-          : Text(
-              label,
-              style: textStyle?.copyWith(
-                color: textColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-    );
+    if (elementImagePath != null && !forceBackground) {
+      // Element icon
+      return Container(
+        width: elementSize,
+        height: elementSize,
+        margin: const EdgeInsets.symmetric(
+          horizontal: _iconMarginH,
+          vertical: _iconMarginV,
+        ),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: colorScheme.onSurface,
+            width: 1,
+          ),
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        child: Image.asset(
+          elementImagePath,
+          width: elementSize - 2, // Account for border
+          height: elementSize - 2,
+          alignment: Alignment.center,
+        ),
+      );
+    } else {
+      // Text chip
+      return Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 8.0,
+          vertical: 4.0,
+        ),
+        margin: const EdgeInsets.symmetric(
+          horizontal: _iconMarginH,
+          vertical: _iconMarginV,
+        ),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          border: Border.all(
+            color: colorScheme.onSurface,
+            width: 1,
+          ),
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        child: Text(
+          label,
+          style: textStyle?.copyWith(
+            color: textColor,
+            fontWeight: FontWeight.bold,
+            height: 1.0, // Better vertical centering
+            shadows: const [
+              Shadow(color: Colors.white, blurRadius: 3)
+            ], // Improved visibility in dark mode
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -95,13 +130,12 @@ class CardMetadataChips extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    // Get font size for spacing calculation
-    final fontSize = Theme.of(context).textTheme.labelMedium?.fontSize ?? 12.0;
-
     return Wrap(
-      spacing: fontSize * 0.5, // Scale spacing with font size
-      runSpacing: fontSize * 0.5,
+      spacing:
+          _iconSpacing, // Use consistent spacing with card_description_text.dart
+      runSpacing: _iconSpacing,
       crossAxisAlignment: WrapCrossAlignment.center,
+      alignment: WrapAlignment.start,
       children: [
         ...elements.map((element) => _buildChip(
               context,
