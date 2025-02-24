@@ -77,7 +77,8 @@ class CardDescriptionText extends StatelessWidget {
       ),
       softWrap: true,
       overflow: TextOverflow.visible, // Ensure text doesn't get cut off
-      textScaleFactor: 1.0, // Use our custom scaling instead of system scaling
+      textScaler: const TextScaler.linear(
+          1.0), // Use our custom scaling instead of system scaling
     );
   }
 
@@ -139,17 +140,74 @@ class CardDescriptionText extends StatelessWidget {
                 fontSize: _specialFontSize * scaleFactor,
                 fontStyle: FontStyle.italic,
                 height: 1.1,
-                shadows: const [Shadow(color: Colors.white, blurRadius: 2)],
+                shadows: const [
+                  Shadow(color: Colors.white, blurRadius: 3)
+                ], // Increased blur radius for better visibility in dark mode
               ),
             ));
 
             // Add a space after the special ability name
             spans.add(const TextSpan(text: ' '));
           } else {
-            // If there's no <br> tag, just style the text before [S]
+            // If there's no <br> tag, check if the text contains HTML tags (like <b>)
             final textBeforeS = text.substring(0, i - currentText.length);
             spans.clear();
-            spans.addAll(HtmlParser.parseHtml(textBeforeS, baseStyle));
+
+            if (textBeforeS.contains('<b>') && textBeforeS.contains('</b>')) {
+              // Extract the content between <b> and </b> as the special ability name
+              final int endTagPos = textBeforeS.lastIndexOf('</b>');
+              final int startTagPos = textBeforeS.lastIndexOf('<b>', endTagPos);
+
+              if (startTagPos != -1 && endTagPos != -1) {
+                // Get the text before the <b> tag
+                final String textBeforeAbility =
+                    textBeforeS.substring(0, startTagPos);
+
+                // Get the special ability name including the <b> tags
+                final String specialAbilityWithTags =
+                    textBeforeS.substring(startTagPos, endTagPos + 4);
+
+                // Add any text before the ability with normal styling
+                if (textBeforeAbility.isNotEmpty) {
+                  spans.addAll(
+                      HtmlParser.parseHtml(textBeforeAbility, baseStyle));
+                }
+
+                // Add the special ability name with orange styling, preserving the <b> tags
+                spans.addAll(HtmlParser.parseHtml(
+                  specialAbilityWithTags,
+                  TextStyle(
+                    color: const Color(0xFFFF8800),
+                    fontWeight: FontWeight.bold,
+                    fontSize: _specialFontSize * scaleFactor,
+                    fontStyle: FontStyle.italic,
+                    height: 1.1,
+                    shadows: const [
+                      Shadow(color: Colors.white, blurRadius: 3)
+                    ], // Increased blur radius for better visibility in dark mode
+                  ),
+                ));
+              } else {
+                // If we can't find the tags properly, style the whole text
+                spans.addAll(HtmlParser.parseHtml(textBeforeS, baseStyle));
+              }
+            } else {
+              // No HTML tags, style the whole text as the ability
+              spans.addAll(HtmlParser.parseHtml(
+                textBeforeS,
+                TextStyle(
+                  color: const Color(0xFFFF8800),
+                  fontWeight: FontWeight.bold,
+                  fontSize: _specialFontSize * scaleFactor,
+                  fontStyle: FontStyle.italic,
+                  height: 1.1,
+                  shadows: const [
+                    Shadow(color: Colors.white, blurRadius: 3)
+                  ], // Increased blur radius for better visibility in dark mode
+                ),
+              ));
+            }
+
             spans.add(const TextSpan(text: ' '));
           }
 
@@ -318,19 +376,22 @@ class CardDescriptionText extends StatelessWidget {
           WidgetSpan(
             alignment: PlaceholderAlignment.middle,
             child: Padding(
-              padding: const EdgeInsets.only(left: 3, right: 10),
+              padding: const EdgeInsets.only(
+                  left: 3,
+                  right: 4), // Reduced right padding to decrease spacing
               child: Text(
                 'EX BURST',
                 style: TextStyle(
                   color: const Color(0xFF332A9D),
                   fontWeight: FontWeight.bold,
-                  fontSize: _baseFontSize *
-                      1.2 *
-                      scaleFactor, // Slightly larger than base
+                  fontSize: _specialFontSize *
+                      scaleFactor, // Match special ability text size
                   fontStyle: FontStyle.italic,
                   fontFamily: 'Arial Black',
                   height: 1.1,
-                  shadows: const [Shadow(color: Colors.white, blurRadius: 2)],
+                  shadows: const [
+                    Shadow(color: Colors.white, blurRadius: 3)
+                  ], // Increased blur radius for better visibility in dark mode
                 ),
               ),
             ),
