@@ -1,6 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 
+// Custom clipper for crystal/gem shape
+class CostClipPath extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    final width = size.width;
+    final height = size.height;
+
+    // Create a crystal/gem shape that matches the reference image
+    path.moveTo(width * 0.5, 0); // Top point
+    path.lineTo(width * 0.8, height * 0.2); // Top right corner
+    path.lineTo(width * 0.95, height * 0.5); // Middle right point
+    path.lineTo(width * 0.8, height * 0.8); // Bottom right corner
+    path.lineTo(width * 0.5, height); // Bottom point
+    path.lineTo(width * 0.2, height * 0.8); // Bottom left corner
+    path.lineTo(width * 0.05, height * 0.5); // Middle left point
+    path.lineTo(width * 0.2, height * 0.2); // Top left corner
+    path.close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+}
+
 class CardMetadataChips extends StatelessWidget {
   final models.Card card;
   final ColorScheme colorScheme;
@@ -46,6 +72,7 @@ class CardMetadataChips extends StatelessWidget {
     Color backgroundColor,
     Color textColor, {
     bool forceBackground = false,
+    bool isCost = false,
   }) {
     // Check if this is an element chip
     final elementImagePath = _getElementImagePath(label);
@@ -80,6 +107,49 @@ class CardMetadataChips extends StatelessWidget {
           alignment: Alignment.center,
         ),
       );
+    } else if (isCost) {
+      // Cost chip with crystal/gem shape
+      return Container(
+        margin: const EdgeInsets.symmetric(
+          horizontal: _iconMarginH,
+          vertical: _iconMarginV,
+        ),
+        child: Stack(
+          children: [
+            // Outer border with clipper
+            ClipPath(
+              clipper: CostClipPath(),
+              child: Container(
+                width: elementSize * 1.3, // Wider for better proportions
+                height: elementSize * 1.5, // Taller to match reference image
+                decoration: BoxDecoration(
+                  color: Colors
+                      .purple.shade800, // Purple background to match reference
+                  border: Border.all(
+                    color: colorScheme.onSurface,
+                    width: 1,
+                  ),
+                ),
+              ),
+            ),
+            // Text centered on the shape
+            Positioned.fill(
+              child: Center(
+                child: Text(
+                  label,
+                  style: textStyle?.copyWith(
+                    color: Colors.white, // White text to match reference
+                    fontWeight: FontWeight.bold,
+                    fontSize: elementSize * 0.6, // Larger text
+                    height: 1.0, // Better vertical centering
+                    // No shadows to eliminate blur
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
     } else {
       // Text chip
       return Container(
@@ -105,9 +175,7 @@ class CardMetadataChips extends StatelessWidget {
             color: textColor,
             fontWeight: FontWeight.bold,
             height: 1.0, // Better vertical centering
-            shadows: const [
-              Shadow(color: Colors.white, blurRadius: 3)
-            ], // Improved visibility in dark mode
+            // No shadows to eliminate blur
           ),
         ),
       );
@@ -149,6 +217,7 @@ class CardMetadataChips extends StatelessWidget {
             costValue,
             colorScheme.primary,
             colorScheme.onPrimary,
+            isCost: true, // Use hexagonal/crystal shape for cost
           ),
         if (typeValue != null)
           _buildChip(
