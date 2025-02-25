@@ -52,6 +52,91 @@ class FirestoreService {
             toFirestore: (data, _) => data,
           );
 
+  DocumentReference<Map<String, dynamic>> get metadataDoc => _firestore
+      .collection('metadata')
+      .doc('cards')
+      .withConverter<Map<String, dynamic>>(
+        fromFirestore: (snapshot, _) => snapshot.data() ?? {},
+        toFirestore: (data, _) => data,
+      );
+
+  // Metadata methods
+  Future<Map<String, dynamic>> getMetadata() async {
+    try {
+      final doc = await metadataDoc.get();
+      if (!doc.exists) {
+        // Create default metadata if it doesn't exist
+        final defaultMetadata = {
+          'version': 1,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        };
+        await metadataDoc.set(defaultMetadata);
+        return defaultMetadata;
+      }
+      return doc.data() ?? {};
+    } catch (e, stack) {
+      talker.error('Error getting metadata', e, stack);
+      return {'version': 1, 'lastUpdated': DateTime.now().toIso8601String()};
+    }
+  }
+
+  Future<void> updateMetadataVersion() async {
+    try {
+      final metadata = await getMetadata();
+      final currentVersion = metadata['version'] as int? ?? 1;
+      await metadataDoc.update({
+        'version': currentVersion + 1,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      talker.debug('Updated metadata version to ${currentVersion + 1}');
+    } catch (e, stack) {
+      talker.error('Error updating metadata version', e, stack);
+    }
+  }
+
+  // Card methods with versioning
+  Future<List<Card>> getCardsUpdatedSince(int version) async {
+    try {
+      final snapshot = await cardsCollection
+          .where('dataVersion', isGreaterThan: version)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => Card.fromFirestore(doc.data()))
+          .toList();
+    } catch (e, stack) {
+      talker.error('Error getting updated cards', e, stack);
+      return [];
+    }
+  }
+
+  // Paginated card loading
+  Future<List<Card>> getCardsPaginated({
+    int limit = 50,
+    DocumentSnapshot? startAfter,
+    required String sortField,
+    required bool sortDescending,
+  }) async {
+    try {
+      Query<Map<String, dynamic>> query = cardsCollection
+          .orderBy(sortField, descending: sortDescending)
+          .limit(limit);
+
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      final snapshot = await query.get();
+
+      return snapshot.docs
+          .map((doc) => Card.fromFirestore(doc.data()))
+          .toList();
+    } catch (e, stack) {
+      talker.error('Error getting paginated cards', e, stack);
+      return [];
+    }
+  }
+
   // Price-specific methods
   Future<Price?> getPrice(String cardId) async {
     try {
@@ -61,6 +146,34 @@ class FirestoreService {
     } catch (e, stack) {
       talker.error('Error getting price for card $cardId', e, stack);
       return null;
+    }
+  }
+
+  // Batch loading for prices
+  Future<Map<String, Price>> getPricesForCards(List<String> cardIds) async {
+    final result = <String, Price>{};
+
+    if (cardIds.isEmpty) return result;
+
+    try {
+      // Process in batches of 10 (Firestore limit for whereIn)
+      for (var i = 0; i < cardIds.length; i += 10) {
+        final end = (i + 10 < cardIds.length) ? i + 10 : cardIds.length;
+        final batch = cardIds.sublist(i, end);
+
+        final snapshot = await pricesCollection
+            .where(FieldPath.documentId, whereIn: batch)
+            .get();
+
+        for (var doc in snapshot.docs) {
+          result[doc.id] = Price.fromFirestore(doc.data());
+        }
+      }
+
+      return result;
+    } catch (e, stack) {
+      talker.error('Error batch loading prices', e, stack);
+      return result;
     }
   }
 

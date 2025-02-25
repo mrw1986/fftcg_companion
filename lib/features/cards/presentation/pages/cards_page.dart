@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
-import 'package:fftcg_companion/features/cards/data/repositories/card_repository.dart';
+import 'package:fftcg_companion/features/repositories.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/search_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart';

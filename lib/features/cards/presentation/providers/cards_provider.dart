@@ -73,7 +73,7 @@ Future<List<models.Card>> cardSearch(ref, String query) async {
   try {
     // Check cache first before any debouncing
     final cardCache = await ref.read(cardCacheNotifierProvider.future);
-    final cachedResults = await cardCache.getCachedSearchResults(query);
+    final cachedResults = await cardCache?.getCachedSearchResults(query);
     if (cachedResults != null) {
       talker.debug('Using cached search results for query: $query');
       return cachedResults;
@@ -101,7 +101,7 @@ Future<List<models.Card>> cardSearch(ref, String query) async {
     }
 
     // Cache the results and all progressive substrings
-    if (results.isNotEmpty) {
+    if (results.isNotEmpty && cardCache != null) {
       await cardCache.cacheSearchResults(query, results);
 
       // Cache progressive substrings for better partial matching

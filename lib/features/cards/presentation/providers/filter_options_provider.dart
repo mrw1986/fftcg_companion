@@ -91,7 +91,8 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
       await _prefetchSetInfo();
 
       // Cache the new filter options
-      await (await ref.read(cardCacheProvider.future)).cacheFilterOptions({
+      final cache = await ref.read(cardCacheProvider.future);
+      await cache.cacheFilterOptions({
         'elements': const [
           'Fire',
           'Ice',
