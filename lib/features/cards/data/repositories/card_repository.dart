@@ -68,11 +68,20 @@ class CardRepository extends _$CardRepository {
       // Check cache first
       final cachedResults = await cache.getCachedSearchResults(normalizedQuery);
       if (cachedResults != null) {
+        talker.debug('Using cached search results for query: $normalizedQuery');
         return cachedResults;
       }
 
-      // Generate search terms
+      talker.debug('Search query: "$normalizedQuery"');
+
+      // Generate search terms - always include the full query
       final searchTerms = <String>{normalizedQuery};
+
+      // IMPORTANT: Always add progressive substrings for any query
+      // This ensures queries like "Clou" will match "Cloud"
+      for (int i = 1; i <= normalizedQuery.length; i++) {
+        searchTerms.add(normalizedQuery.substring(0, i));
+      }
 
       // Handle number formats
       if (normalizedQuery.contains('-') ||
@@ -111,24 +120,42 @@ class CardRepository extends _$CardRepository {
         }
       }
 
-      // Only add progressive substrings for longer name-based queries
-      if (normalizedQuery.length > 3 &&
-          !normalizedQuery.contains('-') &&
-          !RegExp(r'[0-9]').hasMatch(normalizedQuery)) {
-        // Add progressive substrings for prefix search
-        for (int i = 3; i < normalizedQuery.length; i++) {
-          searchTerms.add(normalizedQuery.substring(0, i));
-        }
+      talker.debug('Generated search terms: ${searchTerms.join(', ')}');
+
+      // IMPORTANT: Firestore's arrayContainsAny is limited to 10 terms
+      // If we have more than 10 terms, we need to split into multiple queries
+      final firestoreService = ref.read(firestoreServiceProvider);
+      List<Card> cards = [];
+
+      // Split search terms into chunks of 10 (Firestore's limit)
+      final searchTermChunks = <List<String>>[];
+      final termsList = searchTerms.toList();
+
+      for (int i = 0; i < termsList.length; i += 10) {
+        final end = (i + 10 < termsList.length) ? i + 10 : termsList.length;
+        searchTermChunks.add(termsList.sublist(i, end));
       }
 
-      // Search using arrayContainsAny
-      final firestoreService = ref.read(firestoreServiceProvider);
-      final snapshot = await firestoreService.cardsCollection
-          .where('searchTerms', arrayContainsAny: searchTerms.toList())
-          .get();
+      // Execute each chunk as a separate query and combine results
+      for (final chunk in searchTermChunks) {
+        final snapshot = await firestoreService.cardsCollection
+            .where('searchTerms', arrayContainsAny: chunk)
+            .get();
 
-      final cards =
-          snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
+        final chunkCards =
+            snapshot.docs.map((doc) => Card.fromFirestore(doc.data())).toList();
+
+        cards.addAll(chunkCards);
+      }
+
+      // Remove duplicates (since cards might match multiple terms)
+      final uniqueCards = <int, Card>{};
+      for (final card in cards) {
+        uniqueCards[card.productId] = card;
+      }
+      cards = uniqueCards.values.toList();
+
+      talker.debug('Found ${cards.length} cards for query "$normalizedQuery"');
 
       // Helper function to calculate relevance score
       int getRelevance(Card card) {
@@ -222,6 +249,24 @@ class CardRepository extends _$CardRepository {
 
       // Cache the results
       await cache.cacheSearchResults(normalizedQuery, cards);
+
+      // Also cache progressive substrings for better partial matching
+      if (cards.isNotEmpty && normalizedQuery.length > 1) {
+        for (int i = 1; i < normalizedQuery.length; i++) {
+          final substring = normalizedQuery.substring(0, i);
+          final substringResults = cards.where((card) {
+            final name = card.name.toLowerCase();
+            final number = card.number?.toLowerCase() ?? '';
+            return name.startsWith(substring) ||
+                number.startsWith(substring) ||
+                card.cardNumbers
+                    .any((n) => n.toLowerCase().startsWith(substring));
+          }).toList();
+          if (substringResults.isNotEmpty) {
+            await cache.cacheSearchResults(substring, substringResults);
+          }
+        }
+      }
 
       return cards;
     } catch (e, stack) {
