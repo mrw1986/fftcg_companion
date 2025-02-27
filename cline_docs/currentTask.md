@@ -2,144 +2,104 @@
 
 ## Objective
 
-Fix set filter groups and optimize filter dialog performance
+Fix UI issues with splash screen and card display on foldable phones
 
 ## Context
 
-The set filter groups in the app had the following issues:
+The app had the following UI issues:
 
-1. Core sets that don't have "deck" or "collection" in their names were not being properly categorized as Opus sets
-2. When selecting a set, all card counts briefly showed loading state ("...") before showing the actual counts
-3. The filter dialog was making too many Firestore reads, which could increase operational expenses
+1. The splash screen was displaying the logo inside a circular container, which was not desired
+2. On foldable phones, card images were not fully visible due to aspect ratio issues
 
 ## Implementation Plan
 
-### 1. Update Set Categorization Logic
+### 1. Fix Splash Screen Logo Display
 
-Location: lib/features/cards/presentation/providers/filter_options_provider.dart
+Location: pubspec.yaml
 
 Current Issue:
 
-- Core sets like "Crystal Dominion", "Beyond Destiny", etc. were not being properly categorized as Opus sets
-- These sets were missing from the Opus Sets section in the filter dialog
+- The splash screen was displaying the logo inside a circular container
+- This was not the intended design for the app
 
 Solution:
 
-- Updated the _categorizeSet method to properly identify core sets
-- Added explicit checks for known core set names
-- Ensured all core sets that don't have "deck" or "collection" in their names are categorized as Opus sets
+- Updated the flutter_native_splash configuration in pubspec.yaml
+- Added android_gravity and ios_content_mode parameters set to "center"
+- Added fullscreen: false to ensure proper display
+- Added support for dark mode with image_dark and color_dark parameters
 
 Impact:
 
-- All core sets are now correctly displayed in the Opus Sets section
-- The filter dialog now shows a complete list of sets in their appropriate categories
+- The splash screen now displays the logo without a circular container
+- The logo appears properly centered on both Android and iOS devices
+- The splash screen maintains consistency with the app's design language
 
-### 2. Implement Persistent Caching for Set Card Counts
+### 2. Fix Card Image Display on Foldable Phones
 
-Location: lib/features/cards/presentation/providers/set_card_count_provider.dart
-
-Current Issue:
-
-- Set card counts were being recalculated on every app launch
-- This resulted in unnecessary Firestore reads and slower filter dialog loading
-
-Solution:
-
-- Created a SetCardCountsCache class for persistent storage of set card counts
-- Implemented methods to store and retrieve counts from Hive storage
-- Modified the FilteredSetCardCountCache provider to use the persistent cache
-
-Impact:
-
-- Reduced Firestore reads by caching set card counts
-- Improved filter dialog loading performance
-- Lower operational costs due to fewer Firestore queries
-
-### 3. Prevent Card Count Flickering During Set Selection
-
-Location: Multiple files (see below)
+Location: lib/features/cards/presentation/pages/card_details_page.dart
 
 Current Issue:
 
-- When selecting a set, all card counts briefly showed loading state ("...")
-- This created a flickering effect that was visually distracting
-- Card counts shouldn't change just because a set is being selected
+- On foldable phones, card images were not fully visible due to aspect ratio issues
+- The fixed aspect ratio (223/311) combined with the screen dimensions caused parts of the card to be cut off
+- The BoxFit.cover setting was causing the image to be cropped on certain screen sizes
+- The card was overlapping with the status bar at the top of the screen
+- In dark mode, white corners were visible around the card image, breaking the rounded corner effect
 
 Solution:
 
-- Created a StatefulWidget (SetCardCountDisplay) to maintain card counts during set selection
-- Added a flag in the filter provider to track when a set is being toggled
-- Modified the FilteredSetCardCountCache provider to maintain previous values while loading new ones
-- Implemented asynchronous cache updates to avoid UI flickering
+- Modified the card details page to calculate appropriate card dimensions based on screen size
+- Changed BoxFit from "cover" to "contain" to ensure the entire card is visible
+- Implemented responsive sizing that adapts to different screen dimensions
+- Added constraints to ensure the card is properly displayed on all devices, including foldables
+- Used percentages of screen height/width rather than fixed dimensions
+- Added padding to move the card down from the status bar
+- Implemented proper card styling with ClipRRect and Card widgets to ensure corners match the background color in dark mode
+- Used the same approach as in card_grid_item.dart for consistent styling across the app
 
 Files Modified:
 
-- lib/features/cards/presentation/widgets/filter_dialog.dart
-- lib/features/cards/presentation/providers/filter_provider.dart
-- lib/features/cards/presentation/providers/set_card_count_provider.dart
+- lib/features/cards/presentation/pages/card_details_page.dart
 
 Impact:
 
-- Card counts remain stable when selecting sets
-- No more flickering in the filter dialog
-- Improved user experience with smoother UI interactions
-
-### 4. Optimize Filter Dialog Loading
-
-Location: lib/features/cards/presentation/widgets/filter_dialog.dart
-
-Current Issue:
-
-- The filter dialog was slow to open, especially on first launch
-- All set card counts were being loaded sequentially
-
-Solution:
-
-- Added a prefetch mechanism to load filter options and some set counts before showing the dialog
-- Implemented optimistic UI updates with placeholder counts while loading actual data
-- Modified the filter dialog to show immediately with cached data
-
-Impact:
-
-- Filter dialog opens faster, especially on subsequent launches
-- Better user experience with more responsive UI
-- Reduced perceived loading time
-- Alphabetical sorting is consistent and intuitive
+- Card images are now fully visible on all devices, including foldable phones
+- The entire card content is displayed without cropping
+- The UI adapts to different screen sizes and aspect ratios
+- Improved user experience on devices with unusual aspect ratios
+- Cards no longer overlap with the status bar
+- Card corners appear properly rounded in both light and dark mode
+- Consistent styling across the app
 
 ## Testing Strategy
 
-1. Set Categorization Testing
-   - Open the filter dialog
-   - Verify that core sets like "Crystal Dominion", "Beyond Destiny", etc. appear in the Opus Sets section
-   - Check that all sets are properly categorized
+1. Splash Screen Testing
+   - Launch the app on different devices
+   - Verify that the logo appears without a circular container
+   - Check that the logo is properly centered
+   - Ensure the splash screen transitions smoothly to the main app
 
-2. Card Count Stability Testing
-   - Open the filter dialog
-   - Select and deselect various sets
-   - Verify that card counts remain stable and don't flicker during selection
-
-3. Performance Testing
-   - Clear the app cache
-   - Launch the app and open the filter dialog
-   - Measure the time it takes to load
-   - Open the filter dialog again and verify it loads faster
-
-4. Caching Effectiveness Testing
-   - Launch the app and open the filter dialog
-   - Check the logs for Firestore read operations
-   - Verify that subsequent opens use cached data instead of making new Firestore queries
+2. Card Display Testing
+   - Open a card detail view on different devices, especially foldable phones
+   - Verify that the entire card is visible without cropping
+   - Check that the card maintains its proper aspect ratio
+   - Ensure the card is displayed at an appropriate size for the screen
+   - Verify that the card doesn't overlap with the status bar
+   - Check that card corners appear properly rounded in both light and dark mode
 
 ## Success Criteria
 
-- All core sets are correctly displayed in the Opus Sets section
-- Card counts remain stable when selecting sets (no flickering)
-- The filter dialog opens quickly, especially on subsequent launches
-- Reduced Firestore reads for set card counts
-- Smooth and responsive UI during filter interactions
+- The splash screen displays the logo without a circular container
+- Card images are fully visible on all devices, including foldable phones
+- The UI adapts properly to different screen sizes and aspect ratios
+- No visual artifacts or distortions in the card display
+- Cards don't overlap with the status bar
+- Card corners appear properly rounded in both light and dark mode
 
 ## Next Steps
 
-1. Consider implementing a more sophisticated caching strategy for other parts of the app
-2. Explore further optimizations for the filter dialog
-3. Add analytics to track filter usage patterns
-4. Implement similar caching and UI stability improvements for other dialogs
+1. Consider implementing similar responsive sizing for other image displays in the app
+2. Explore further UI optimizations for unusual screen sizes
+3. Add comprehensive device testing to ensure consistent experience across all form factors
+4. Consider adding analytics to track user device types and screen sizes

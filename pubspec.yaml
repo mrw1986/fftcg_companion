@@ -112,5 +112,13 @@ flutter_native_splash:
   android_12:
     image: assets/images/fftcg_companion_logo.png
     color: "#1E1E1E"
+    icon_background_color: "#1E1E1E"
   ios: true
   web: false
+  android: true
+  fullscreen: false
+  image_dark: assets/images/fftcg_companion_logo.png
+  color_dark: "#1E1E1E"
+  # Remove circular container
+  android_gravity: center
+  ios_content_mode: center

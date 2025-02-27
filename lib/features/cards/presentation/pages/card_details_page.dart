@@ -1,4 +1,5 @@
 // lib/features/cards/presentation/pages/card_details_page.dart
+import 'dart:math';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/card_description_text.dart';
@@ -50,6 +51,19 @@ class CardDetailsPage extends StatelessWidget {
   }
 
   Widget _buildWideLayout(BuildContext context) {
+    // Calculate dimensions for wide layout
+    final screenHeight = MediaQuery.of(context).size.height;
+    final statusBarHeight = MediaQuery.of(context).padding.top;
+
+    // Use a percentage of screen height to ensure the card is fully visible
+    final maxCardHeight = screenHeight * 0.8;
+
+    // Calculate card width based on the standard card aspect ratio (223/311)
+    final cardWidth = maxCardHeight * (223 / 311);
+
+    // Add padding to move the card down from the status bar
+    final topPadding = statusBarHeight + 16.0;
+
     return Stack(
       children: [
         Row(
@@ -57,27 +71,38 @@ class CardDetailsPage extends StatelessWidget {
             Expanded(
               flex: 2,
               child: Center(
-                child: Hero(
-                  tag: 'card_${card.productId}',
-                  child: Material(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: BorderRadius.circular(3.0),
-                    clipBehavior: Clip.antiAlias,
-                    child: AspectRatio(
-                      aspectRatio: 223 / 311,
-                      child: CachedCardImage(
-                        imageUrl: card.getBestImageUrl(),
-                        fit: BoxFit.cover,
-                        borderRadius: BorderRadius.circular(3.0),
-                        placeholder: Image.asset(
-                          'assets/images/card-back.jpeg',
-                          fit: BoxFit.cover,
+                child: Padding(
+                  padding: EdgeInsets.only(top: topPadding),
+                  child: Hero(
+                    tag: 'card_${card.productId}',
+                    child: Card(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      elevation: 0,
+                      margin: EdgeInsets.zero,
+                      clipBehavior: Clip.antiAlias,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      child: SizedBox(
+                        width: cardWidth,
+                        height: maxCardHeight,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8.0),
+                          child: CachedCardImage(
+                            imageUrl: card.getBestImageUrl(),
+                            fit: BoxFit.contain,
+                            borderRadius: BorderRadius.circular(8.0),
+                            placeholder: Image.asset(
+                              'assets/images/card-back.jpeg',
+                              fit: BoxFit.contain,
+                            ),
+                            useProgressiveLoading: false,
+                            onImageError: () {
+                              talker.error(
+                                  'Failed to load high-res image for card: ${card.productId}');
+                            },
+                          ),
                         ),
-                        useProgressiveLoading: false,
-                        onImageError: () {
-                          talker.error(
-                              'Failed to load high-res image for card: ${card.productId}');
-                        },
                       ),
                     ),
                   ),
@@ -104,36 +129,68 @@ class CardDetailsPage extends StatelessWidget {
   }
 
   Widget _buildNormalLayout(BuildContext context) {
+    // Calculate the maximum height to ensure the card is fully visible
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final statusBarHeight = MediaQuery.of(context).padding.top;
+
+    // Use a percentage of screen height to ensure the card is visible on all devices
+    // including foldable phones with unusual aspect ratios
+    final maxCardHeight = screenHeight * 0.55;
+
+    // Calculate card width based on the standard card aspect ratio (223/311)
+    // but constrained by the maximum height
+    final cardWidth = min(screenWidth, maxCardHeight * (223 / 311));
+
+    // Recalculate the height based on the constrained width to maintain aspect ratio
+    final cardHeight = cardWidth * (311 / 223);
+
+    // Add padding to move the card down from the status bar
+    final topPadding = statusBarHeight + 16.0;
+
     return Stack(
       children: [
         CustomScrollView(
           slivers: [
             SliverAppBar(
-              expandedHeight: MediaQuery.of(context).size.width * (311 / 223),
+              expandedHeight: cardHeight + topPadding,
               pinned: true,
               automaticallyImplyLeading: false,
               flexibleSpace: FlexibleSpaceBar(
                 background: Hero(
                   tag: 'card_${card.productId}',
-                  child: Material(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: BorderRadius.circular(3.0),
-                    clipBehavior: Clip.antiAlias,
-                    child: AspectRatio(
-                      aspectRatio: 223 / 311,
-                      child: CachedCardImage(
-                        imageUrl: card.getBestImageUrl(),
-                        fit: BoxFit.cover,
-                        borderRadius: BorderRadius.circular(3.0),
-                        placeholder: Image.asset(
-                          'assets/images/card-back.jpeg',
-                          fit: BoxFit.cover,
+                  child: Padding(
+                    padding: EdgeInsets.only(top: topPadding),
+                    child: Center(
+                      child: Card(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        elevation: 0,
+                        margin: EdgeInsets.zero,
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.0),
                         ),
-                        useProgressiveLoading: false,
-                        onImageError: () {
-                          talker.error(
-                              'Failed to load high-res image for card: ${card.productId}');
-                        },
+                        child: SizedBox(
+                          width: cardWidth,
+                          height: cardHeight,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8.0),
+                            child: CachedCardImage(
+                              imageUrl: card.getBestImageUrl(),
+                              fit: BoxFit.contain,
+                              borderRadius: BorderRadius.circular(8.0),
+                              placeholder: Image.asset(
+                                'assets/images/card-back.jpeg',
+                                fit: BoxFit.contain,
+                              ),
+                              useProgressiveLoading: false,
+                              onImageError: () {
+                                talker.error(
+                                    'Failed to load high-res image for card: ${card.productId}');
+                              },
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
