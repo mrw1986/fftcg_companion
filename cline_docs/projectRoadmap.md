@@ -15,6 +15,7 @@
   - [x] Handle crystal cards and sealed products properly
   - [x] Advanced filtering system
   - [x] Rich text processing
+  - [x] Comprehensive search functionality
 - [x] App initialization and loading
   - [x] Native splash screen
   - [x] Efficient provider initialization
@@ -60,6 +61,10 @@
 - Fixed card name reference preservation
 - Updated special ability formatting
 - Optimized filter collection structure
+- Improved search functionality for card names and numbers
+- Enhanced search result relevance sorting
+- Added offline support for search functionality
+- Implemented progressive substring matching
 
 ### In Progress
 

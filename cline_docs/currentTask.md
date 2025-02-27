@@ -2,113 +2,103 @@
 
 ## Objective
 
-Fix text processing issues in card description display
+Implement proper metadata system for efficient card syncing
 
 ## Context
 
-Two issues have been identified in the card description text processing:
+The app's incremental sync functionality was not working properly because:
 
-1. Special ability text styling
-2. Icon spacing and alignment
+1. The sync service wasn't adding the `dataVersion` field to card documents
+2. The app was trying to query cards with a `dataVersion` field greater than the locally stored version
+3. This mismatch caused the app to always perform full syncs, resulting in excessive Firestore reads
 
 ## Implementation Plan
 
-### 1. Special Ability Text Styling
+### 1. Add dataVersion Field to Card Documents
 
-Location: lib/features/cards/presentation/widgets/card_description_text.dart
-
-Current Issue:
-
-- Special ability text (text before [S]) needs to be styled with orange color
-- Text contains HTML tags that need to be preserved (<br>, <b>)
-- Need to correctly identify text before [S] tag
-
-Solution:
-
-- Parse text before [S] tag while preserving HTML formatting
-- Apply special styling:
-
-  ```dart
-  TextStyle(
-    color: Color(0xFFFF8800),
-    fontWeight: FontWeight.bold,
-    fontSize: 16.0 * scaleFactor,
-    fontStyle: FontStyle.italic,
-    height: 1.1,
-    shadows: [Shadow(color: Colors.white, blurRadius: 2)],
-  )
-  ```
-
-- Handle line breaks and bold tags properly
-
-Impact:
-
-- Correct special ability text styling
-- Preserved HTML formatting
-- Proper text flow
-
-### 2. Icon Spacing and Alignment
-
-Location: lib/features/cards/presentation/widgets/card_description_text.dart
+Location: ../fftcg-sync-service/functions/src/services/cardSync.ts
 
 Current Issue:
 
-- Inconsistent spacing between icons
-- [S] icon spacing doesn't match other icons
-- Cost numbers not properly centered
+- The `dataVersion` field was defined in the CardDocument interface but not being set when creating card documents
+- This caused the app's incremental sync functionality to fail
 
 Solution:
 
-- Use consistent spacing constants:
+- Add the `dataVersion` field to the card document in the `processCards` method:
 
-  ```dart
-  static const double _iconMarginH = 1.0; // Minimal margin
-  static const double _iconMarginV = 1.0;
-  static const double _iconSpacing = 2.0; // Space between icons
-  ```
-
-- Use SizedBox for consistent spacing:
-
-  ```dart
-  spans.add(WidgetSpan(
-    child: SizedBox(width: _iconSpacing),
-  ));
-  ```
-
-- Add padding for cost number centering:
-
-  ```dart
-  padding: const EdgeInsets.only(top: 1)
+  ```typescript
+  const cardDoc: CardDocument = {
+    // existing fields...
+    dataVersion: currentVersion, // Add the current version to enable incremental sync
+  };
   ```
 
 Impact:
 
-- Consistent spacing between all icons
-- Proper vertical alignment
-- Better visual appearance
+- New and updated cards will have the proper version information
+- Enables the app to query only for cards updated since last sync
+- Reduces Firestore reads during updates
+
+### 2. Ensure Existing Cards Get Updated
+
+Location: ../fftcg-sync-service/functions/src/services/cardSync.ts
+
+Current Issue:
+
+- Existing cards without the `dataVersion` field wouldn't be updated unless their content changed
+- The sync service was skipping updates for cards with matching hashes
+
+Solution:
+
+- Modify the skip condition to check for the `dataVersion` field:
+
+  ```typescript
+  // Check if the card document has the dataVersion field
+  const cardData = cardSnapshot.data();
+  const hasDataVersion = cardSnapshot.exists && cardData && 'dataVersion' in cardData;
+
+  // Skip only if document exists, hash matches, has dataVersion, and not forcing update
+  if (cardSnapshot.exists && currentHash === storedHash && hasDataVersion && !options.forceUpdate) {
+    logger.info(`Skipping card ${card.productId} - no changes detected`);
+    return;
+  }
+  ```
+
+Impact:
+
+- Existing cards will be updated with the `dataVersion` field on the next sync
+- No force flag required - the regular sync process will handle it
+- Smooth transition to the new versioning system
 
 ## Testing Strategy
 
-1. Special Ability Text
-   - Test with various HTML tags
-   - Verify line break handling
-   - Check text styling consistency
+1. Sync Process Testing
+   - Run a normal sync without the force flag
+   - Verify cards are updated with the `dataVersion` field
+   - Check that subsequent syncs skip cards with matching hashes and existing `dataVersion` field
 
-2. Icon Spacing
-   - Verify consistent spacing between all icons
-   - Check vertical alignment
-   - Test with different text lengths
+2. Incremental Sync Testing
+   - Update a few cards in the sync service
+   - Verify only those cards are fetched by the app during sync
+   - Confirm the app's local version is updated correctly
+
+3. Offline Functionality
+   - Test sync with no internet connection
+   - Verify graceful fallback to cached data
+   - Check error handling for permission issues
 
 ## Success Criteria
 
-- Special ability text is correctly styled with preserved HTML formatting
-- All icons have consistent spacing and alignment
-- Cost numbers are properly centered
-- Text scales appropriately with screen size
+- All card documents have the `dataVersion` field after a sync
+- The app only fetches cards updated since the last sync
+- Firestore reads are significantly reduced during sync operations
+- Sync works properly even with intermittent connectivity
+- Version tracking is consistent between app and backend
 
 ## Next Steps
 
-1. Update HTML parsing for special ability text
-2. Verify line break handling
-3. Test with various card descriptions
-4. Document HTML tag support
+1. Monitor sync performance and Firestore usage
+2. Consider implementing batch processing for large sync operations
+3. Add analytics to track sync efficiency
+4. Explore further optimizations for the sync process

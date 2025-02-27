@@ -63,69 +63,62 @@ class CardsNotifier extends _$CardsNotifier {
   }
 }
 
-Timer? _searchDebounceTimer;
-Object? _searchDebounceKey;
+/// Completely rewritten search implementation to fix progressive search issues
+@riverpod
+class CardSearchNotifier extends _$CardSearchNotifier {
+  Timer? _debounceTimer;
+  String? _lastQuery;
 
+  @override
+  FutureOr<List<models.Card>> build(String query) async {
+    // For empty queries, return empty results immediately
+    if (query.isEmpty) return [];
+
+    // Always set loading state when the query changes
+    if (_lastQuery != query) {
+      _lastQuery = query;
+      state = const AsyncLoading();
+
+      // Clear any existing search cache for this query to ensure fresh results
+      final cardCache = await ref.read(cardCacheNotifierProvider.future);
+      await cardCache.clearSearchCache();
+    }
+
+    try {
+      // Cancel any pending debounce timer
+      _debounceTimer?.cancel();
+
+      // Create a completer to handle the async result
+      final completer = Completer<List<models.Card>>();
+
+      // Use a shorter debounce time (100ms) to be more responsive during typing
+      _debounceTimer = Timer(const Duration(milliseconds: 100), () async {
+        try {
+          // Always perform a fresh search for each query
+          final results = await ref
+              .read(cardRepositoryProvider.notifier)
+              .searchCards(query);
+
+          // Update state with the search results
+          state = AsyncData(results);
+          completer.complete(results);
+        } catch (e, stack) {
+          talker.error('Error performing search', e, stack);
+          state = AsyncError(e, stack);
+          completer.completeError(e, stack);
+        }
+      });
+
+      return completer.future;
+    } catch (error, stack) {
+      talker.error('Error searching cards', error, stack);
+      return [];
+    }
+  }
+}
+
+// Convenience provider that uses the notifier
 @riverpod
 Future<List<models.Card>> cardSearch(ref, String query) async {
-  if (query.isEmpty) return [];
-
-  try {
-    // Check cache first before any debouncing
-    final cardCache = await ref.read(cardCacheNotifierProvider.future);
-    final cachedResults = await cardCache?.getCachedSearchResults(query);
-    if (cachedResults != null) {
-      talker.debug('Using cached search results for query: $query');
-      return cachedResults;
-    }
-
-    // Only debounce network requests
-    final searchKey = Object();
-    ref.keepAlive();
-    _searchDebounceKey = searchKey;
-
-    _searchDebounceTimer?.cancel();
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    // If this is no longer the current search request, cancel it
-    if (searchKey != _searchDebounceKey) {
-      return [];
-    }
-
-    final results =
-        await ref.read(cardRepositoryProvider.notifier).searchCards(query);
-
-    // If this is no longer the current search request, cancel it
-    if (searchKey != _searchDebounceKey) {
-      return [];
-    }
-
-    // Cache the results and all progressive substrings
-    if (results.isNotEmpty && cardCache != null) {
-      await cardCache.cacheSearchResults(query, results);
-
-      // Cache progressive substrings for better partial matching
-      if (query.length > 1) {
-        for (int i = 1; i < query.length; i++) {
-          final substring = query.substring(0, i);
-          final substringResults = results.where((card) {
-            final name = card.name.toLowerCase();
-            final number = card.number?.toLowerCase() ?? '';
-            return name.startsWith(substring) ||
-                number.startsWith(substring) ||
-                card.cardNumbers
-                    .any((n) => n.toLowerCase().startsWith(substring));
-          }).toList();
-          if (substringResults.isNotEmpty) {
-            await cardCache.cacheSearchResults(substring, substringResults);
-          }
-        }
-      }
-    }
-
-    return results;
-  } catch (error, stack) {
-    talker.error('Error searching cards', error, stack);
-    return [];
-  }
+  return ref.watch(cardSearchNotifierProvider(query).future);
 }

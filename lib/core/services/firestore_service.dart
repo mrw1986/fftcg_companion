@@ -65,18 +65,25 @@ class FirestoreService {
     try {
       final doc = await metadataDoc.get();
       if (!doc.exists) {
-        // Create default metadata if it doesn't exist
-        final defaultMetadata = {
+        // If metadata doesn't exist, just return default values
+        // without attempting to create the document
+        talker.info('Metadata document does not exist, using default values');
+        return {
           'version': 1,
-          'lastUpdated': FieldValue.serverTimestamp(),
+          'lastUpdated': DateTime.now().toIso8601String(),
         };
-        await metadataDoc.set(defaultMetadata);
-        return defaultMetadata;
       }
       return doc.data() ?? {};
     } catch (e, stack) {
+      // Log the error but don't crash - return default metadata
       talker.error('Error getting metadata', e, stack);
-      return {'version': 1, 'lastUpdated': DateTime.now().toIso8601String()};
+
+      // Return default metadata that won't trigger unnecessary syncs
+      return {
+        'version': 1,
+        'lastUpdated': DateTime.now().toIso8601String(),
+        'offline': true // Flag to indicate we're using offline data
+      };
     }
   }
 

@@ -136,6 +136,9 @@ class CacheService {
     }
   }
 
+  // Maximum number of searches to cache
+  static const int _maxCachedSearches = 100;
+
   // Search cache methods
   Future<void> cacheSearchResults(String query, List<Card> results) async {
     try {
@@ -148,6 +151,40 @@ class CacheService {
         ...results.map((card) => card.toJson())
       ];
       await _searchCacheBox.put(query, cacheData);
+
+      // Limit cache size by removing oldest entries if needed
+      if (_searchCacheBox.length > _maxCachedSearches) {
+        // Get all keys sorted by timestamp (oldest first)
+        final keys = _searchCacheBox.keys.toList();
+        final timestamps = <String, DateTime>{};
+
+        for (final key in keys) {
+          final data = _searchCacheBox.get(key);
+          if (data != null && data.isNotEmpty) {
+            try {
+              final timestamp = DateTime.parse(data[0] as String);
+              timestamps[key as String] = timestamp;
+            } catch (e) {
+              // If timestamp can't be parsed, consider it old
+              timestamps[key as String] = DateTime(2000);
+            }
+          }
+        }
+
+        // Sort keys by timestamp (oldest first)
+        keys.sort((a, b) => (timestamps[a] ?? DateTime(2000))
+            .compareTo(timestamps[b] ?? DateTime(2000)));
+
+        // Remove oldest entries to get back to max size
+        final keysToRemove = keys.take(keys.length - _maxCachedSearches);
+        for (final key in keysToRemove) {
+          await _searchCacheBox.delete(key);
+          // Also remove from memory cache if present
+          _memorySearchCache.remove(key);
+        }
+
+        talker.debug('Pruned ${keysToRemove.length} old search cache entries');
+      }
 
       talker.debug(
           'Cached search results for query: $query (${results.length} results)');
@@ -238,6 +275,21 @@ class CacheService {
     _memoryFilterOptions.clear();
 
     talker.debug('Cleared memory cache');
+  }
+
+  // Clear only search cache
+  Future<void> clearSearchCache() async {
+    try {
+      // Clear memory search cache
+      _memorySearchCache.clear();
+
+      // Clear disk search cache
+      await _searchCacheBox.clear();
+
+      talker.debug('Cleared search cache');
+    } catch (e, stack) {
+      talker.error('Failed to clear search cache', e, stack);
+    }
   }
 
   // Full cache clearing

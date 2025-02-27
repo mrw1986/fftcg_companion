@@ -155,6 +155,22 @@ class CardCache {
     _memoryFilterOptions.clear();
   }
 
+  /// Clear search cache (both memory and disk)
+  Future<void> clearSearchCache() async {
+    // Clear memory search cache
+    _memorySearchCache.clear();
+
+    // Clear disk search cache if available
+    if (_searchCacheBox != null) {
+      try {
+        await _searchCacheBox!.clear();
+        talker.debug('Cleared search cache');
+      } catch (e, stack) {
+        talker.error('Failed to clear search cache', e, stack);
+      }
+    }
+  }
+
   // Filter options caching
   Future<void> cacheFilterOptions(Map<String, dynamic> options) async {
     if (_filterOptionsBox == null) return;

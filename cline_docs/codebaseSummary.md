@@ -80,9 +80,20 @@
 
 ## Recent Changes
 
+### Metadata System Improvements
+
+- Implemented proper card versioning with `dataVersion` field
+  - Added `dataVersion` field to card documents in sync service
+  - Modified sync logic to detect and update cards missing the field
+  - Enabled efficient incremental sync in the app
+- Enhanced sync process to reduce Firestore reads
+  - App now queries only for cards updated since last sync
+  - Improved version tracking between app and backend
+  - Better offline handling and error recovery
+
 ### Text Processing Improvements
 
-- Enhanced HTML tag support (<strong>, <em>, <br>)
+- Enhanced HTML tag support ```(<strong>, <em>, <br>)```
 - Case-insensitive EX BURST handling
 - Preserved card name references
 - Improved special ability formatting
@@ -97,6 +108,23 @@
 - Enhanced filter dialog UI
 - Better filter combination handling
 - Preserved filtering performance
+
+### Search Functionality Improvements
+
+- Comprehensive search approach for both card names and numbers
+  - Utilizes searchTerms array from Firestore
+  - Supports progressive substring matching
+  - Handles special cases for card numbers (e.g., "1-" vs "1")
+- Enhanced relevance sorting
+  - Prioritizes exact matches
+  - Considers card number format for number searches
+  - Sorts by name for text searches
+- Improved caching for search results
+  - Consistent substring caching
+  - Better partial matching support
+- Offline support
+  - Graceful handling of Firestore permission errors
+  - Fallback to cached data when offline
 
 ### Loading System Improvements
 

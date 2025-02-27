@@ -38,6 +38,11 @@
   - Offline persistence
   - Complex querying capabilities
   - Optimized filter collections
+  - SearchTerms array for efficient text search
+  - Metadata collection for version tracking
+  - Card versioning with dataVersion field
+  - Incremental sync support
+  - Hash-based change detection
 - Firebase Storage for card images
 - Firebase Authentication (planned)
 
@@ -125,9 +130,20 @@
   - Version-based cache management
   - Optimized cache initialization
   - Improved cache hit rates
+- Incremental sync system
+  - Card-level versioning with dataVersion field
+  - Selective data fetching based on version
+  - Efficient Firestore reads
+  - Robust offline fallback
 - Lazy loading for large datasets
 - Optimized provider initialization
 - Separate filter collections
+- Advanced search functionality
+  - Progressive substring matching
+  - Comprehensive search approach
+  - Relevance-based sorting
+  - Offline search support
+  - Efficient search term generation
 
 ### Loading States
 

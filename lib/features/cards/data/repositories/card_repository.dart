@@ -26,16 +26,32 @@ class CardRepository extends _$CardRepository {
 
       // If we have cached cards, use them immediately
       if (cachedCards.isNotEmpty) {
-        // Schedule a background sync if needed
-        _scheduleBackgroundSync();
+        talker.info('Using ${cachedCards.length} cached cards');
+
+        // Try to schedule a background sync, but don't block on it
+        try {
+          _scheduleBackgroundSync();
+        } catch (e) {
+          talker.debug('Error scheduling background sync: $e');
+        }
+
         return cachedCards;
       }
 
-      // If no cached cards, we need to fetch from Firestore
-      return _fetchCardsFromFirestore();
+      // If no cached cards, try to fetch from assets or bundled data first
+      // before attempting Firestore
+      try {
+        talker.info('No cached cards found, trying to load from Firestore');
+        return _fetchCardsFromFirestore();
+      } catch (e, stack) {
+        talker.error(
+            'Error fetching from Firestore, returning empty list', e, stack);
+        // Return empty list as last resort
+        return [];
+      }
     } catch (e, stack) {
       talker.error('Error loading cards', e, stack);
-      rethrow;
+      return []; // Return empty list instead of rethrowing
     }
   }
 
@@ -45,8 +61,15 @@ class CardRepository extends _$CardRepository {
 
     try {
       // Get metadata to check version
-      final metadata = await firestoreService.getMetadata();
-      final remoteVersion = metadata['version'] as int? ?? 1;
+      int remoteVersion = 1;
+      try {
+        final metadata = await firestoreService.getMetadata();
+        remoteVersion = metadata['version'] as int? ?? 1;
+      } catch (e) {
+        talker.warning(
+            'Could not access Firestore metadata, using default version');
+        // Continue with default version
+      }
 
       // Fetch all cards
       final snapshot = await firestoreService.cardsCollection.get();
@@ -71,7 +94,19 @@ class CardRepository extends _$CardRepository {
       return cards;
     } catch (e, stack) {
       talker.error('Error fetching cards from Firestore', e, stack);
-      // Return empty list if fetch fails
+
+      // Try to return cached cards if available
+      try {
+        final cachedCards = await cache.getCachedCards();
+        if (cachedCards.isNotEmpty) {
+          talker.info('Using ${cachedCards.length} cached cards instead');
+          return cachedCards;
+        }
+      } catch (cacheError) {
+        talker.error('Could not retrieve cached cards', cacheError);
+      }
+
+      // Return empty list if fetch fails and no cached cards
       return [];
     }
   }
@@ -138,7 +173,7 @@ class CardRepository extends _$CardRepository {
       final cache = await ref.watch(cardCacheNotifierProvider.future);
       final firestoreService = ref.read(firestoreServiceProvider);
 
-      // Get local and remote versions
+      // Get local version
       int localVersion = 0;
       try {
         if (cache is CacheService) {
@@ -148,8 +183,28 @@ class CardRepository extends _$CardRepository {
         talker.debug('Error getting data version: $e');
       }
 
-      final metadata = await firestoreService.getMetadata();
-      final remoteVersion = metadata['version'] as int? ?? 1;
+      // Try to get remote metadata, but handle permission errors gracefully
+      int remoteVersion = 1;
+      try {
+        final metadata = await firestoreService.getMetadata();
+
+        // Check if we're in offline mode
+        if (metadata['offline'] == true) {
+          talker.info('App is in offline mode, skipping sync');
+          _isSyncing = false;
+          return;
+        }
+
+        remoteVersion = metadata['version'] as int? ?? 1;
+      } catch (e, stack) {
+        // If we get a permission error, just log it and continue with local data
+        talker.warning(
+            'Could not access Firestore metadata, using local data only',
+            e,
+            stack);
+        _isSyncing = false;
+        return;
+      }
 
       // Skip if versions match and not forced
       if (localVersion == remoteVersion && !force) {
@@ -164,8 +219,17 @@ class CardRepository extends _$CardRepository {
 
       // If we have a local version, only fetch updated cards
       if (localVersion > 0 && !force) {
-        final updatedCards =
-            await firestoreService.getCardsUpdatedSince(localVersion);
+        List<Card> updatedCards = [];
+        try {
+          updatedCards =
+              await firestoreService.getCardsUpdatedSince(localVersion);
+        } catch (e, stack) {
+          // If we get a permission error, just log it and continue with local data
+          talker.warning(
+              'Could not fetch updated cards, using local data only', e, stack);
+          _isSyncing = false;
+          return;
+        }
 
         if (updatedCards.isEmpty) {
           talker.info('No updated cards found, updating version only');
@@ -211,11 +275,19 @@ class CardRepository extends _$CardRepository {
       } else {
         // Full sync
         talker.info('Performing full sync');
-        final cards = await _fetchCardsFromFirestore();
+        try {
+          final cards = await _fetchCardsFromFirestore();
 
-        // Update state if not in background
-        if (!inBackground && cards.isNotEmpty) {
-          state = AsyncData(cards);
+          // Update state if not in background
+          if (!inBackground && cards.isNotEmpty) {
+            state = AsyncData(cards);
+          }
+        } catch (e, stack) {
+          // If we get a permission error, just log it and continue with local data
+          talker.warning(
+              'Could not fetch cards from Firestore, using local data only',
+              e,
+              stack);
         }
       }
 
@@ -237,6 +309,10 @@ class CardRepository extends _$CardRepository {
       if (normalizedQuery.isEmpty) {
         return [];
       }
+
+      // Determine if this is a card number search
+      final isCardNumberSearch = normalizedQuery.contains('-') ||
+          RegExp(r'^\d+$').hasMatch(normalizedQuery);
 
       // Check cache first
       final cachedResults = await cache.getCachedSearchResults(normalizedQuery);
@@ -377,10 +453,6 @@ class CardRepository extends _$CardRepository {
 
       talker.debug(
           'Found ${results.length} cards locally for query "$normalizedQuery"');
-
-      // Determine if this is a card number search
-      final isCardNumberSearch = normalizedQuery.contains('-') ||
-          RegExp(r'^\d+$').hasMatch(normalizedQuery);
 
       // Helper function to calculate relevance score
       int getRelevance(Card card) {
@@ -578,9 +650,11 @@ class CardRepository extends _$CardRepository {
         for (int i = 1; i < normalizedQuery.length; i++) {
           final substring = normalizedQuery.substring(0, i);
 
+          List<Card> substringResults;
+
           // For card number searches, be more comprehensive with substring caching
           if (isCardNumberSearch) {
-            final substringResults = filteredResults.where((card) {
+            substringResults = filteredResults.where((card) {
               final number = card.number?.toLowerCase() ?? '';
               final cardNumbers =
                   card.cardNumbers.map((n) => n.toLowerCase()).toList();
@@ -614,22 +688,22 @@ class CardRepository extends _$CardRepository {
 
               return false;
             }).toList();
-
-            if (substringResults.isNotEmpty) {
-              await cache.cacheSearchResults(substring, substringResults);
-            }
           }
           // For name searches, focus on name matching
           else {
-            final substringResults = filteredResults.where((card) {
+            substringResults = filteredResults.where((card) {
               final name = card.name.toLowerCase();
               return name.startsWith(substring) ||
                   name.split(' ').any((word) => word.startsWith(substring));
             }).toList();
+          }
 
-            if (substringResults.isNotEmpty) {
-              await cache.cacheSearchResults(substring, substringResults);
-            }
+          if (substringResults.isNotEmpty) {
+            await cache.cacheSearchResults(substring, substringResults);
+          }
+
+          if (substringResults.isNotEmpty) {
+            await cache.cacheSearchResults(substring, substringResults);
           }
         }
       }

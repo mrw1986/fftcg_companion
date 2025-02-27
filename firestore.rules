@@ -1,33 +1,125 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read access to all users for cards collection
+    // Helper Functions
+    function isAuthorizedUser() {
+      return request.auth != null && 
+             (request.auth.token.email == 'mrw1986@gmail.com' ||
+              request.auth.token.email == 'preliatorzero@gmail.com' ||
+              request.auth.token.email == 'fftcgcompanion@gmail.com');
+    }
+
+    function isCloudFunction() {
+      return request.auth != null &&
+             request.auth.token.firebase.sign_in_provider == 'google.com' &&
+             request.auth.token.email.matches('.*@firebase.google.com$');
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Validation Functions
+    function isValidCard() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['productId', 'name', 'cleanName', 'elements']) &&
+             data.productId is number &&
+             data.name is string &&
+             data.cleanName is string &&
+             data.elements is list;
+    }
+
+    function isValidPrice() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['productId', 'lastUpdated']) &&
+             data.productId is number &&
+             (data.get('normal', {}).get('marketPrice', null) is number || 
+              data.get('foil', {}).get('marketPrice', null) is number);
+    }
+
+    function isValidDeck() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['userId', 'name', 'cards']) &&
+             data.userId == request.auth.uid &&
+             data.name is string &&
+             data.cards is list &&
+             data.cards.size() >= 50;
+    }
+
+    function isValidCollection() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['userId', 'cardId', 'lastModified']) &&
+             data.userId == request.auth.uid &&
+             data.lastModified is timestamp &&
+             (data.regularQty is number || data.foilQty is number);
+    }
+
+    // Cards Collection (Public read, admin write)
     match /cards/{cardId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+      allow update: if isCloudFunction() || isAuthorizedUser() && isValidCard();
     }
 
-    // Allow read access to groups collection
-    match /groups/{groupId} {
-      allow read: if true;
-      allow write: if false;
-    }
-
-    // Allow read access to prices collection
+    // Prices Collection
     match /prices/{priceId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+      allow update: if isCloudFunction() || isAuthorizedUser() && isValidPrice();
     }
 
-    // Allow read access to historical prices
+    // Historical Prices Collection
     match /historicalPrices/{priceId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+    }
+
+    // Groups Collection (Sets)
+    match /groups/{groupId} {
+      allow read: if true;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+    }
+
+    // Collections (User specific)
+    match /collections/{collectionId} {
+      allow read: if isOwner(resource.data.userId);
+      allow write: if isOwner(request.resource.data.userId) && isValidCollection();
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Decks
+    match /decks/{deckId} {
+      allow read: if resource.data.isPublic || isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && isValidDeck();
+      allow update: if isOwner(resource.data.userId) && isValidDeck();
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // User Settings
+    match /users/{userId}/settings/{document=**} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // User Stats
+    match /users/{userId}/stats/{document=**} {
+      allow read: if resource.data.isPublic || isOwner(userId);
+      allow write: if isOwner(userId);
     }
 
     // Default deny
     match /{document=**} {
       allow read, write: if false;
+    }
+    
+    // Metadata
+    // Allow read access to metadata collection
+    match /metadata/{docId} {
+      allow read: if true;
+      allow write: if false;
     }
   }
 }
