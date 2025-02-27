@@ -10,6 +10,11 @@ final filterProvider =
 class FilterNotifier extends StateNotifier<CardFilters> {
   FilterNotifier() : super(const CardFilters());
 
+  // Flag to indicate when a set is being toggled
+  // This helps prevent unnecessary recalculations
+  bool _isTogglingSet = false;
+  bool get isTogglingSet => _isTogglingSet;
+
   void toggleElement(String element) {
     final elements = Set<String>.from(state.elements);
     if (elements.contains(element)) {
@@ -50,13 +55,22 @@ class FilterNotifier extends StateNotifier<CardFilters> {
   }
 
   void toggleSet(String setId) {
-    final set = Set<String>.from(state.set);
-    if (set.contains(setId)) {
-      set.remove(setId);
-    } else {
-      set.add(setId);
+    _isTogglingSet = true;
+
+    try {
+      final set = Set<String>.from(state.set);
+      if (set.contains(setId)) {
+        set.remove(setId);
+      } else {
+        set.add(setId);
+      }
+      state = state.copyWith(set: set);
+    } finally {
+      // Reset the flag after a short delay to allow the UI to update
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _isTogglingSet = false;
+      });
     }
-    state = state.copyWith(set: set);
   }
 
   void toggleShowSealedProducts() {

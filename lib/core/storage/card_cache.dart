@@ -190,6 +190,22 @@ class CardCache {
     }
   }
 
+  /// Clear filter options cache (both memory and disk)
+  Future<void> clearFilterOptionsCache() async {
+    // Clear memory filter options cache
+    _memoryFilterOptions.clear();
+
+    // Clear disk filter options cache if available
+    if (_filterOptionsBox != null) {
+      try {
+        await _filterOptionsBox!.delete('filter_options');
+        talker.debug('Cleared filter options cache');
+      } catch (e, stack) {
+        talker.error('Failed to clear filter options cache', e, stack);
+      }
+    }
+  }
+
   Future<Map<String, dynamic>?> getCachedFilterOptions() async {
     if (_filterOptionsBox == null) return null;
 

@@ -5,26 +5,49 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_options_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/set_card_count_provider.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
+
+/// A provider to prefetch filter options before showing the dialog
+/// This helps reduce the loading time when opening the filter dialog
+final prefetchFilterOptionsProvider = FutureProvider.autoDispose((ref) async {
+  // Start loading filter options
+  final options = await ref.watch(filterOptionsNotifierProvider.future);
+
+  // Prefetch a few set counts to warm up the cache
+  final allSetIds = options.set.toList();
+
+  // Only prefetch a few sets to avoid too many concurrent requests
+  for (final setId in allSetIds.take(10)) {
+    ref.read(filteredSetCardCountCacheProvider(setId).future).ignore();
+  }
+
+  talker.debug('Prefetched filter options and some set counts');
+  return options;
+});
 
 class FilterDialog extends ConsumerWidget {
   const FilterDialog({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Trigger prefetch of filter options
+    ref.watch(prefetchFilterOptionsProvider);
+
     final filterOptions = ref.watch(filterOptionsNotifierProvider);
     final filters = ref.watch(filterProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final size = MediaQuery.of(context).size;
 
+    // Calculate dialog dimensions
     final dialogWidth = size.width < 600 ? size.width * 0.9 : size.width * 0.6;
-    final maxWidth = dialogWidth.clamp(300.0, 600.0);
+    final dialogMaxWidth = dialogWidth.clamp(300.0, 600.0);
 
     return Dialog(
       backgroundColor: colorScheme.surface,
       surfaceTintColor: colorScheme.surfaceTint,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: maxWidth,
+          maxWidth: dialogMaxWidth,
           maxHeight: size.height * 0.8,
         ),
         child: Padding(
@@ -298,17 +321,11 @@ class FilterDialog extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  cardCount.when(
-                    data: (count) => Text(
-                      '($count)',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    loading: () => const SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    error: (_, __) => const Text('(!)'),
+                  // Use our StatefulWidget to maintain the count during set selection
+                  SetCardCountDisplay(
+                    setId: setId,
+                    cardCount: cardCount,
+                    colorScheme: colorScheme,
                   ),
                 ],
               ),
@@ -428,6 +445,83 @@ class FilterDialog extends ConsumerWidget {
           },
         ),
       ],
+    );
+  }
+}
+
+/// A StatefulWidget to maintain the card count during set selection
+class SetCardCountDisplay extends StatefulWidget {
+  final String setId;
+  final AsyncValue<int> cardCount;
+  final ColorScheme colorScheme;
+
+  const SetCardCountDisplay({
+    super.key,
+    required this.setId,
+    required this.cardCount,
+    required this.colorScheme,
+  });
+
+  @override
+  State<SetCardCountDisplay> createState() => _SetCardCountDisplayState();
+}
+
+class _SetCardCountDisplayState extends State<SetCardCountDisplay> {
+  // Store the count once we have it
+  int? _cachedCount;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize cached count if data is already available
+    if (widget.cardCount.hasValue) {
+      _cachedCount = widget.cardCount.value;
+    }
+  }
+
+  @override
+  void didUpdateWidget(SetCardCountDisplay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Update cached count when data is available
+    if (widget.cardCount.hasValue && !widget.cardCount.isLoading) {
+      _cachedCount = widget.cardCount.value;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // If we have a cached count, use it
+    if (_cachedCount != null) {
+      return Text(
+        '($_cachedCount)',
+        style: Theme.of(context).textTheme.bodySmall,
+      );
+    }
+
+    // Otherwise, show loading or error state
+    return widget.cardCount.when(
+      data: (count) {
+        // Store the count for future use
+        _cachedCount = count;
+        return Text(
+          '($count)',
+          style: Theme.of(context).textTheme.bodySmall,
+        );
+      },
+      loading: () => Text(
+        '(...)',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: widget.colorScheme.onSurfaceVariant.withAlpha(128),
+            ),
+      ),
+      error: (_, __) => Text(
+        '(!)',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: widget.colorScheme.error,
+            ),
+      ),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:fftcg_companion/features/repositories.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card_filter_options.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/providers/card_cache_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 part 'filter_options_provider.g.dart';
 part 'filter_options_provider.freezed.dart';
@@ -179,9 +180,10 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
   Future<void> _prefetchSetInfo() async {
     try {
       final firestoreService = ref.read(firestoreServiceProvider);
+
       // Get all cards to determine ranges and sets
-      final snapshot = await firestoreService.cardsCollection.get();
-      if (snapshot.docs.isEmpty) {
+      final cardsSnapshot = await firestoreService.cardsCollection.get();
+      if (cardsSnapshot.docs.isEmpty) {
         talker.warning('No cards found in Firestore');
         return;
       }
@@ -190,8 +192,9 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
       int? minCost, maxCost;
       int? minPower, maxPower;
       final allSets = <String>{};
+      final groupIdToSets = <int, Set<String>>{};
 
-      for (final doc in snapshot.docs) {
+      for (final doc in cardsSnapshot.docs) {
         final data = doc.data();
 
         // Get cost range
@@ -224,9 +227,16 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
                   : maxPower;
         }
 
-        // Get sets
-        final cardSets = (data['set'] as List?)?.map((e) => e.toString()) ?? [];
+        // Get sets and map them to groupId
+        final cardSets =
+            (data['set'] as List?)?.map((e) => e.toString()).toList() ?? [];
         allSets.addAll(cardSets);
+
+        // Store the groupId to sets mapping
+        final groupId = data['groupId'] as int?;
+        if (groupId != null && cardSets.isNotEmpty) {
+          groupIdToSets.putIfAbsent(groupId, () => <String>{}).addAll(cardSets);
+        }
       }
 
       // Update ranges
@@ -241,48 +251,65 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
         );
       }
 
-      // Sort sets by opus number if possible
-      final sets = allSets.toList()
-        ..sort((a, b) {
-          // Extract opus numbers if they exist
-          final aMatch = RegExp(r'Opus (\w+)').firstMatch(a);
-          final bMatch = RegExp(r'Opus (\w+)').firstMatch(b);
+      // Fetch group information to get published dates
+      final groupsSnapshot = await firestoreService.groupsCollection.get();
+      final groupInfo = <int, Map<String, dynamic>>{};
 
-          if (aMatch != null && bMatch != null) {
-            // Both are opus sets, sort by roman numeral
-            return _parseOpusNumber(aMatch.group(1)!)
-                .compareTo(_parseOpusNumber(bMatch.group(1)!));
-          } else if (aMatch != null) {
-            // Only a is opus, put it first
-            return -1;
-          } else if (bMatch != null) {
-            // Only b is opus, put it first
-            return 1;
-          } else {
-            // Neither are opus, sort alphabetically
-            return a.compareTo(b);
+      for (final doc in groupsSnapshot.docs) {
+        final data = doc.data();
+        final groupId = data['groupId'] as int?;
+        if (groupId != null) {
+          groupInfo[groupId] = data;
+        }
+      }
+
+      // Process all sets with their group information
+      for (final setName in allSets) {
+        // Find the groupId for this set
+        int? setGroupId;
+        for (final entry in groupIdToSets.entries) {
+          if (entry.value.contains(setName)) {
+            setGroupId = entry.key;
+            break;
           }
-        });
+        }
 
-      for (final setName in sets) {
+        // Get category and sort order
         final (category, sortOrder) = _categorizeSet(
           setId: setName,
           name: setName,
           abbreviation: setName,
         );
 
+        // Get published date from group info if available
+        DateTime publishedDate = DateTime(1900);
+        if (setGroupId != null && groupInfo.containsKey(setGroupId)) {
+          final group = groupInfo[setGroupId]!;
+          final publishedOn = group['publishedOn'];
+
+          if (publishedOn is Timestamp) {
+            publishedDate = publishedOn.toDate();
+          } else if (publishedOn is String) {
+            try {
+              publishedDate = DateTime.parse(publishedOn);
+            } catch (e) {
+              talker.warning('Failed to parse publishedOn date: $publishedOn');
+            }
+          }
+        }
+
         _setInfo[setName] = SetInfo(
           id: setName,
           name: setName,
           abbreviation: null,
           category: category,
-          publishedDate:
-              DateTime(1900), // Default date since we don't have this info
+          publishedDate: publishedDate,
           sortOrder: sortOrder,
         );
       }
 
-      talker.debug('Cached ${_setInfo.length} set records');
+      talker.debug(
+          'Cached ${_setInfo.length} set records with publication dates');
     } catch (e, stack) {
       talker.error('Error prefetching set information', e, stack);
       // Don't rethrow - allow fallback to default options
@@ -311,15 +338,38 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
       return (SetCategory.promotional, 1000);
     }
 
-    // Collections and special sets
+    // Collections and special sets - these are explicitly identified by keywords
     if (name.toLowerCase().contains('collection') ||
         name.toLowerCase().contains('deck') ||
         name.toLowerCase().contains('starter')) {
       return (SetCategory.collection, 3500);
     }
 
-    // Default to collection category
-    return (SetCategory.collection, 3999);
+    // Check for core sets that should be categorized as Opus
+    // These include sets like "Crystal Dominion", "Beyond Destiny", etc.
+    // that are core sets but don't have "Opus" in their name
+    final coreSetNames = [
+      'Crystal Dominion',
+      'Beyond Destiny',
+      'Dawn of Heroes',
+      'Emissaries of Light',
+      'From Nightmares',
+      'Hidden Hope',
+      'Hidden Legends',
+      'Hidden Trials',
+      'Rebellion\'s Call',
+      'Resurgence of Power',
+      'Tears of the Planet',
+    ];
+
+    if (coreSetNames.any(
+        (coreName) => name.toLowerCase().contains(coreName.toLowerCase()))) {
+      return (SetCategory.opus, 3000);
+    }
+
+    // Any other sets that don't match the above categories
+    // should be categorized as Opus sets by default
+    return (SetCategory.opus, 3000);
   }
 
   int _parseOpusNumber(String input) {

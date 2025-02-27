@@ -61,4 +61,25 @@ extension CardCacheExtensions on CardCache {
       talker.error('Error clearing search cache', e, stack);
     }
   }
+
+  /// Clear filter options cache (clears memory cache and disk cache if available)
+  Future<void> clearFilterOptionsCache() async {
+    try {
+      // Use the method from CardCache to clear memory cache
+      clearMemoryCache();
+      talker.debug('Cleared memory cache (including filter options)');
+
+      // Clear disk filter options cache
+      try {
+        final filterOptionsBox = await Hive.openBox<Map>('filter_options');
+        await filterOptionsBox.delete('filter_options');
+        await filterOptionsBox.close();
+        talker.debug('Cleared disk filter options cache');
+      } catch (e) {
+        talker.debug('Could not clear disk filter options cache: $e');
+      }
+    } catch (e, stack) {
+      talker.error('Error clearing filter options cache', e, stack);
+    }
+  }
 }
