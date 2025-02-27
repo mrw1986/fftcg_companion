@@ -76,6 +76,12 @@
   - Ensured consistent sorting behavior across the app
   - Added automatic scroll to top when applying sort
   - Created provider for accessing CardContent state
+- Fixed set filter groups and optimized filter dialog:
+  - Updated set categorization to properly include all core sets in Opus category
+  - Implemented persistent caching for set card counts to reduce Firestore reads
+  - Created StatefulWidget approach to eliminate card count flickering during set selection
+  - Added prefetch mechanism for faster filter dialog loading
+  - Optimized UI with placeholder counts while loading actual data
 
 ### In Progress
 

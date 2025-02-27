@@ -2,166 +2,144 @@
 
 ## Objective
 
-Fix search functionality issues in the app
+Fix set filter groups and optimize filter dialog performance
 
 ## Context
 
-The search functionality in the app was not working correctly:
+The set filter groups in the app had the following issues:
 
-1. When typing a search term and then modifying it (e.g., typing "s", then "se", then back to "s"), the search results were not updating properly
-2. The search results were not being sorted correctly, particularly for single-letter searches
-3. The caching mechanism was causing stale results to be displayed
+1. Core sets that don't have "deck" or "collection" in their names were not being properly categorized as Opus sets
+2. When selecting a set, all card counts briefly showed loading state ("...") before showing the actual counts
+3. The filter dialog was making too many Firestore reads, which could increase operational expenses
 
 ## Implementation Plan
 
-### 1. Rewrite CardSearchNotifier for Better State Management
+### 1. Update Set Categorization Logic
 
-Location: lib/features/cards/presentation/providers/cards_provider.dart
-
-Current Issue:
-
-- The debouncing and caching mechanisms were interfering with each other
-- State was not being properly updated when the search query changed
-- Progressive searches were not working correctly
-
-Solution:
-
-- Completely rewrote the CardSearchNotifier class
-- Simplified the search implementation
-- Added code to clear the search cache when the query changes
-- Maintained a minimal debounce timer to prevent excessive searches during typing
-
-Impact:
-
-- Search results now update correctly when the search query changes
-- The UI is more responsive during typing
-- No more stale results from previous searches
-
-### 2. Add clearSearchCache Method to CardCache
-
-Location: lib/core/storage/card_cache.dart
+Location: lib/features/cards/presentation/providers/filter_options_provider.dart
 
 Current Issue:
 
-- There was no way to clear the search cache when needed
-- This was causing stale results to be displayed
+- Core sets like "Crystal Dominion", "Beyond Destiny", etc. were not being properly categorized as Opus sets
+- These sets were missing from the Opus Sets section in the filter dialog
 
 Solution:
 
-- Added a clearSearchCache method to the CardCache class
-- This method clears both memory and disk search caches
-- Called this method when the search query changes
+- Updated the _categorizeSet method to properly identify core sets
+- Added explicit checks for known core set names
+- Ensured all core sets that don't have "deck" or "collection" in their names are categorized as Opus sets
 
 Impact:
 
-- Each search query now gets fresh results
-- The search cache is properly cleared when needed
-- No more stale results from previous searches
+- All core sets are now correctly displayed in the Opus Sets section
+- The filter dialog now shows a complete list of sets in their appropriate categories
 
-### 3. Improve Sorting Logic for Search Results
+### 2. Implement Persistent Caching for Set Card Counts
 
-Location: lib/features/cards/data/repositories/card_repository.dart
+Location: lib/features/cards/presentation/providers/set_card_count_provider.dart
 
 Current Issue:
 
-- When searching for "s", SOLDIER was appearing before Sabin
-- The sorting logic wasn't properly prioritizing alphabetical order for cards with the same relevance score
+- Set card counts were being recalculated on every app launch
+- This resulted in unnecessary Firestore reads and slower filter dialog loading
 
 Solution:
 
-- Modified the relevance calculation and sorting logic
-- Improved the sorting logic to properly handle alphabetical sorting for cards with the same relevance score
-- Enhanced the name comparison logic for single-letter searches
+- Created a SetCardCountsCache class for persistent storage of set card counts
+- Implemented methods to store and retrieve counts from Hive storage
+- Modified the FilteredSetCardCountCache provider to use the persistent cache
 
 Impact:
 
-- Search results are now sorted correctly
-- For single-letter searches, cards are sorted alphabetically
-- The search results are more intuitive and consistent
+- Reduced Firestore reads by caching set card counts
+- Improved filter dialog loading performance
+- Lower operational costs due to fewer Firestore queries
 
-### 4. Fix Name Sorting in Descending Order
-
-Location: lib/features/cards/data/repositories/card_repository.dart and lib/features/cards/domain/models/card.dart
-
-Current Issue:
-
-- When sorting cards by name in descending order, "Leslie" appeared as the first card (alphabetically last)
-- Simply inverting the comparison result for descending order didn't work correctly for alphabetical sorting
-- The `compareByName` method in the Card model wasn't consistently using lowercase comparison
-
-Solution:
-
-- Added special handling for name sorting in descending order in the repository
-- Implemented direct name comparison in reverse order instead of just inverting the comparison result
-- Modified the `compareByName` method in the Card model to use lowercase comparison
-- Ensured consistent case handling in both the repository and the Card model
-
-Impact:
-
-- Cards are now properly sorted by name in both ascending and descending order
-- Alphabetical sorting is consistent and intuitive
-- Case-insensitive sorting ensures proper alphabetical order regardless of capitalization
-
-### 5. Scroll to Top When Applying Sort
+### 3. Prevent Card Count Flickering During Set Selection
 
 Location: Multiple files (see below)
 
 Current Issue:
 
-- When applying a sort, the list remained at the current scroll position
-- This was confusing for users as they couldn't see the beginning of the sorted list
-- Users had to manually scroll back to the top to see the new sort order
+- When selecting a set, all card counts briefly showed loading state ("...")
+- This created a flickering effect that was visually distracting
+- Card counts shouldn't change just because a set is being selected
 
 Solution:
 
-- Created a new provider (`cardContentKeyProvider`) to access the `CardContent` widget's state from anywhere
-- Added a `scrollToTop` method to the `CardContentState` class
-- Added an extension method on `WidgetRef` to easily scroll to the top
-- Modified the `SortBottomSheet` to scroll to the top after applying a sort
+- Created a StatefulWidget (SetCardCountDisplay) to maintain card counts during set selection
+- Added a flag in the filter provider to track when a set is being toggled
+- Modified the FilteredSetCardCountCache provider to maintain previous values while loading new ones
+- Implemented asynchronous cache updates to avoid UI flickering
 
 Files Modified:
 
-- lib/features/cards/presentation/widgets/card_content.dart
-- lib/features/cards/presentation/pages/cards_page.dart
-- lib/features/cards/presentation/widgets/sort_bottom_sheet.dart
-- lib/features/cards/presentation/providers/card_content_provider.dart (new file)
+- lib/features/cards/presentation/widgets/filter_dialog.dart
+- lib/features/cards/presentation/providers/filter_provider.dart
+- lib/features/cards/presentation/providers/set_card_count_provider.dart
 
 Impact:
 
-- When a sort is applied, the list automatically scrolls to the top
-- Users can immediately see the beginning of the sorted list
-- Improved user experience with more intuitive behavior
+- Card counts remain stable when selecting sets
+- No more flickering in the filter dialog
+- Improved user experience with smoother UI interactions
+
+### 4. Optimize Filter Dialog Loading
+
+Location: lib/features/cards/presentation/widgets/filter_dialog.dart
+
+Current Issue:
+
+- The filter dialog was slow to open, especially on first launch
+- All set card counts were being loaded sequentially
+
+Solution:
+
+- Added a prefetch mechanism to load filter options and some set counts before showing the dialog
+- Implemented optimistic UI updates with placeholder counts while loading actual data
+- Modified the filter dialog to show immediately with cached data
+
+Impact:
+
+- Filter dialog opens faster, especially on subsequent launches
+- Better user experience with more responsive UI
+- Reduced perceived loading time
 - Alphabetical sorting is consistent and intuitive
 
 ## Testing Strategy
 
-1. Progressive Search Testing
-   - Type a search term (e.g., "s")
-   - Modify the search term (e.g., "se")
-   - Go back to the original search term (e.g., "s")
-   - Verify that the search results update correctly
+1. Set Categorization Testing
+   - Open the filter dialog
+   - Verify that core sets like "Crystal Dominion", "Beyond Destiny", etc. appear in the Opus Sets section
+   - Check that all sets are properly categorized
 
-2. Sorting Testing
-   - Search for a single letter (e.g., "s")
-   - Verify that the results are sorted alphabetically
-   - Check that cards starting with that letter appear before cards containing that letter
+2. Card Count Stability Testing
+   - Open the filter dialog
+   - Select and deselect various sets
+   - Verify that card counts remain stable and don't flicker during selection
 
-3. Cache Invalidation Testing
-   - Perform multiple searches
-   - Verify that each search gets fresh results
-   - Check that there are no stale results from previous searches
+3. Performance Testing
+   - Clear the app cache
+   - Launch the app and open the filter dialog
+   - Measure the time it takes to load
+   - Open the filter dialog again and verify it loads faster
+
+4. Caching Effectiveness Testing
+   - Launch the app and open the filter dialog
+   - Check the logs for Firestore read operations
+   - Verify that subsequent opens use cached data instead of making new Firestore queries
 
 ## Success Criteria
 
-- Search results update correctly when the search query changes
-- Search results are sorted correctly, particularly for single-letter searches
-- No stale results from previous searches
-- The UI is responsive during typing
-- The search functionality works as expected for all search patterns
+- All core sets are correctly displayed in the Opus Sets section
+- Card counts remain stable when selecting sets (no flickering)
+- The filter dialog opens quickly, especially on subsequent launches
+- Reduced Firestore reads for set card counts
+- Smooth and responsive UI during filter interactions
 
 ## Next Steps
 
-1. Consider implementing a more sophisticated relevance calculation for search results
-2. Explore further optimizations for the search process
-3. Add analytics to track search performance and usage
-4. Implement more comprehensive testing for the search functionality
+1. Consider implementing a more sophisticated caching strategy for other parts of the app
+2. Explore further optimizations for the filter dialog
+3. Add analytics to track filter usage patterns
+4. Implement similar caching and UI stability improvements for other dialogs
