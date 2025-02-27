@@ -65,6 +65,12 @@
 - Enhanced search result relevance sorting
 - Added offline support for search functionality
 - Implemented progressive substring matching
+- Fixed search functionality issues:
+  - Rewrote CardSearchNotifier for better state management
+  - Added clearSearchCache method to CardCache
+  - Improved sorting logic for search results
+  - Fixed progressive search issues
+  - Enhanced alphabetical sorting for single-letter searches
 
 ### In Progress
 

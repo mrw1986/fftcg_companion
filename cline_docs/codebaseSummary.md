@@ -119,12 +119,18 @@
   - Prioritizes exact matches
   - Considers card number format for number searches
   - Sorts by name for text searches
+  - Improved alphabetical sorting for single-letter searches
 - Improved caching for search results
   - Consistent substring caching
   - Better partial matching support
+  - Added clearSearchCache method for cache invalidation
 - Offline support
   - Graceful handling of Firestore permission errors
   - Fallback to cached data when offline
+- Fixed progressive search issues
+  - Completely rewrote CardSearchNotifier for better state management
+  - Ensured proper cache invalidation between searches
+  - Improved debouncing mechanism to prevent stale results
 
 ### Loading System Improvements
 

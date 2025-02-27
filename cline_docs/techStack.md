@@ -141,9 +141,12 @@
 - Advanced search functionality
   - Progressive substring matching
   - Comprehensive search approach
-  - Relevance-based sorting
+  - Relevance-based sorting with improved alphabetical ordering
   - Offline search support
   - Efficient search term generation
+  - Robust cache invalidation mechanism
+  - Improved state management for search queries
+  - Debounced search for better performance
 
 ### Loading States
 
