@@ -891,18 +891,35 @@ class CardRepository extends _$CardRepository {
         }
 
         // If both are crystal or both are not, use normal sorting
-        final comparison = switch (filters.sortField) {
-          'number' => cardA.compareByNumber(cardB),
-          'name' => cardA.compareByName(cardB),
-          'cost' => cardA.compareByCost(cardB) != 0
-              ? cardA.compareByCost(cardB)
-              : cardA.compareByNumber(cardB),
-          'power' => cardA.compareByPower(cardB) != 0
-              ? cardA.compareByPower(cardB)
-              : cardA.compareByNumber(cardB),
-          _ => 0,
-        };
-        return filters.sortDescending ? -comparison : comparison;
+        if (filters.sortField == 'name' && filters.sortDescending) {
+          // Special handling for name sorting in descending order
+          // We need to compare names directly rather than just inverting the comparison
+          final nameA = cardA.cleanName.toLowerCase();
+          final nameB = cardB.cleanName.toLowerCase();
+
+          // Compare names in reverse order
+          final nameComparison = nameB.compareTo(nameA);
+          if (nameComparison != 0) {
+            return nameComparison;
+          }
+
+          // If names are identical, compare by card number
+          return cardB.compareByNumber(cardA);
+        } else {
+          // For all other sorts, use the standard comparison
+          final comparison = switch (filters.sortField) {
+            'number' => cardA.compareByNumber(cardB),
+            'name' => cardA.compareByName(cardB),
+            'cost' => cardA.compareByCost(cardB) != 0
+                ? cardA.compareByCost(cardB)
+                : cardA.compareByNumber(cardB),
+            'power' => cardA.compareByPower(cardB) != 0
+                ? cardA.compareByPower(cardB)
+                : cardA.compareByNumber(cardB),
+            _ => 0,
+          };
+          return filters.sortDescending ? -comparison : comparison;
+        }
       });
     }
 

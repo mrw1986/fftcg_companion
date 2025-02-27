@@ -210,7 +210,11 @@ class Card with _$Card {
 
   int compareByName(Card other) {
     // First compare by name
-    final nameComparison = cleanName.compareTo(other.cleanName);
+    // Use lowercase comparison to ensure consistent sorting
+    final thisName = cleanName.toLowerCase();
+    final otherName = other.cleanName.toLowerCase();
+
+    final nameComparison = thisName.compareTo(otherName);
     if (nameComparison != 0) return nameComparison;
 
     // If names are equal, compare by card number

@@ -79,6 +79,30 @@ Impact:
 - For single-letter searches, cards are sorted alphabetically
 - The search results are more intuitive and consistent
 
+### 4. Fix Name Sorting in Descending Order
+
+Location: lib/features/cards/data/repositories/card_repository.dart and lib/features/cards/domain/models/card.dart
+
+Current Issue:
+
+- When sorting cards by name in descending order, "Leslie" appeared as the first card (alphabetically last)
+- Simply inverting the comparison result for descending order didn't work correctly for alphabetical sorting
+- The `compareByName` method in the Card model wasn't consistently using lowercase comparison
+
+Solution:
+
+- Added special handling for name sorting in descending order in the repository
+- Implemented direct name comparison in reverse order instead of just inverting the comparison result
+- Modified the `compareByName` method in the Card model to use lowercase comparison
+- Ensured consistent case handling in both the repository and the Card model
+
+Impact:
+
+- Cards are now properly sorted by name in both ascending and descending order
+- Alphabetical sorting is consistent and intuitive
+- Case-insensitive sorting ensures proper alphabetical order regardless of capitalization
+- Alphabetical sorting is consistent and intuitive
+
 ## Testing Strategy
 
 1. Progressive Search Testing

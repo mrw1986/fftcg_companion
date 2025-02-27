@@ -146,6 +146,10 @@
 - Updated sorting logic for crystal cards
 - Improved filtering for non-card items
 - Added secondary sorting by number
+- Fixed name sorting in descending order
+- Enhanced alphabetical sorting consistency
+- Implemented case-insensitive name comparison
+- Ensured consistent sorting behavior across the app
 
 ### Code Organization
 

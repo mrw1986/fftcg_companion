@@ -71,6 +71,9 @@
   - Improved sorting logic for search results
   - Fixed progressive search issues
   - Enhanced alphabetical sorting for single-letter searches
+  - Fixed name sorting in descending order
+  - Implemented case-insensitive name comparison
+  - Ensured consistent sorting behavior across the app
 
 ### In Progress
 
