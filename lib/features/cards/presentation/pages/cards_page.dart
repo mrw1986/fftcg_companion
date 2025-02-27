@@ -13,6 +13,7 @@ import 'package:fftcg_companion/features/cards/presentation/widgets/card_search_
 import 'package:fftcg_companion/features/cards/presentation/widgets/card_app_bar_actions.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/card_content.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/error_view.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/card_content_provider.dart';
 
 class CardsPage extends ConsumerStatefulWidget {
   const CardsPage({super.key});
@@ -128,6 +129,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                           );
                         }
                         return CardContent(
+                          key: ref.watch(cardContentKeyProvider),
                           cards: searchedCards,
                           viewPrefs: viewPrefs,
                         );
@@ -148,6 +150,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                     );
                   }
                   return CardContent(
+                    key: ref.watch(cardContentKeyProvider),
                     cards: cardList,
                     viewPrefs: viewPrefs,
                   );

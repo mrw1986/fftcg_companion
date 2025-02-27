@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/card_content_provider.dart';
 
 class SortBottomSheet extends ConsumerWidget {
   const SortBottomSheet({super.key});
@@ -147,5 +148,11 @@ class SortBottomSheet extends ConsumerWidget {
 
     // Close the bottom sheet
     Navigator.pop(context);
+
+    // Schedule a microtask to scroll to top after the UI updates
+    Future.microtask(() {
+      // Use the extension method to scroll to top
+      ref.scrollCardsToTop();
+    });
   }
 }

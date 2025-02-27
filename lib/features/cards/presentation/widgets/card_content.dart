@@ -4,7 +4,7 @@ import 'package:fftcg_companion/features/cards/presentation/providers/view_prefe
 import 'package:fftcg_companion/features/cards/presentation/widgets/card_grid_item.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/card_list_item.dart';
 
-class CardContent extends StatelessWidget {
+class CardContent extends StatefulWidget {
   final List<models.Card> cards;
   final ({
     ViewType type,
@@ -20,10 +20,34 @@ class CardContent extends StatelessWidget {
   });
 
   @override
+  State<CardContent> createState() => CardContentState();
+}
+
+class CardContentState extends State<CardContent> {
+  final ScrollController scrollController = ScrollController();
+
+  void scrollToTop() {
+    if (scrollController.hasClients) {
+      scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return CustomScrollView(
+      controller: scrollController,
       slivers: [
-        viewPrefs.type == ViewType.grid
+        widget.viewPrefs.type == ViewType.grid
             ? _buildSliverGrid(context)
             : _buildSliverList(context),
       ],
@@ -35,7 +59,7 @@ class CardContent extends StatelessWidget {
     final size = MediaQuery.sizeOf(context);
     final isSmallScreen = size.width <= size.shortestSide;
 
-    final int desiredColumns = switch (viewPrefs.gridSize) {
+    final int desiredColumns = switch (widget.viewPrefs.gridSize) {
       ViewSize.small => isSmallScreen ? 4 : 6,
       ViewSize.normal => isSmallScreen ? 3 : 5,
       ViewSize.large => isSmallScreen ? 2 : 4,
@@ -54,12 +78,12 @@ class CardContent extends StatelessWidget {
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) => CardGridItem(
-            key: ValueKey(cards[index].productId),
-            card: cards[index],
-            viewSize: viewPrefs.gridSize,
-            showLabels: viewPrefs.showLabels,
+            key: ValueKey(widget.cards[index].productId),
+            card: widget.cards[index],
+            viewSize: widget.viewPrefs.gridSize,
+            showLabels: widget.viewPrefs.showLabels,
           ),
-          childCount: cards.length,
+          childCount: widget.cards.length,
           addAutomaticKeepAlives: true,
           addRepaintBoundaries: true,
         ),
@@ -82,12 +106,12 @@ class CardContent extends StatelessWidget {
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) => CardListItem(
-            key: ValueKey(cards[index].productId),
-            card: cards[index],
-            viewSize: viewPrefs.listSize,
+            key: ValueKey(widget.cards[index].productId),
+            card: widget.cards[index],
+            viewSize: widget.viewPrefs.listSize,
             isSmallScreen: isSmallScreen,
           ),
-          childCount: cards.length,
+          childCount: widget.cards.length,
           addAutomaticKeepAlives: true,
           addRepaintBoundaries: true,
         ),
