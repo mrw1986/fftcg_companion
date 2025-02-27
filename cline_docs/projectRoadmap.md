@@ -74,6 +74,8 @@
   - Fixed name sorting in descending order
   - Implemented case-insensitive name comparison
   - Ensured consistent sorting behavior across the app
+  - Added automatic scroll to top when applying sort
+  - Created provider for accessing CardContent state
 
 ### In Progress
 

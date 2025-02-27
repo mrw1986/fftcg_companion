@@ -101,6 +101,36 @@ Impact:
 - Cards are now properly sorted by name in both ascending and descending order
 - Alphabetical sorting is consistent and intuitive
 - Case-insensitive sorting ensures proper alphabetical order regardless of capitalization
+
+### 5. Scroll to Top When Applying Sort
+
+Location: Multiple files (see below)
+
+Current Issue:
+
+- When applying a sort, the list remained at the current scroll position
+- This was confusing for users as they couldn't see the beginning of the sorted list
+- Users had to manually scroll back to the top to see the new sort order
+
+Solution:
+
+- Created a new provider (`cardContentKeyProvider`) to access the `CardContent` widget's state from anywhere
+- Added a `scrollToTop` method to the `CardContentState` class
+- Added an extension method on `WidgetRef` to easily scroll to the top
+- Modified the `SortBottomSheet` to scroll to the top after applying a sort
+
+Files Modified:
+
+- lib/features/cards/presentation/widgets/card_content.dart
+- lib/features/cards/presentation/pages/cards_page.dart
+- lib/features/cards/presentation/widgets/sort_bottom_sheet.dart
+- lib/features/cards/presentation/providers/card_content_provider.dart (new file)
+
+Impact:
+
+- When a sort is applied, the list automatically scrolls to the top
+- Users can immediately see the beginning of the sorted list
+- Improved user experience with more intuitive behavior
 - Alphabetical sorting is consistent and intuitive
 
 ## Testing Strategy

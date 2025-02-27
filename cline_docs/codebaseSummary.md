@@ -150,6 +150,8 @@
 - Enhanced alphabetical sorting consistency
 - Implemented case-insensitive name comparison
 - Ensured consistent sorting behavior across the app
+- Added automatic scroll to top when applying sort
+- Created provider for accessing CardContent state
 
 ### Code Organization
 
