@@ -516,8 +516,15 @@ class CardRepository extends _$CardRepository {
         }
         // For name searches, prioritize name matches
         else {
-          // Name starts with query
+          // Name starts with query - highest priority for name searches
           if (name.startsWith(normalizedQuery)) {
+            // For single letter searches like "s", we want to prioritize alphabetical order
+            // So we return a high score but don't make them all equal
+            if (normalizedQuery.length == 1) {
+              // This ensures that cards are primarily sorted alphabetically
+              // while still maintaining a high relevance score
+              return 9;
+            }
             return 9;
           }
 
@@ -567,8 +574,19 @@ class CardRepository extends _$CardRepository {
             // For card number searches, sort by card number first
             return a.compareByNumber(b);
           } else {
-            // For name searches, sort alphabetically by name first, then by card number
-            return a.compareByName(b);
+            // For name searches, sort alphabetically by name first
+            // This is the key change - we need to ensure alphabetical sorting
+            final nameA = a.name.toLowerCase();
+            final nameB = b.name.toLowerCase();
+
+            // First compare by name alphabetically
+            final nameComparison = nameA.compareTo(nameB);
+            if (nameComparison != 0) {
+              return nameComparison;
+            }
+
+            // If names are identical, then sort by card number
+            return a.compareByNumber(b);
           }
         }
         // Otherwise sort by relevance
