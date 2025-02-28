@@ -2,104 +2,67 @@
 
 ## Objective
 
-Fix UI issues with splash screen and card display on foldable phones
+Fix set filter groups and card count display issues
 
 ## Context
 
-The app had the following UI issues:
+The set filter groups in the app had the following issues:
 
-1. The splash screen was displaying the logo inside a circular container, which was not desired
-2. On foldable phones, card images were not fully visible due to aspect ratio issues
+1. When filtering by a set and adjusting other filters, only the selected set had its card count updated while all other sets showed 0
+2. This created a confusing user experience when trying to filter by multiple criteria
 
 ## Implementation Plan
 
-### 1. Fix Splash Screen Logo Display
+### 1. Fix Card Count Calculation for Set Filters
 
-Location: pubspec.yaml
-
-Current Issue:
-
-- The splash screen was displaying the logo inside a circular container
-- This was not the intended design for the app
-
-Solution:
-
-- Updated the flutter_native_splash configuration in pubspec.yaml
-- Added android_gravity and ios_content_mode parameters set to "center"
-- Added fullscreen: false to ensure proper display
-- Added support for dark mode with image_dark and color_dark parameters
-
-Impact:
-
-- The splash screen now displays the logo without a circular container
-- The logo appears properly centered on both Android and iOS devices
-- The splash screen maintains consistency with the app's design language
-
-### 2. Fix Card Image Display on Foldable Phones
-
-Location: lib/features/cards/presentation/pages/card_details_page.dart
+Location: lib/features/cards/presentation/providers/set_card_count_provider.dart
 
 Current Issue:
 
-- On foldable phones, card images were not fully visible due to aspect ratio issues
-- The fixed aspect ratio (223/311) combined with the screen dimensions caused parts of the card to be cut off
-- The BoxFit.cover setting was causing the image to be cropped on certain screen sizes
-- The card was overlapping with the status bar at the top of the screen
-- In dark mode, white corners were visible around the card image, breaking the rounded corner effect
+- When a set was selected and other filters were applied, only the selected set's card count was updated
+- All other sets showed 0 cards, even though they should have shown their counts with the other filters applied
+- The cache key generation didn't properly handle set filtering
 
 Solution:
 
-- Modified the card details page to calculate appropriate card dimensions based on screen size
-- Changed BoxFit from "cover" to "contain" to ensure the entire card is visible
-- Implemented responsive sizing that adapts to different screen dimensions
-- Added constraints to ensure the card is properly displayed on all devices, including foldables
-- Used percentages of screen height/width rather than fixed dimensions
-- Added padding to move the card down from the status bar
-- Implemented proper card styling with ClipRRect and Card widgets to ensure corners match the background color in dark mode
-- Used the same approach as in card_grid_item.dart for consistent styling across the app
+- Modified the `_getCacheKey` method to exclude selected sets from the cache key
+- Updated the `FilteredSetCardCount` provider to use a modified filter without the set filter
+- This ensures that set counts are calculated independently of which sets are selected
+- Applied the same approach to `_updateCacheAsync` and `preloadAllSetCounts` methods for consistency
 
 Files Modified:
 
-- lib/features/cards/presentation/pages/card_details_page.dart
+- lib/features/cards/presentation/providers/set_card_count_provider.dart
 
 Impact:
 
-- Card images are now fully visible on all devices, including foldable phones
-- The entire card content is displayed without cropping
-- The UI adapts to different screen sizes and aspect ratios
-- Improved user experience on devices with unusual aspect ratios
-- Cards no longer overlap with the status bar
-- Card corners appear properly rounded in both light and dark mode
-- Consistent styling across the app
+- Card counts for all sets now update correctly when applying other filters
+- Users can see accurate card counts for all sets regardless of which sets are selected
+- The filter dialog provides a more intuitive and consistent experience
 
 ## Testing Strategy
 
-1. Splash Screen Testing
-   - Launch the app on different devices
-   - Verify that the logo appears without a circular container
-   - Check that the logo is properly centered
-   - Ensure the splash screen transitions smoothly to the main app
+1. Set Filtering Test
+   - Open the filter dialog
+   - Select a set (e.g., "Opus I")
+   - Apply another filter (e.g., select an element like "Fire")
+   - Verify that all sets show their correct card counts with the element filter applied
+   - Reset the filters and verify all counts return to their original values
 
-2. Card Display Testing
-   - Open a card detail view on different devices, especially foldable phones
-   - Verify that the entire card is visible without cropping
-   - Check that the card maintains its proper aspect ratio
-   - Ensure the card is displayed at an appropriate size for the screen
-   - Verify that the card doesn't overlap with the status bar
-   - Check that card corners appear properly rounded in both light and dark mode
+2. Multiple Filter Test
+   - Apply multiple filters (elements, types, rarities)
+   - Select and deselect various sets
+   - Verify that all set counts update correctly with the applied filters
 
 ## Success Criteria
 
-- The splash screen displays the logo without a circular container
-- Card images are fully visible on all devices, including foldable phones
-- The UI adapts properly to different screen sizes and aspect ratios
-- No visual artifacts or distortions in the card display
-- Cards don't overlap with the status bar
-- Card corners appear properly rounded in both light and dark mode
+- When a set is selected and other filters are applied, all sets show their correct card counts
+- Card counts update properly when any filter is applied or removed
+- The filter dialog provides a consistent and intuitive experience
 
 ## Next Steps
 
-1. Consider implementing similar responsive sizing for other image displays in the app
-2. Explore further UI optimizations for unusual screen sizes
-3. Add comprehensive device testing to ensure consistent experience across all form factors
-4. Consider adding analytics to track user device types and screen sizes
+1. Consider implementing similar filtering improvements for other filter categories
+2. Add analytics to track filter usage patterns
+3. Explore further optimizations for the filter dialog
+4. Consider adding a "Select All" option for each filter category

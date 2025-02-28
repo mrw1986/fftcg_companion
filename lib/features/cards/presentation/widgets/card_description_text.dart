@@ -84,9 +84,117 @@ class CardDescriptionText extends StatelessWidget {
 
   List<InlineSpan> _parseDescription(
       BuildContext context, TextStyle baseStyle, double scaleFactor) {
+    // Process the entire text first to handle line breaks and special formatting
+    final processedText = text.replaceAll('<br>', '\n');
+
     final List<InlineSpan> spans = [];
+
+    // Define the special ability style once to ensure consistency
+    final specialAbilityStyle = TextStyle(
+      color: const Color(0xFFFF8800),
+      fontWeight: FontWeight.bold,
+      fontSize: _specialFontSize * scaleFactor,
+      fontStyle: FontStyle.italic,
+      height: 1.1,
+      shadows: const [Shadow(color: Colors.white, blurRadius: 3)],
+    );
+
+    // Split the text by line breaks to handle each line separately
+    final lines = processedText.split('\n');
+
+    // Process each line
+    for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+      final line = lines[lineIndex];
+
+      // Check if this line contains a special ability
+      final bool containsSpecialAbility = line.contains('[S]') &&
+          (line.contains('<b>') || RegExp(r'\b\w+\s*\[S\]').hasMatch(line));
+
+      if (containsSpecialAbility) {
+        // Extract the special ability name
+        String abilityName = '';
+
+        // Check for <b>AbilityName</b> pattern
+        final RegExp boldAbilityRegex = RegExp(r'<b>([^<]+)</b>');
+        final Match? boldMatch = boldAbilityRegex.firstMatch(line);
+
+        if (boldMatch != null && boldMatch.group(1) != null) {
+          abilityName = boldMatch.group(1)!;
+
+          // Get the text before the ability
+          final int tagStart = line.indexOf('<b>');
+          final int tagEnd = line.indexOf('</b>') + 4;
+          final String textBeforeAbility = line.substring(0, tagStart);
+          final String abilityWithTags = line.substring(tagStart, tagEnd);
+          final String textAfterAbility = line.substring(tagEnd);
+
+          // Add text before ability with normal styling
+          if (textBeforeAbility.isNotEmpty) {
+            spans.addAll(HtmlParser.parseHtml(textBeforeAbility, baseStyle));
+          }
+
+          // Add the ability with orange styling
+          spans.addAll(HtmlParser.parseHtml(
+            abilityWithTags,
+            specialAbilityStyle,
+          ));
+
+          // Process the rest of the line (after the ability name)
+          _processTextWithBrackets(
+              context, textAfterAbility, spans, baseStyle, scaleFactor);
+        } else {
+          // Try to find ability name without HTML tags
+          final RegExp plainAbilityRegex = RegExp(r'(\w+)\s*\[S\]');
+          final Match? plainMatch = plainAbilityRegex.firstMatch(line);
+
+          if (plainMatch != null && plainMatch.group(1) != null) {
+            abilityName = plainMatch.group(1)!;
+            final int abilityStart = line.indexOf(abilityName);
+            final int abilityEnd = abilityStart + abilityName.length;
+
+            // Get the text before the ability
+            final String textBeforeAbility = line.substring(0, abilityStart);
+            final String textAfterAbility = line.substring(abilityEnd);
+
+            // Add text before ability with normal styling
+            if (textBeforeAbility.isNotEmpty) {
+              spans.addAll(HtmlParser.parseHtml(textBeforeAbility, baseStyle));
+            }
+
+            // Add the ability with orange styling
+            spans.addAll(HtmlParser.parseHtml(
+              abilityName,
+              specialAbilityStyle,
+            ));
+
+            // Process the rest of the line
+            _processTextWithBrackets(
+                context, textAfterAbility, spans, baseStyle, scaleFactor);
+          } else {
+            // No ability pattern found, process the whole line
+            _processTextWithBrackets(
+                context, line, spans, baseStyle, scaleFactor);
+          }
+        }
+      } else {
+        // Regular line without special ability
+        _processTextWithBrackets(context, line, spans, baseStyle, scaleFactor);
+      }
+
+      // Add line break if this is not the last line
+      if (lineIndex < lines.length - 1) {
+        spans.add(const TextSpan(text: '\n'));
+      }
+    }
+
+    return spans;
+  }
+
+  void _processTextWithBrackets(BuildContext context, String text,
+      List<InlineSpan> spans, TextStyle baseStyle, double scaleFactor) {
     String currentText = '';
     bool inBrackets = false;
+
     void addCurrentText() {
       if (currentText.isNotEmpty) {
         spans.addAll(HtmlParser.parseHtml(currentText, baseStyle));
@@ -109,110 +217,6 @@ class CardDescriptionText extends StatelessWidget {
 
         // Handle special ability [S] tag
         if (content == 'S') {
-          // We need to handle the text differently to avoid duplication
-          // Find the last <br> tag before [S]
-          final int lastBrIndex =
-              text.lastIndexOf('<br>', i - currentText.length);
-
-          if (lastBrIndex != -1) {
-            // Get the text before the <br> tag
-            final String textBeforeBr = text.substring(0, lastBrIndex);
-
-            // Get the special ability name (between <br> and [S])
-            final String specialAbilityName =
-                text.substring(lastBrIndex + 4, i - currentText.length).trim();
-
-            // Clear all spans to avoid duplication
-            spans.clear();
-
-            // Add the text before the <br> with normal styling
-            spans.addAll(HtmlParser.parseHtml(textBeforeBr, baseStyle));
-
-            // Add the line break
-            spans.add(const TextSpan(text: '\n'));
-
-            // Add the special ability name with orange styling
-            spans.addAll(HtmlParser.parseHtml(
-              specialAbilityName,
-              TextStyle(
-                color: const Color(0xFFFF8800),
-                fontWeight: FontWeight.bold,
-                fontSize: _specialFontSize * scaleFactor,
-                fontStyle: FontStyle.italic,
-                height: 1.1,
-                shadows: const [
-                  Shadow(color: Colors.white, blurRadius: 3)
-                ], // Increased blur radius for better visibility in dark mode
-              ),
-            ));
-
-            // Add a space after the special ability name
-            spans.add(const TextSpan(text: ' '));
-          } else {
-            // If there's no <br> tag, check if the text contains HTML tags (like <b>)
-            final textBeforeS = text.substring(0, i - currentText.length);
-            spans.clear();
-
-            if (textBeforeS.contains('<b>') && textBeforeS.contains('</b>')) {
-              // Extract the content between <b> and </b> as the special ability name
-              final int endTagPos = textBeforeS.lastIndexOf('</b>');
-              final int startTagPos = textBeforeS.lastIndexOf('<b>', endTagPos);
-
-              if (startTagPos != -1 && endTagPos != -1) {
-                // Get the text before the <b> tag
-                final String textBeforeAbility =
-                    textBeforeS.substring(0, startTagPos);
-
-                // Get the special ability name including the <b> tags
-                final String specialAbilityWithTags =
-                    textBeforeS.substring(startTagPos, endTagPos + 4);
-
-                // Add any text before the ability with normal styling
-                if (textBeforeAbility.isNotEmpty) {
-                  spans.addAll(
-                      HtmlParser.parseHtml(textBeforeAbility, baseStyle));
-                }
-
-                // Add the special ability name with orange styling, preserving the <b> tags
-                spans.addAll(HtmlParser.parseHtml(
-                  specialAbilityWithTags,
-                  TextStyle(
-                    color: const Color(0xFFFF8800),
-                    fontWeight: FontWeight.bold,
-                    fontSize: _specialFontSize * scaleFactor,
-                    fontStyle: FontStyle.italic,
-                    height: 1.1,
-                    shadows: const [
-                      Shadow(color: Colors.white, blurRadius: 3)
-                    ], // Increased blur radius for better visibility in dark mode
-                  ),
-                ));
-              } else {
-                // If we can't find the tags properly, style the whole text
-                spans.addAll(HtmlParser.parseHtml(textBeforeS, baseStyle));
-              }
-            } else {
-              // No HTML tags, style the whole text as the ability
-              spans.addAll(HtmlParser.parseHtml(
-                textBeforeS,
-                TextStyle(
-                  color: const Color(0xFFFF8800),
-                  fontWeight: FontWeight.bold,
-                  fontSize: _specialFontSize * scaleFactor,
-                  fontStyle: FontStyle.italic,
-                  height: 1.1,
-                  shadows: const [
-                    Shadow(color: Colors.white, blurRadius: 3)
-                  ], // Increased blur radius for better visibility in dark mode
-                ),
-              ));
-            }
-
-            spans.add(const TextSpan(text: ' '));
-          }
-
-          currentText = '';
-
           // Add the [S] icon
           spans.add(WidgetSpan(
             alignment: PlaceholderAlignment.middle,
@@ -403,7 +407,9 @@ class CardDescriptionText extends StatelessWidget {
       }
     }
 
-    addCurrentText();
-    return spans;
+    // Add any remaining text
+    if (currentText.isNotEmpty) {
+      spans.addAll(HtmlParser.parseHtml(currentText, baseStyle));
+    }
   }
 }

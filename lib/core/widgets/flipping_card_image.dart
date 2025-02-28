@@ -98,11 +98,21 @@ class _FlippingCardImageState extends State<FlippingCardImage>
           ..setEntry(3, 2, 0.001) // Perspective
           ..rotateY(_animation.value);
 
-        return Transform(
-          transform: transform,
-          alignment: Alignment.center,
-          child: _showFrontSide ? widget.frontWidget : widget.backWidget,
-        );
+        // For the front side (card back), we need to ensure it's not mirrored
+        // by applying a counter-rotation when showing the front
+        if (_showFrontSide) {
+          return Transform(
+            transform: Matrix4.identity(),
+            alignment: Alignment.center,
+            child: widget.frontWidget,
+          );
+        } else {
+          return Transform(
+            transform: transform,
+            alignment: Alignment.center,
+            child: widget.backWidget,
+          );
+        }
       },
     );
   }

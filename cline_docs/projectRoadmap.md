@@ -82,6 +82,9 @@
   - Created StatefulWidget approach to eliminate card count flickering during set selection
   - Added prefetch mechanism for faster filter dialog loading
   - Optimized UI with placeholder counts while loading actual data
+  - Fixed issue where only selected sets showed correct card counts with multiple filters
+  - Modified cache key generation to handle set filtering properly
+  - Updated filter providers to calculate set counts independently of selected sets
 
 ### In Progress
 

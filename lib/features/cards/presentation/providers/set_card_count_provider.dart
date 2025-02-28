@@ -75,9 +75,15 @@ class FilteredSetCardCount extends _$FilteredSetCardCount {
           final setCards =
               allCards.where((card) => card.set.contains(setId)).toList();
 
-          // Apply current filters to these cards
+          // Create a modified filter without the set filter
+          // This ensures that we count cards in this set regardless of which sets are selected
+          final modifiedFilters = filters.copyWith(
+            set: {}, // Clear the set filter to count all cards in this set
+          );
+
+          // Apply modified filters to these cards
           final filteredCards =
-              cardRepository.applyLocalFilters(setCards, filters);
+              cardRepository.applyLocalFilters(setCards, modifiedFilters);
 
           return filteredCards.length;
         } catch (e, stack) {
@@ -163,8 +169,14 @@ class FilteredSetCardCountCache extends _$FilteredSetCardCountCache {
   Future<void> _updateCacheAsync(
       String setId, CardFilters filters, String cacheKey) async {
     try {
+      // Create a modified filter without the set filter
+      // This ensures that we count cards in this set regardless of which sets are selected
+      final modifiedFilters = filters.copyWith(
+        set: {}, // Clear the set filter to count all cards in this set
+      );
+
       final count = await ref.read(
-        filteredSetCardCountProvider(setId, filters).future,
+        filteredSetCardCountProvider(setId, modifiedFilters).future,
       );
 
       // Update memory cache
@@ -191,6 +203,9 @@ class FilteredSetCardCountCache extends _$FilteredSetCardCountCache {
 
   String _getCacheKey(CardFilters filters) {
     // Create a unique key based on filter values
+    // Important: We need to exclude the current set from the key
+    // Otherwise, when a set is selected, all other sets will show 0
+
     return [
       ...filters.elements,
       ...filters.types,
@@ -200,6 +215,8 @@ class FilteredSetCardCountCache extends _$FilteredSetCardCountCache {
       filters.minPower?.toString() ?? '',
       filters.maxPower?.toString() ?? '',
       filters.showSealedProducts.toString(),
+      // Don't include the selected sets in the cache key
+      // This ensures that set counts are calculated independently of which sets are selected
     ].join('|');
   }
 
@@ -235,8 +252,15 @@ class FilteredSetCardCountCache extends _$FilteredSetCardCountCache {
       // Calculate and cache counts for each set
       for (final setId in allSetIds) {
         final setCards = cardsBySet[setId] ?? [];
+
+        // Create a modified filter without the set filter
+        // This ensures that we count cards in this set regardless of which sets are selected
+        final modifiedFilters = filters.copyWith(
+          set: {}, // Clear the set filter to count all cards in this set
+        );
+
         final filteredCards =
-            cardRepository.applyLocalFilters(setCards, filters);
+            cardRepository.applyLocalFilters(setCards, modifiedFilters);
         final count = filteredCards.length;
 
         // Update memory cache
