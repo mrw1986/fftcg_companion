@@ -235,6 +235,7 @@ class _CachedCardImageState extends State<CachedCardImage>
             ),
             backWidget: imageWidget,
             duration: const Duration(milliseconds: 500),
+            borderRadius: widget.borderRadius,
             onAnimationComplete: () {
               CardImageCacheManager.markAsAnimated(targetUrl);
             },

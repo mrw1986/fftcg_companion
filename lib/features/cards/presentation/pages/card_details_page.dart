@@ -75,34 +75,27 @@ class CardDetailsPage extends StatelessWidget {
                   padding: EdgeInsets.only(top: topPadding),
                   child: Hero(
                     tag: 'card_${card.productId}',
-                    child: Card(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      elevation: 0,
-                      margin: EdgeInsets.zero,
-                      clipBehavior: Clip.antiAlias,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.0),
+                    child: Container(
+                      width: cardWidth,
+                      height: maxCardHeight,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        borderRadius: BorderRadius.circular(9.0),
                       ),
-                      child: SizedBox(
-                        width: cardWidth,
-                        height: maxCardHeight,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8.0),
-                          child: CachedCardImage(
-                            imageUrl: card.getBestImageUrl(),
-                            fit: BoxFit.contain,
-                            borderRadius: BorderRadius.circular(8.0),
-                            placeholder: Image.asset(
-                              'assets/images/card-back.jpeg',
-                              fit: BoxFit.contain,
-                            ),
-                            useProgressiveLoading: false,
-                            onImageError: () {
-                              talker.error(
-                                  'Failed to load high-res image for card: ${card.productId}');
-                            },
-                          ),
+                      clipBehavior: Clip.antiAlias,
+                      child: CachedCardImage(
+                        imageUrl: card.getBestImageUrl(),
+                        fit: BoxFit.contain,
+                        borderRadius: BorderRadius.circular(9.0),
+                        placeholder: Image.asset(
+                          'assets/images/card-back.jpeg',
+                          fit: BoxFit.contain,
                         ),
+                        useProgressiveLoading: false,
+                        onImageError: () {
+                          talker.error(
+                              'Failed to load high-res image for card: ${card.productId}');
+                        },
                       ),
                     ),
                   ),
@@ -162,34 +155,27 @@ class CardDetailsPage extends StatelessWidget {
                   child: Padding(
                     padding: EdgeInsets.only(top: topPadding),
                     child: Center(
-                      child: Card(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        elevation: 0,
-                        margin: EdgeInsets.zero,
-                        clipBehavior: Clip.antiAlias,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.0),
+                      child: Container(
+                        width: cardWidth,
+                        height: cardHeight,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          borderRadius: BorderRadius.circular(9.0),
                         ),
-                        child: SizedBox(
-                          width: cardWidth,
-                          height: cardHeight,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8.0),
-                            child: CachedCardImage(
-                              imageUrl: card.getBestImageUrl(),
-                              fit: BoxFit.contain,
-                              borderRadius: BorderRadius.circular(8.0),
-                              placeholder: Image.asset(
-                                'assets/images/card-back.jpeg',
-                                fit: BoxFit.contain,
-                              ),
-                              useProgressiveLoading: false,
-                              onImageError: () {
-                                talker.error(
-                                    'Failed to load high-res image for card: ${card.productId}');
-                              },
-                            ),
+                        clipBehavior: Clip.antiAlias,
+                        child: CachedCardImage(
+                          imageUrl: card.getBestImageUrl(),
+                          fit: BoxFit.contain,
+                          borderRadius: BorderRadius.circular(9.0),
+                          placeholder: Image.asset(
+                            'assets/images/card-back.jpeg',
+                            fit: BoxFit.contain,
                           ),
+                          useProgressiveLoading: false,
+                          onImageError: () {
+                            talker.error(
+                                'Failed to load high-res image for card: ${card.productId}');
+                          },
                         ),
                       ),
                     ),

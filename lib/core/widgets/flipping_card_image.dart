@@ -9,6 +9,7 @@ class FlippingCardImage extends StatefulWidget {
   static const defaultDuration = Duration(milliseconds: 300);
   final Duration duration;
   final VoidCallback? onAnimationComplete;
+  final BorderRadius? borderRadius;
 
   const FlippingCardImage({
     super.key,
@@ -16,6 +17,7 @@ class FlippingCardImage extends StatefulWidget {
     required this.backWidget,
     this.duration = defaultDuration,
     this.onAnimationComplete,
+    this.borderRadius,
   });
 
   @override
@@ -101,16 +103,22 @@ class _FlippingCardImageState extends State<FlippingCardImage>
         // For the front side (card back), we need to ensure it's not mirrored
         // by applying a counter-rotation when showing the front
         if (_showFrontSide) {
-          return Transform(
-            transform: Matrix4.identity(),
-            alignment: Alignment.center,
-            child: widget.frontWidget,
+          return ClipRRect(
+            borderRadius: widget.borderRadius ?? BorderRadius.zero,
+            child: Transform(
+              transform: Matrix4.identity(),
+              alignment: Alignment.center,
+              child: widget.frontWidget,
+            ),
           );
         } else {
-          return Transform(
-            transform: transform,
-            alignment: Alignment.center,
-            child: widget.backWidget,
+          return ClipRRect(
+            borderRadius: widget.borderRadius ?? BorderRadius.zero,
+            child: Transform(
+              transform: transform,
+              alignment: Alignment.center,
+              child: widget.backWidget,
+            ),
           );
         }
       },
