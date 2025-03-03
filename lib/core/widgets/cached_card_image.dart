@@ -178,8 +178,12 @@ class _CachedCardImageState extends State<CachedCardImage>
         memCacheHeight: null,
         maxWidthDiskCache: null,
         maxHeightDiskCache: null,
-        fadeInDuration: Duration.zero, // Remove fade-in effect
-        fadeOutDuration: Duration.zero, // Remove fade-out effect
+        fadeInDuration:
+            const Duration(milliseconds: 0), // Completely remove fade-in effect
+        fadeOutDuration: const Duration(
+            milliseconds: 0), // Completely remove fade-out effect
+        placeholderFadeInDuration:
+            const Duration(milliseconds: 0), // Remove placeholder fade-in
         fadeInCurve:
             Curves.linear, // Use linear curve for no visible fade effect
         fadeOutCurve:

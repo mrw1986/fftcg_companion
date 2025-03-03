@@ -144,7 +144,7 @@ class CardDescriptionText extends StatelessWidget {
               context, textAfterAbility, spans, baseStyle, scaleFactor);
         } else {
           // Try to find ability name without HTML tags
-          final RegExp plainAbilityRegex = RegExp(r'(\w+)\s*\[S\]');
+          final RegExp plainAbilityRegex = RegExp(r'(\w+)(\s*)\[S\]');
           final Match? plainMatch = plainAbilityRegex.firstMatch(line);
 
           if (plainMatch != null && plainMatch.group(1) != null) {
@@ -154,7 +154,10 @@ class CardDescriptionText extends StatelessWidget {
 
             // Get the text before the ability
             final String textBeforeAbility = line.substring(0, abilityStart);
-            final String textAfterAbility = line.substring(abilityEnd);
+            // Include any whitespace between ability name and [S] in the styled text
+            final String whitespace = plainMatch.group(2) ?? '';
+            final String textAfterAbility =
+                line.substring(abilityEnd + whitespace.length);
 
             // Add text before ability with normal styling
             if (textBeforeAbility.isNotEmpty) {
@@ -162,9 +165,9 @@ class CardDescriptionText extends StatelessWidget {
             }
 
             // Add the ability with orange styling
-            spans.addAll(HtmlParser.parseHtml(
-              abilityName,
-              specialAbilityStyle,
+            spans.add(TextSpan(
+              text: abilityName,
+              style: specialAbilityStyle,
             ));
 
             // Process the rest of the line

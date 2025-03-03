@@ -105,6 +105,7 @@ class _FlippingCardImageState extends State<FlippingCardImage>
         if (_showFrontSide) {
           return ClipRRect(
             borderRadius: widget.borderRadius ?? BorderRadius.zero,
+            clipBehavior: Clip.antiAlias,
             child: Transform(
               transform: Matrix4.identity(),
               alignment: Alignment.center,
@@ -114,6 +115,7 @@ class _FlippingCardImageState extends State<FlippingCardImage>
         } else {
           return ClipRRect(
             borderRadius: widget.borderRadius ?? BorderRadius.zero,
+            clipBehavior: Clip.antiAlias,
             child: Transform(
               transform: transform,
               alignment: Alignment.center,
