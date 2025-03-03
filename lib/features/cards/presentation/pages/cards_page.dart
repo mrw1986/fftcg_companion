@@ -27,7 +27,6 @@ class _CardsPageState extends ConsumerState<CardsPage>
     with SingleTickerProviderStateMixin {
   bool _isSearching = false;
   late AnimationController _fabAnimationController;
-  late Animation<double> _fabAnimation;
 
   @override
   void initState() {
@@ -40,13 +39,6 @@ class _CardsPageState extends ConsumerState<CardsPage>
     _fabAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
-    );
-
-    _fabAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _fabAnimationController,
-        curve: Curves.easeOutCubic,
-      ),
     );
   }
 

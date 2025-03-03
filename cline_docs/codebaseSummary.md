@@ -29,9 +29,10 @@
 1. **Cards Feature**
    - Card data models and repositories
    - Card grid and details views
-   - Search and filtering functionality
+   - Advanced search with filtering and sorting
    - Card metadata display
    - Animated search interface
+   - Integrated search, filter, and sort functionality
 
 2. **Collection Feature**
    - User's card collection management
@@ -60,13 +61,16 @@
    - Cached locally using Hive
    - Displayed in grid/list views
    - Detailed view shows comprehensive card information
-
 2. **Search Flow**
    - User activates search with animated transition
    - Search query is entered in expanding search field
    - Local cache is searched first
    - Results are filtered and displayed with smooth transitions
+   - Users can apply filters to search results
+   - Search results can be sorted using any sort criteria
+   - All operations are performed client-side for better performance
    - Cards remain visible during search operations
+   - Search history is maintained
    - Search history is maintained
 
 3. **Collection Management Flow**
@@ -118,7 +122,12 @@
 
 1. **Search Experience**
    - Users wanted a more intuitive search interface
+   - Users requested ability to search within filtered cards
+   - Users needed to sort search results
+   - Users wanted access to all app bar actions during search
    - Implemented animated search bar that expands from right to left
+   - Created FilteredSearchProvider for integrated search, filter, and sort
+   - Made all app bar actions visible and functional during search
    - Added smooth transitions for all search-related UI elements
    - Ensured cards remain visible during search operations
 
