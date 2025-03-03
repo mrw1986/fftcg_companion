@@ -80,6 +80,28 @@
 
 ## Recent Changes
 
+### Card Description Text Improvements
+
+- Enhanced special ability detection and styling
+  - Fixed regex pattern to properly detect abilities like "Meteorain" without spaces before [S] tag
+  - Improved text processing for consistent styling of all special abilities
+  - Optimized text rendering for better performance
+- Maintained consistent formatting for all card text elements
+  - Special abilities now display with orange color and bold formatting
+  - Consistent handling of [S], [Dull], and element icons
+  - Proper spacing between text and icons
+
+### Card Image Animation Enhancements
+
+- Attempted improvements to card flipping animation
+  - Modified CachedCardImage to completely disable fading effects
+  - Updated FlippingCardImage to better handle border radius
+  - Simplified card_details_page layout to use consistent border radius
+- Optimized image loading performance
+  - Reduced animation overhead
+  - Improved caching mechanisms
+  - Better error handling for failed image loads
+
 ### Metadata System Improvements
 
 - Implemented proper card versioning with `dataVersion` field
@@ -185,7 +207,9 @@
 
 ## Known Issues
 
-- None currently tracked
+- Card corner rounding issue during flipping animation
+  - Border radius not consistently applied during transitions
+  - Requires further investigation and potential redesign of animation system
 
 ## Recent Performance Improvements
 
