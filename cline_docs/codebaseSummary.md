@@ -1,257 +1,153 @@
 # Codebase Summary
 
-## Project Structure
+## Key Components and Their Interactions
 
 ### Core Components
 
-- `/lib/core/`
-  - Services (Firestore, caching)
-  - Widgets (shared UI components)
-  - Utils (helper functions, HTML parsing)
-  - Storage (local data persistence)
-  - Providers (app-wide state management)
+1. **App Structure**
+   - Flutter application with a modular architecture
+   - Uses Riverpod for state management
+   - Implements Go Router for navigation
 
-### Features
+2. **Theme System**
+   - Supports both light and dark modes
+   - Custom theme extensions for consistent styling
+   - Theme provider for dynamic theme switching
 
-- `/lib/features/cards/`
-  - Data layer (repositories)
-  - Domain layer (models, business logic)
-  - Presentation layer (pages, providers, widgets)
-  - Filter collection system
-- `/lib/features/prices/` (planned)
-- `/lib/features/collection/` (planned)
-- `/lib/features/decks/` (planned)
+3. **Storage Layer**
+   - Hive for local storage and caching
+   - Card cache for efficient data access
+   - Cache persistence for offline functionality
 
-### App Configuration
+4. **Networking**
+   - Firestore service for cloud data
+   - Cache-first strategy for improved performance
+   - Error handling and retry mechanisms
 
-- `/lib/app/`
-  - Theme configuration
-  - App initialization
-  - Route management
-  - Native splash screen
-- `/lib/shared/`
-  - Common widgets (loading indicators)
-  - Utility components
+### Feature Modules
+
+1. **Cards Feature**
+   - Card data models and repositories
+   - Card grid and details views
+   - Search and filtering functionality
+   - Card metadata display
+   - Animated search interface
+
+2. **Collection Feature**
+   - User's card collection management
+   - Collection statistics and tracking
+   - Add/remove cards from collection
+
+3. **Decks Feature**
+   - Deck building and management
+   - Deck validation and statistics
+   - Card recommendations
+
+4. **Scanner Feature**
+   - Card scanning functionality
+   - Image recognition for cards
+   - Quick add to collection
+
+5. **Profile Feature**
+   - User preferences and settings
+   - Profile management
+   - Application settings
 
 ## Data Flow
 
-### Card Data Management
+1. **Card Data Flow**
+   - Cards are fetched from Firestore
+   - Cached locally using Hive
+   - Displayed in grid/list views
+   - Detailed view shows comprehensive card information
 
-1. Initial load from Firestore
-2. Local caching with Hive
-3. Repository layer for data access
-4. Providers for state management
-5. UI components for display
+2. **Search Flow**
+   - User activates search with animated transition
+   - Search query is entered in expanding search field
+   - Local cache is searched first
+   - Results are filtered and displayed with smooth transitions
+   - Cards remain visible during search operations
+   - Search history is maintained
 
-### Filter System
-
-1. Filter collection in Firestore
-   - Separate documents for each filter type
-   - Optimized for UI presentation
-2. Card document fields for filtering
-   - Maintains efficient query performance
-   - Supports complex filter combinations
-
-### State Management
-
-- Riverpod providers for dependency injection
-- AsyncNotifier for async operations
-- StateNotifier for mutable state
-- Consumer widgets for UI updates
-
-### Loading and Initialization
-
-1. Native splash screen during app launch
-2. Efficient provider initialization
-3. Page-level loading states
-4. Consistent loading indicators
-5. Error handling and recovery
+3. **Collection Management Flow**
+   - User adds/removes cards from collection
+   - Collection is updated locally and in cloud
+   - Statistics are recalculated
+   - UI reflects changes immediately
 
 ## External Dependencies
 
-### Key Components
+1. **Firebase/Firestore**
+   - Used for card database
+   - Authentication (if implemented)
+   - Analytics and crash reporting
 
-- Firebase for backend services
-- Hive for local storage
-- Riverpod for state management
-- GoRouter for navigation
-- Freezed for immutable models
-- flutter_native_splash for launch screen
+2. **Image Handling**
+   - Cached network image for efficient loading
+   - Custom image widgets for card display
+   - Progressive image loading
 
-## Recent Changes
+3. **UI Components**
+   - Custom widgets for consistent UI
+   - Responsive layouts for different screen sizes
+   - Animations for improved UX
+   - Animated transitions for search and filtering
 
-### Card Description Text Improvements
+## Recent Significant Changes
 
-- Enhanced special ability detection and styling
-  - Fixed regex pattern to properly detect abilities like "Meteorain" without spaces before [S] tag
-  - Improved text processing for consistent styling of all special abilities
-  - Optimized text rendering for better performance
-- Maintained consistent formatting for all card text elements
-  - Special abilities now display with orange color and bold formatting
-  - Consistent handling of [S], [Dull], and element icons
-  - Proper spacing between text and icons
+1. **UI Improvements**
+   - Implemented animated search bar in app bar
+   - Fixed special ability styling in card descriptions
+   - Improved card corner rounding in dark mode
+   - Enhanced card image display with proper border radius
+   - Added smooth animations for search transitions
 
-### Card Image Animation Enhancements
+2. **Performance Optimizations**
+   - Improved image caching
+   - Reduced unnecessary rebuilds
+   - Optimized search functionality
+   - Enhanced animation performance
 
-- Attempted improvements to card flipping animation
-  - Modified CachedCardImage to completely disable fading effects
-  - Updated FlippingCardImage to better handle border radius
-  - Simplified card_details_page layout to use consistent border radius
-- Optimized image loading performance
-  - Reduced animation overhead
-  - Improved caching mechanisms
-  - Better error handling for failed image loads
-
-### Metadata System Improvements
-
-- Implemented proper card versioning with `dataVersion` field
-  - Added `dataVersion` field to card documents in sync service
-  - Modified sync logic to detect and update cards missing the field
-  - Enabled efficient incremental sync in the app
-- Enhanced sync process to reduce Firestore reads
-  - App now queries only for cards updated since last sync
-  - Improved version tracking between app and backend
-  - Better offline handling and error recovery
-
-### Text Processing Improvements
-
-- Enhanced HTML tag support ```(<strong>, <em>, <br>)```
-- Case-insensitive EX BURST handling
-- Preserved card name references
-- Improved special ability formatting
-- Optimized text rendering performance
-
-### Filter System Enhancements
-
-- New filter collection structure
-  - Separate documents by filter type
-  - Optimized value arrays
-  - Improved maintainability
-- Enhanced filter dialog UI
-- Better filter combination handling
-- Preserved filtering performance
-
-### Search Functionality Improvements
-
-- Comprehensive search approach for both card names and numbers
-  - Utilizes searchTerms array from Firestore
-  - Supports progressive substring matching
-  - Handles special cases for card numbers (e.g., "1-" vs "1")
-- Enhanced relevance sorting
-  - Prioritizes exact matches
-  - Considers card number format for number searches
-  - Sorts by name for text searches
-  - Improved alphabetical sorting for single-letter searches
-- Improved caching for search results
-  - Consistent substring caching
-  - Better partial matching support
-  - Added clearSearchCache method for cache invalidation
-- Offline support
-  - Graceful handling of Firestore permission errors
-  - Fallback to cached data when offline
-- Fixed progressive search issues
-  - Completely rewrote CardSearchNotifier for better state management
-  - Ensured proper cache invalidation between searches
-  - Improved debouncing mechanism to prevent stale results
-
-### Loading System Improvements
-
-- Implemented native splash screen
-- Created simplified LoadingIndicator widget
-- Removed LoadingWrapper complexity
-- Enhanced provider initialization
-- Improved error handling
-
-### Card Sorting Improvements
-
-- Moved SortBottomSheet to dedicated widget
-- Updated sorting logic for crystal cards
-- Improved filtering for non-card items
-- Added secondary sorting by number
-- Fixed name sorting in descending order
-- Enhanced alphabetical sorting consistency
-- Implemented case-insensitive name comparison
-- Ensured consistent sorting behavior across the app
-- Added automatic scroll to top when applying sort
-- Created provider for accessing CardContent state
-
-### Code Organization
-
-- Separated concerns in card repository
-- Improved provider structure
-- Enhanced error handling
-- Better state management
-- New shared widgets directory
-
-### Performance Optimizations
-
-- Efficient filtering algorithms
-- Improved image caching
-  - Deferred image prefetching
-  - Limited to visible cards
-  - Memory-efficient loading
-- Better state updates
-- Optimized initialization flow
-  - Version-based cache management
-  - Reduced logging overhead
-  - Improved code quality
-  - Removed unnecessary operations
+3. **Bug Fixes**
+   - Fixed card description text styling issues
+   - Resolved card corner rounding problems in dark mode
+   - Improved error handling for image loading
+   - Fixed search visibility issues
 
 ## User Feedback Integration
 
-- Improved loading experience
-- Better error handling
-- Enhanced initialization flow
-- Consistent loading indicators
-- More accurate card text display
+1. **Search Experience**
+   - Users wanted a more intuitive search interface
+   - Implemented animated search bar that expands from right to left
+   - Added smooth transitions for all search-related UI elements
+   - Ensured cards remain visible during search operations
 
-## Known Issues
+2. **Card Details Page**
+   - Users reported white corners on card images in dark mode
+   - Implemented fix using BoxDecoration with larger border radius
+   - Removed Hero animation to prevent transition issues
 
-- Card corner rounding issue during flipping animation
-  - Border radius not consistently applied during transitions
-  - Requires further investigation and potential redesign of animation system
+3. **Card Description Text**
+   - Users reported inconsistent styling for special abilities
+   - Updated regex pattern to handle different spacing scenarios
+   - Improved text processing for consistent formatting
 
-## Recent Performance Improvements
+## Upcoming Development Focus
 
-### Text Processing
+1. **Performance Improvements**
+   - Further optimize image loading
+   - Reduce animation overhead
+   - Implement progressive image loading techniques
+   - Improve overall app responsiveness
 
-- Optimized HTML parsing
-- Efficient special token handling
-- Improved text style application
-- Better memory management
+2. **Error Handling**
+   - Enhance error reporting
+   - Improve recovery mechanisms
+   - Add retry functionality for failed image loads
+   - Better user feedback for errors
 
-### Caching System
-
-- Added version tracking to prevent unnecessary cache clearing
-- Optimized cache initialization
-- Improved cache hit rates
-
-### Image Loading
-
-- Deferred prefetching until after initial render
-- Limited prefetching to first 20 visible cards
-- Removed redundant image preloading
-
-### Logging System
-
-- Reduced logging verbosity
-- Filtered out debug logs
-- Removed excessive animation logging
-- Cleaned up unnecessary logging code
-
-### Code Quality
-
-- Removed duplicate catch clauses
-- Cleaned up unused imports
-- Removed unnecessary overrides
-- Enhanced code organization
-
-## Development Guidelines
-
-- Feature-first architecture
-- Clean Architecture principles
-- Comprehensive documentation
-- Regular testing
-- Performance monitoring
-- Consistent loading states
-- Error handling best practices
+3. **Additional UI Enhancements**
+   - Refine animation timings for optimal user experience
+   - Implement additional micro-interactions
+   - Improve accessibility features
+   - Enhance dark mode experience

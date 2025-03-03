@@ -1,7 +1,6 @@
 // lib/features/cards/presentation/pages/card_details_page.dart
 import 'dart:math';
 import 'package:fftcg_companion/core/utils/logger.dart';
-import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/card_description_text.dart';
 import 'package:flutter/material.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
@@ -73,23 +72,17 @@ class CardDetailsPage extends StatelessWidget {
               child: Center(
                 child: Padding(
                   padding: EdgeInsets.only(top: topPadding),
-                  child: Hero(
-                    tag: 'card_${card.productId}',
-                    child: SizedBox(
-                      width: cardWidth,
-                      height: maxCardHeight,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(9.0),
-                        child: CachedCardImage(
-                          imageUrl: card.getBestImageUrl(),
+                  child: SizedBox(
+                    width: cardWidth,
+                    height: maxCardHeight,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        borderRadius: BorderRadius.circular(16.0),
+                        image: DecorationImage(
+                          image: NetworkImage(card.getBestImageUrl() ?? ''),
                           fit: BoxFit.contain,
-                          borderRadius: BorderRadius.circular(9.0),
-                          placeholder: Image.asset(
-                            'assets/images/card-back.jpeg',
-                            fit: BoxFit.contain,
-                          ),
-                          useProgressiveLoading: false,
-                          onImageError: () {
+                          onError: (_, __) {
                             talker.error(
                                 'Failed to load high-res image for card: ${card.productId}');
                           },
@@ -148,26 +141,20 @@ class CardDetailsPage extends StatelessWidget {
               pinned: true,
               automaticallyImplyLeading: false,
               flexibleSpace: FlexibleSpaceBar(
-                background: Hero(
-                  tag: 'card_${card.productId}',
-                  child: Padding(
-                    padding: EdgeInsets.only(top: topPadding),
-                    child: Center(
-                      child: SizedBox(
-                        width: cardWidth,
-                        height: cardHeight,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(9.0),
-                          child: CachedCardImage(
-                            imageUrl: card.getBestImageUrl(),
+                background: Padding(
+                  padding: EdgeInsets.only(top: topPadding),
+                  child: Center(
+                    child: SizedBox(
+                      width: cardWidth,
+                      height: cardHeight,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          borderRadius: BorderRadius.circular(16.0),
+                          image: DecorationImage(
+                            image: NetworkImage(card.getBestImageUrl() ?? ''),
                             fit: BoxFit.contain,
-                            borderRadius: BorderRadius.circular(9.0),
-                            placeholder: Image.asset(
-                              'assets/images/card-back.jpeg',
-                              fit: BoxFit.contain,
-                            ),
-                            useProgressiveLoading: false,
-                            onImageError: () {
+                            onError: (_, __) {
                               talker.error(
                                   'Failed to load high-res image for card: ${card.productId}');
                             },

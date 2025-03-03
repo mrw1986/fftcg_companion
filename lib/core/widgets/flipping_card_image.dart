@@ -103,22 +103,22 @@ class _FlippingCardImageState extends State<FlippingCardImage>
         // For the front side (card back), we need to ensure it's not mirrored
         // by applying a counter-rotation when showing the front
         if (_showFrontSide) {
-          return ClipRRect(
-            borderRadius: widget.borderRadius ?? BorderRadius.zero,
-            clipBehavior: Clip.antiAlias,
-            child: Transform(
-              transform: Matrix4.identity(),
-              alignment: Alignment.center,
+          return Transform(
+            transform: Matrix4.identity(),
+            alignment: Alignment.center,
+            child: ClipRRect(
+              borderRadius: widget.borderRadius ?? BorderRadius.zero,
+              clipBehavior: Clip.antiAlias,
               child: widget.frontWidget,
             ),
           );
         } else {
-          return ClipRRect(
-            borderRadius: widget.borderRadius ?? BorderRadius.zero,
-            clipBehavior: Clip.antiAlias,
-            child: Transform(
-              transform: transform,
-              alignment: Alignment.center,
+          return Transform(
+            transform: transform,
+            alignment: Alignment.center,
+            child: ClipRRect(
+              borderRadius: widget.borderRadius ?? BorderRadius.zero,
+              clipBehavior: Clip.antiAlias,
               child: widget.backWidget,
             ),
           );

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/card_content_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/filtered_search_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/search_provider.dart';
 
 class SortBottomSheet extends ConsumerWidget {
   const SortBottomSheet({super.key});
@@ -145,6 +147,13 @@ class SortBottomSheet extends ConsumerWidget {
     ref.read(cardsNotifierProvider.notifier).applyFilters(
           ref.read(filterProvider),
         );
+
+    // Check if we're currently searching
+    final searchQuery = ref.read(searchQueryProvider);
+    if (searchQuery.isNotEmpty) {
+      // If searching, also invalidate the filtered search provider to apply the new sort
+      ref.invalidate(filteredSearchNotifierProvider);
+    }
 
     // Close the bottom sheet
     Navigator.pop(context);

@@ -162,95 +162,91 @@ class _CachedCardImageState extends State<CachedCardImage>
       return widget.errorWidget ?? _buildErrorWidget(context);
     }
 
-    return ClipRRect(
-      borderRadius: widget.borderRadius ?? BorderRadius.zero,
-      child: CachedNetworkImage(
-        key: ValueKey(targetUrl),
-        imageUrl: targetUrl,
-        cacheManager: CardImageCacheManager.instance,
-        // Use base URL as cache key to share cached images between views
-        cacheKey: Uri.parse(targetUrl).path,
-        fit: widget.fit,
-        width: widget.width,
-        height: widget.height,
-        // Let Flutter handle resizing internally
-        memCacheWidth: null,
-        memCacheHeight: null,
-        maxWidthDiskCache: null,
-        maxHeightDiskCache: null,
-        fadeInDuration:
-            const Duration(milliseconds: 0), // Completely remove fade-in effect
-        fadeOutDuration: const Duration(
-            milliseconds: 0), // Completely remove fade-out effect
-        placeholderFadeInDuration:
-            const Duration(milliseconds: 0), // Remove placeholder fade-in
-        fadeInCurve:
-            Curves.linear, // Use linear curve for no visible fade effect
-        fadeOutCurve:
-            Curves.linear, // Use linear curve for no visible fade effect
-        placeholder: (context, url) {
-          if (_isLoaded) {
-            return Image.asset(
+    return CachedNetworkImage(
+      key: ValueKey(targetUrl),
+      imageUrl: targetUrl,
+      cacheManager: CardImageCacheManager.instance,
+      // Use base URL as cache key to share cached images between views
+      cacheKey: Uri.parse(targetUrl).path,
+      fit: widget.fit,
+      width: widget.width,
+      height: widget.height,
+      // Let Flutter handle resizing internally
+      memCacheWidth: null,
+      memCacheHeight: null,
+      maxWidthDiskCache: null,
+      maxHeightDiskCache: null,
+      fadeInDuration:
+          const Duration(milliseconds: 0), // Completely remove fade-in effect
+      fadeOutDuration:
+          const Duration(milliseconds: 0), // Completely remove fade-out effect
+      placeholderFadeInDuration:
+          const Duration(milliseconds: 0), // Remove placeholder fade-in
+      fadeInCurve: Curves.linear, // Use linear curve for no visible fade effect
+      fadeOutCurve:
+          Curves.linear, // Use linear curve for no visible fade effect
+      placeholder: (context, url) {
+        if (_isLoaded) {
+          return Image.asset(
+            'assets/images/card-back.jpeg',
+            fit: widget.fit,
+            width: widget.width,
+            height: widget.height,
+          );
+        }
+        return widget.placeholder ??
+            Image.asset(
               'assets/images/card-back.jpeg',
               fit: widget.fit,
               width: widget.width,
               height: widget.height,
             );
-          }
-          return widget.placeholder ??
-              Image.asset(
-                'assets/images/card-back.jpeg',
-                fit: widget.fit,
-                width: widget.width,
-                height: widget.height,
-              );
-        },
-        imageBuilder: (context, imageProvider) {
-          if (!_isLoaded) {
-            _isLoaded = true;
-            CardImageCacheManager.markAsLoaded(targetUrl);
-          }
+      },
+      imageBuilder: (context, imageProvider) {
+        if (!_isLoaded) {
+          _isLoaded = true;
+          CardImageCacheManager.markAsLoaded(targetUrl);
+        }
 
-          // Keep the image in memory cache
-          imageProvider.resolve(ImageConfiguration.empty);
+        // Keep the image in memory cache
+        imageProvider.resolve(ImageConfiguration.empty);
 
-          final imageWidget = Image(
-            image: imageProvider,
+        final imageWidget = Image(
+          image: imageProvider,
+          fit: widget.fit,
+          width: widget.width,
+          height: widget.height,
+        );
+
+        if (!widget.animate ||
+            CardImageCacheManager.hasBeenAnimated(targetUrl)) {
+          return imageWidget;
+        }
+
+        // Mark this URL as animated before starting the animation
+        CardImageCacheManager.markAsAnimated(targetUrl);
+
+        return FlippingCardImage(
+          key: ValueKey('flip_$targetUrl'),
+          frontWidget: Image.asset(
+            'assets/images/card-back.jpeg',
             fit: widget.fit,
             width: widget.width,
             height: widget.height,
-          );
-
-          if (!widget.animate ||
-              CardImageCacheManager.hasBeenAnimated(targetUrl)) {
-            return imageWidget;
-          }
-
-          // Mark this URL as animated before starting the animation
-          CardImageCacheManager.markAsAnimated(targetUrl);
-
-          return FlippingCardImage(
-            key: ValueKey('flip_$targetUrl'),
-            frontWidget: Image.asset(
-              'assets/images/card-back.jpeg',
-              fit: widget.fit,
-              width: widget.width,
-              height: widget.height,
-            ),
-            backWidget: imageWidget,
-            duration: const Duration(milliseconds: 500),
-            borderRadius: widget.borderRadius,
-            onAnimationComplete: () {
-              CardImageCacheManager.markAsAnimated(targetUrl);
-            },
-          );
-        },
-        errorWidget: (context, url, error) {
-          talker.error('Failed to load image: $url', error);
-          widget.onImageError?.call();
-          return widget.errorWidget ?? _buildErrorWidget(context);
-        },
-      ),
+          ),
+          backWidget: imageWidget,
+          duration: const Duration(milliseconds: 500),
+          borderRadius: widget.borderRadius,
+          onAnimationComplete: () {
+            CardImageCacheManager.markAsAnimated(targetUrl);
+          },
+        );
+      },
+      errorWidget: (context, url, error) {
+        talker.error('Failed to load image: $url', error);
+        widget.onImageError?.call();
+        return widget.errorWidget ?? _buildErrorWidget(context);
+      },
     );
   }
 
