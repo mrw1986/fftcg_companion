@@ -101,6 +101,11 @@
   - Made all app bar actions (filter, view type, size) visible during search
   - Ensured all operations are performed client-side to minimize Firestore reads
   - Improved search result accuracy with better matching algorithms
+- Improved splash screen and loading experience:
+  - Fixed splash screen to properly respect dark/light mode
+  - Updated native splash screen configuration to use appropriate images for each theme
+  - Modified custom splash screen to properly detect system brightness
+  - Simplified loading indicator to show only a progress spinner
 
 ### In Progress
 

@@ -187,6 +187,80 @@ Impact:
 - Search results can be filtered and sorted
 - All animations are smooth and enhance the user experience
 
+### 5. Fix Splash Screen Issues (Completed)
+
+Location:
+
+- pubspec.yaml
+- lib/features/profile/presentation/widgets/custom_splash_screen.dart
+- lib/shared/widgets/loading_indicator.dart
+
+Current Issue:
+
+- The splash screen wasn't properly respecting dark mode, showing a white background with black logo in dark mode
+- The logo was displayed inside a circular container instead of directly against the background
+- The loading indicator showed a logo that wasn't necessary
+
+Solution:
+
+1. Updated Native Splash Screen:
+   - Modified flutter_native_splash configuration in pubspec.yaml to use different images for light and dark mode
+   - Used logo_transparent.png for light mode with white background
+   - Used logo_black.png for dark mode with dark background (#1E1E1E)
+
+2. Fixed Custom Splash Screen:
+   - Modified the custom splash screen to use MediaQuery.platformBrightnessOf(context) instead of Theme.of(context).brightness
+   - This ensures the correct theme is applied even before the Flutter theme is fully initialized
+   - Applied appropriate colors to the logo based on the detected brightness (black in light mode, white in dark mode)
+
+3. Simplified Loading Indicator:
+   - Removed the logo from the loading indicator
+   - Replaced it with just a circular progress indicator for a cleaner look
+
+Files Modified:
+
+- pubspec.yaml
+- lib/features/profile/presentation/widgets/custom_splash_screen.dart
+- lib/shared/widgets/loading_indicator.dart
+
+Impact:
+
+- Splash screen properly respects the device's dark/light mode
+- Logo appears with the correct color in each mode (black in light mode, white in dark mode)
+- Loading indicator is simplified for a cleaner look
+- Improved user experience with consistent theming throughout the app
+
+### 6. Fix Card List Item Corner Rounding Issue (Completed)
+
+Location:
+
+- lib/features/cards/presentation/widgets/card_list_item.dart
+
+Current Issue:
+
+- The card images in the list view had white corners that were visible against the dark background in dark mode
+- The corners needed to be transparent to match the background color
+- The placeholder image wasn't properly clipped with the same border radius
+
+Solution:
+
+- Implemented dynamic border radius based on view size, matching the approach used in card_grid_item.dart:
+  - ViewSize.small: 4.0
+  - ViewSize.normal: 5.5
+  - ViewSize.large: 7.0
+- Wrapped the placeholder Image.asset in a ClipRRect with the same border radius
+- This ensures that both the card image and placeholder image have properly rounded corners with consistent styling
+
+Files Modified:
+
+- lib/features/cards/presentation/widgets/card_list_item.dart
+
+Impact:
+
+- Card images in the list view now have properly rounded corners that match the style used in the grid view
+- No more white corners visible against dark backgrounds
+- Consistent appearance between the actual card image and the placeholder image
+
 ## Next Steps
 
 1. Improve image loading performance

@@ -45,6 +45,13 @@ class _CardListItemState extends State<CardListItem>
     final textTheme = theme.textTheme;
     final colorScheme = theme.colorScheme;
 
+    // Calculate border radius based on view size
+    final double imageRadius = switch (widget.viewSize) {
+      ViewSize.small => 4.0,
+      ViewSize.normal => 5.5,
+      ViewSize.large => 7.0,
+    };
+
     // Scale label text size based on view size
     final TextStyle labelStyle = switch (widget.viewSize) {
       ViewSize.small => textTheme.labelSmall ?? const TextStyle(fontSize: 10),
@@ -75,16 +82,19 @@ class _CardListItemState extends State<CardListItem>
                     height: height,
                     color: Theme.of(context).scaffoldBackgroundColor,
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(3),
+                      borderRadius: BorderRadius.circular(imageRadius),
                       child: CachedCardImage(
                         imageUrl: widget.card.getBestImageUrl(),
                         fit: BoxFit.contain,
                         width: imageWidth,
                         height: height,
-                        borderRadius: BorderRadius.circular(3),
-                        placeholder: Image.asset(
-                          'assets/images/card-back.jpeg',
-                          fit: BoxFit.contain,
+                        borderRadius: BorderRadius.circular(imageRadius),
+                        placeholder: ClipRRect(
+                          borderRadius: BorderRadius.circular(imageRadius),
+                          child: Image.asset(
+                            'assets/images/card-back.jpeg',
+                            fit: BoxFit.contain,
+                          ),
                         ),
                         onImageError: () {
                           talker.error(

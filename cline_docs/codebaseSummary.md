@@ -105,6 +105,9 @@
    - Improved card corner rounding in dark mode
    - Enhanced card image display with proper border radius
    - Added smooth animations for search transitions
+   - Fixed splash screen to properly respect dark/light mode
+   - Simplified loading indicator for a cleaner look
+   - Fixed card list item corner rounding with dynamic border radius based on view size
 
 2. **Performance Optimizations**
    - Improved image caching
@@ -140,6 +143,13 @@
    - Users reported inconsistent styling for special abilities
    - Updated regex pattern to handle different spacing scenarios
    - Improved text processing for consistent formatting
+
+4. **Splash Screen and Loading Experience**
+   - Users reported splash screen not respecting dark mode
+   - Users wanted a cleaner loading indicator without the logo
+   - Updated native splash screen configuration to use appropriate images for each theme
+   - Modified custom splash screen to properly detect system brightness
+   - Simplified loading indicator to show only a progress spinner
 
 ## Upcoming Development Focus
 
