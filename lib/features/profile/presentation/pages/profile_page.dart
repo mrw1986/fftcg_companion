@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart';
+import 'package:fftcg_companion/features/profile/presentation/providers/splash_screen_provider.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -9,6 +10,7 @@ class ProfilePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final viewPrefs = ref.watch(viewPreferencesProvider);
+    final splashPrefs = ref.watch(splashScreenPreferencesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -29,6 +31,17 @@ class ProfilePage extends ConsumerWidget {
             value: viewPrefs.showLabels,
             onChanged: (_) {
               ref.read(viewPreferencesProvider.notifier).toggleLabels();
+            },
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.image_outlined),
+            title: const Text('Show Splash Screen'),
+            subtitle: const Text('Display splash screen when app starts'),
+            value: splashPrefs.enabled,
+            onChanged: (_) {
+              ref
+                  .read(splashScreenPreferencesProvider.notifier)
+                  .toggleEnabled();
             },
           ),
           ListTile(

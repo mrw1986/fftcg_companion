@@ -106,18 +106,18 @@ flutter_launcher_icons:
     generate: false
 
 flutter_native_splash:
-  color: "#1E1E1E"
-  image: assets/images/fftcg_companion_logo.png
+  color: "#FFFFFF"
+  image: assets/images/logo_transparent.png
+  color_dark: "#1E1E1E"
+  image_dark: assets/images/logo_black.png
   android_12:
-    image: assets/images/fftcg_companion_logo.png
-    color: "#1E1E1E"
-    icon_background_color: "#1E1E1E"
+    color: "#FFFFFF"
+    image: assets/images/logo_transparent.png
+    color_dark: "#1E1E1E"
+    image_dark: assets/images/logo_black.png
   ios: true
   web: false
   android: true
   fullscreen: false
-  image_dark: assets/images/fftcg_companion_logo.png
-  color_dark: "#1E1E1E"
-  # Remove circular container
   android_gravity: center
   ios_content_mode: center
