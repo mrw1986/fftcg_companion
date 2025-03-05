@@ -261,6 +261,55 @@ Impact:
 - No more white corners visible against dark backgrounds
 - Consistent appearance between the actual card image and the placeholder image
 
+### 7. Implement Element-Colored Cost Crystals (Completed)
+
+Location:
+
+- lib/features/cards/presentation/widgets/card_metadata_chips.dart
+
+Current Issue:
+
+- Cost crystals were displayed with a single color regardless of the card's elements
+- Multi-element cards didn't visually indicate their elemental affiliations in the cost display
+
+Solution:
+
+1. Enhanced MultiElementCrystalPainter:
+   - Implemented dynamic coloring based on card elements
+   - Created different rendering approaches based on number of elements:
+     - Single element: Fill entire crystal with element color
+     - Two elements: Split crystal vertically into two halves
+     - Three elements: Create a "Y" configuration with three sections
+     - Four elements: Split crystal into four triangular quadrants meeting at center
+     - Five+ elements: Use pie-slice approach for equal divisions
+
+2. Updated Element Colors:
+   - Implemented standardized color palette for all elements:
+     - Dark: #919192
+     - Earth: #fdd000
+     - Fire: #ea5432
+     - Ice: #63c7f2
+     - Light: #ffffff
+     - Lightning: #b077b1
+     - Water: #6c9bd2
+     - Wind: #33b371
+
+3. Improved UI Organization:
+   - Moved element icons to the end of the metadata chips
+   - Ensured cost crystal is displayed first, followed by type, job, and category
+
+Files Modified:
+
+- lib/features/cards/presentation/widgets/card_metadata_chips.dart
+
+Impact:
+
+- Cost crystals now visually represent the card's elemental affiliations
+- Multi-element cards show clear visual indication of all elements
+- Consistent color scheme across the application
+- Improved visual hierarchy with logical ordering of metadata chips
+- Enhanced user experience with more informative card displays
+
 ## Next Steps
 
 1. Improve image loading performance

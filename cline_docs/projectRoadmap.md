@@ -106,6 +106,11 @@
   - Updated native splash screen configuration to use appropriate images for each theme
   - Modified custom splash screen to properly detect system brightness
   - Simplified loading indicator to show only a progress spinner
+- Enhanced card metadata display:
+  - Implemented element-colored cost crystals with dynamic rendering
+  - Created different rendering approaches based on number of elements
+  - Standardized element color palette across the application
+  - Improved metadata chip organization with logical ordering
 
 ### In Progress
 

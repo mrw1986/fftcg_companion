@@ -108,6 +108,9 @@
    - Fixed splash screen to properly respect dark/light mode
    - Simplified loading indicator for a cleaner look
    - Fixed card list item corner rounding with dynamic border radius based on view size
+   - Implemented element-colored cost crystals with dynamic rendering based on number of elements
+   - Standardized element color palette across the application
+   - Improved metadata chip organization with logical ordering
 
 2. **Performance Optimizations**
    - Improved image caching
