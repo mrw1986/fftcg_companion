@@ -34,6 +34,7 @@ class Card with _$Card {
     @Default([]) List<String> cardNumbers,
     @Default([]) List<String> searchTerms,
     @Default([]) List<String> set,
+    String? fullCardNumber,
   }) = _Card;
 
   factory Card.fromJson(Map<String, dynamic> json) => _$CardFromJson(json);
@@ -48,6 +49,9 @@ class Card with _$Card {
         (data['searchTerms'] as List?)?.map((e) => e.toString()).toList() ?? [];
     final categories =
         (data['categories'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    // Get fullCardNumber or construct it from cardNumbers
+    final fullCardNumber = data['fullCardNumber'] as String? ??
+        (cardNumbers.isNotEmpty ? cardNumbers.join('/') : number);
 
     return Card(
       productId: data['productId'] as int? ?? 0,
@@ -75,6 +79,7 @@ class Card with _$Card {
       cardNumbers: cardNumbers,
       searchTerms: searchTerms,
       set: (data['set'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      fullCardNumber: fullCardNumber,
     );
   }
 
@@ -120,7 +125,7 @@ class Card with _$Card {
   bool get isMonster => cardType?.toLowerCase() == 'monster';
 
   // Display helpers
-  String? get displayNumber => isNonCard ? null : number;
+  String? get displayNumber => isNonCard ? null : (fullCardNumber ?? number);
   String get displayRarity => isNonCard ? 'Sealed Product' : (rarity ?? '');
   String? get displayCategory => category?.replaceAll('&middot;', ' · ');
 
@@ -139,13 +144,14 @@ class Card with _$Card {
     if (isNonCard) return 1;
     if (other.isNonCard) return -1;
 
-    // Compare by number field if both are actual cards
-    final thisNum = number ?? '';
-    final otherNum = other.number ?? '';
+    // Use fullCardNumber if available, otherwise fall back to number
+    final thisNum = fullCardNumber ?? number ?? '';
+    final otherNum = other.fullCardNumber ?? other.number ?? '';
 
     // Split numbers into parts (e.g., "2-017R" -> ["2", "017"])
-    final thisParts = thisNum.split('-');
-    final otherParts = otherNum.split('-');
+    // For fullCardNumber like "Re-001H/12-002H", use the first part
+    final thisParts = thisNum.split('/')[0].split('-');
+    final otherParts = otherNum.split('/')[0].split('-');
 
     if (thisParts.isEmpty || otherParts.isEmpty) {
       return thisNum.compareTo(otherNum);

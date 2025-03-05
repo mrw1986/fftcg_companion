@@ -52,16 +52,34 @@ class FilterCollectionNotifier extends AsyncNotifier<FilterCollection> {
 
   Future<FilterCollection> _fetchFromFirestore() async {
     final snapshot = await _firestoreService.collection('filters').get();
+
+    // Debug log the documents found
+    talker.debug(
+        'Fetched ${snapshot.docs.length} filter documents from Firestore');
+    for (final doc in snapshot.docs) {
+      talker.debug('Filter document: ${doc.id}');
+    }
+
     final data = snapshot.docs.fold<Map<String, List<String>>>(
       {},
       (map, doc) {
-        final values = List<String>.from(doc.data()['values'] ?? []);
-        map[doc.id] = values;
+        try {
+          // Handle both string and integer values
+          final rawValues = doc.data()['values'] ?? [];
+          final values =
+              (rawValues as List).map((value) => value.toString()).toList();
+          talker.debug(
+              'Filter ${doc.id} has ${values.length} values: ${values.take(5).join(", ")}${values.length > 5 ? "..." : ""}');
+          map[doc.id] = values;
+        } catch (e, stack) {
+          talker.error('Error processing filter ${doc.id}', e, stack);
+          map[doc.id] = [];
+        }
         return map;
       },
     );
 
-    return FilterCollection(
+    final result = FilterCollection(
       cardType: data['cardType'] ?? [],
       category: data['category'] ?? [],
       cost: data['cost'] ?? [],
@@ -70,6 +88,11 @@ class FilterCollectionNotifier extends AsyncNotifier<FilterCollection> {
       rarity: data['rarity'] ?? [],
       set: data['set'] ?? [],
     );
+
+    talker.debug(
+        'Created FilterCollection with ${result.category.length} categories');
+
+    return result;
   }
 
   Future<void> _updateCache(FilterCollection filters) async {

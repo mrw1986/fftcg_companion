@@ -147,6 +147,12 @@ Impact:
 - All issues have been fixed and all enhancements have been implemented
 - The app now provides a more flexible and intuitive search experience
 - Users can perform complex card discovery operations without losing context
+- Additional enhancements have been implemented:
+  1. Set categories (Promotional Sets, Collections & Decks, and Opus Sets) are now collapsed by default UNLESS a set(s) are selected for filtering
+  2. When filtering by set, "isNonCard = true" products (sealed products) now appear at the bottom instead of the top of the results
+  3. Added a Category filter using the filters.category document values
+  4. Updated the Card model to use fullCardNumber for display and sorting
+  5. Modified the sorting logic to ensure non-cards always appear at the bottom regardless of sort type
 
 ## Testing Strategy
 

@@ -802,19 +802,26 @@ class CardRepository extends _$CardRepository {
 
   /// Apply filters to a list of cards locally
   List<Card> applyLocalFilters(List<Card> cards, CardFilters filters) {
+    talker.debug('Applying filters: ${filters.toString()}');
+    talker.debug('showSealedProducts: ${filters.showSealedProducts}');
+
     // Create a list of indices that match the filters
     final indices = <int>[];
+    int nonCardCount = 0;
+
     for (var i = 0; i < cards.length; i++) {
       final card = cards[i];
 
-      // For number, cost, and power sorts, always hide non-cards
-      if (filters.sortField == 'number' ||
-          filters.sortField == 'cost' ||
-          filters.sortField == 'power') {
-        if (card.isNonCard) continue;
-      } else if (!filters.showSealedProducts && card.isNonCard) {
-        // For other sorts, respect showSealedProducts flag
-        continue;
+      if (card.isNonCard) {
+        nonCardCount++;
+      }
+
+      // Check if we should include sealed products (non-cards)
+      if (card.isNonCard) {
+        // Only include non-cards if showSealedProducts is true
+        if (!filters.showSealedProducts) {
+          continue;
+        }
       }
 
       // Apply element filter
@@ -881,6 +888,14 @@ class CardRepository extends _$CardRepository {
         final cardA = cards[a];
         final cardB = cards[b];
 
+        // ALWAYS check for non-cards first, regardless of sort field
+        // Non-cards (sealed products) should always appear at the bottom
+        if (cardA.isNonCard != cardB.isNonCard) {
+          talker.debug(
+              'Sorting non-card at top level: ${cardA.name} (isNonCard=${cardA.isNonCard}) vs ${cardB.name} (isNonCard=${cardB.isNonCard})');
+          return cardA.isNonCard ? 1 : -1;
+        }
+
         // Check if either card is a crystal card
         final aIsCrystal = cardA.number?.startsWith('C-') ?? false;
         final bIsCrystal = cardB.number?.startsWith('C-') ?? false;
@@ -907,6 +922,9 @@ class CardRepository extends _$CardRepository {
           return cardB.compareByNumber(cardA);
         } else {
           // For all other sorts, use the standard comparison
+          // We already checked for non-cards at the top level
+
+          // Use standard comparison for cards of the same type
           final comparison = switch (filters.sortField) {
             'number' => cardA.compareByNumber(cardB),
             'name' => cardA.compareByName(cardB),
@@ -916,14 +934,37 @@ class CardRepository extends _$CardRepository {
             'power' => cardA.compareByPower(cardB) != 0
                 ? cardA.compareByPower(cardB)
                 : cardA.compareByNumber(cardB),
-            _ => 0,
+            _ => cardA.compareByNumber(cardB), // Default to number sort
           };
           return filters.sortDescending ? -comparison : comparison;
         }
       });
     }
 
-    // Create and return filtered list using sorted indices
-    return indices.map((i) => cards[i]).toList();
+    // Create filtered list using sorted indices
+    final result = indices.map((i) => cards[i]).toList();
+
+    // Debug log the first few cards to check sorting
+    talker.debug('Filtered cards: ${result.length} (from ${cards.length})');
+    talker.debug('Non-cards in original list: $nonCardCount');
+
+    // Log the first 5 cards and last 5 cards to check sorting
+    if (result.isNotEmpty) {
+      talker.debug('First 5 cards:');
+      for (int i = 0; i < 5 && i < result.length; i++) {
+        talker.debug(
+            '  ${i + 1}. ${result[i].name} (isNonCard=${result[i].isNonCard})');
+      }
+
+      if (result.length > 10) {
+        talker.debug('Last 5 cards:');
+        for (int i = result.length - 5; i < result.length; i++) {
+          talker.debug(
+              '  ${i + 1}. ${result[i].name} (isNonCard=${result[i].isNonCard})');
+        }
+      }
+    }
+
+    return result;
   }
 }

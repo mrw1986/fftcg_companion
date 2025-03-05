@@ -54,6 +54,17 @@ class FilterNotifier extends StateNotifier<CardFilters> {
     state = state.copyWith(rarities: rarities);
   }
 
+  void toggleCategory(String category) {
+    final categories = Set<String>.from(state.categories);
+    if (categories.contains(category)) {
+      categories.remove(category);
+    } else {
+      categories.add(category);
+    }
+    state = state.copyWith(categories: categories);
+    talker.debug('Filter updated - Categories: $categories');
+  }
+
   void toggleSet(String setId) {
     _isTogglingSet = true;
 

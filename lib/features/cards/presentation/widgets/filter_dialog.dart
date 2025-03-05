@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_options_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/set_card_count_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/filter_collection_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 
 /// A provider to prefetch filter options before showing the dialog
@@ -100,6 +101,51 @@ class FilterDialog extends ConsumerWidget {
                               .toggleRarity(rarity),
                           // No need for display names since we're using full names
                         ).animate().slideX().fadeIn(delay: 300.ms),
+                        Divider(color: colorScheme.outlineVariant),
+                        // Add Category filter section using Consumer for better reactivity
+                        Consumer(
+                          builder: (context, ref, child) {
+                            final filterCollection =
+                                ref.watch(filterCollectionProvider);
+
+                            return filterCollection.when(
+                              data: (collection) {
+                                // Display categories from the "category" document
+                                talker.debug(
+                                    'Categories found: ${collection.category.length}');
+
+                                if (collection.category.isEmpty) {
+                                  talker.debug(
+                                      'No categories found in collection');
+                                  return const SizedBox.shrink();
+                                }
+
+                                return _buildFilterSection(
+                                  context,
+                                  'Categories',
+                                  collection.category
+                                      .toSet(), // Use the values from the category document
+                                  filters
+                                      .categories, // Current selected categories
+                                  (category) => ref
+                                      .read(filterProvider.notifier)
+                                      .toggleCategory(category),
+                                ).animate().slideX().fadeIn(delay: 350.ms);
+                              },
+                              loading: () => const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                              error: (error, stack) => Text(
+                                'Error loading categories',
+                                style: TextStyle(color: colorScheme.error),
+                              ),
+                            );
+                          },
+                        ),
                         Divider(color: colorScheme.outlineVariant),
                         _buildGroupedSetsSection(
                           context,
@@ -281,7 +327,10 @@ class FilterDialog extends ConsumerWidget {
   ) {
     final filterOptionsNotifier =
         ref.watch(filterOptionsNotifierProvider.notifier);
-    final isOpusCategory = category == SetCategory.opus;
+
+    // Check if any sets from this category are selected
+    final hasSelectedSetsInCategory =
+        sets.any((setId) => selectedValues.contains(setId));
 
     return ExpansionTile(
       title: Text(
@@ -292,7 +341,8 @@ class FilterDialog extends ConsumerWidget {
         },
         style: Theme.of(context).textTheme.titleMedium,
       ),
-      initiallyExpanded: isOpusCategory,
+      // Only expand if sets from this category are selected
+      initiallyExpanded: hasSelectedSetsInCategory,
       children: [
         GridView.builder(
           shrinkWrap: true,

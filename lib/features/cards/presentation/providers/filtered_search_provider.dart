@@ -144,6 +144,12 @@ class FilteredSearchNotifier extends AsyncNotifier<List<models.Card>> {
 
         // If both have same relevance, sort based on current filters
         if (relevanceA == relevanceB) {
+          // First check if either card is a non-card (sealed product)
+          if (a.isNonCard != b.isNonCard) {
+            // Non-cards (sealed products) should always appear at the bottom
+            return a.isNonCard ? 1 : -1;
+          }
+
           if (filters != null && filters.sortField != null) {
             final comparison = switch (filters.sortField) {
               'number' => a.compareByNumber(b),
@@ -154,7 +160,7 @@ class FilteredSearchNotifier extends AsyncNotifier<List<models.Card>> {
               'power' => a.compareByPower(b) != 0
                   ? a.compareByPower(b)
                   : a.compareByNumber(b),
-              _ => 0,
+              _ => a.compareByNumber(b), // Default to number sort
             };
             return filters.sortDescending ? -comparison : comparison;
           } else {

@@ -111,6 +111,11 @@
    - Implemented element-colored cost crystals with dynamic rendering based on number of elements
    - Standardized element color palette across the application
    - Improved metadata chip organization with logical ordering
+   - Made set categories (Promotional Sets, Collections & Decks, and Opus Sets) collapsed by default unless sets are selected
+   - Changed sorting to make sealed products appear at the bottom of results instead of the top
+   - Added Category filter using the filters.category document values
+   - Updated Card model to use fullCardNumber for display and sorting
+   - Modified sorting logic to ensure non-cards always appear at the bottom regardless of sort type
 
 2. **Performance Optimizations**
    - Improved image caching
