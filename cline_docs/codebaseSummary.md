@@ -101,6 +101,10 @@
 ## Recent Significant Changes
 
 1. **UI Improvements**
+   - Implemented swipe navigation in card details page with intuitive controls
+   - Added navigation buttons on sides of card image for easy browsing
+   - Implemented PageView for smooth transitions between cards
+   - Ensured navigation respects current filtered card list
    - Implemented animated search bar in app bar
    - Fixed special ability styling in card descriptions
    - Improved card corner rounding in dark mode
@@ -140,7 +144,16 @@
 
 ## User Feedback Integration
 
-1. **Search Experience**
+1. **Card Details Navigation**
+   - Users wanted to browse through cards without returning to the list
+   - Users needed to navigate between filtered or search results easily
+   - Implemented swipe navigation with PageView for intuitive browsing
+   - Added navigation buttons on sides of card image
+   - Ensured navigation respects current filtered card list
+   - Made navigation controls visually appealing and non-intrusive
+   - Implemented smooth transitions between cards
+
+2. **Search Experience**
    - Users wanted a more intuitive search interface
    - Users requested ability to search within filtered cards
    - Users needed to sort search results
@@ -151,7 +164,7 @@
    - Added smooth transitions for all search-related UI elements
    - Ensured cards remain visible during search operations
 
-2. **Card Details Page**
+3. **Card Details Page**
    - Users reported white corners on card images in dark mode
    - Implemented fix using BoxDecoration with larger border radius
    - Removed Hero animation to prevent transition issues

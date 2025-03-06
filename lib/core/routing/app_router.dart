@@ -56,7 +56,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: ':id',
                 builder: (context, state) {
                   final card = state.extra as models.Card;
-                  return CardDetailsPage(card: card);
+                  return CardDetailsPage(initialCard: card);
                 },
               ),
             ],

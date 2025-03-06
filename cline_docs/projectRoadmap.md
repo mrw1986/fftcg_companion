@@ -18,6 +18,7 @@
   - [x] Comprehensive search functionality
   - [x] Animated search interface
   - [x] Integrated search, filter, and sort functionality
+  - [x] Swipe navigation in card details view
 - [x] App initialization and loading
   - [x] Native splash screen
   - [x] Efficient provider initialization
@@ -117,6 +118,12 @@
   - Added Category filter using the filters.category document values
   - Updated Card model to use fullCardNumber for display and sorting
   - Modified sorting logic to ensure non-cards always appear at the bottom regardless of sort type
+- Implemented swipe navigation in card details page:
+  - Added PageView for swiping between cards
+  - Implemented navigation buttons on sides of card image
+  - Ensured navigation respects current filtered card list
+  - Added smooth transitions between cards
+  - Improved UI with semi-transparent navigation controls
 
 ### In Progress
 
