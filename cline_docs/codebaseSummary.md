@@ -169,12 +169,12 @@
    - Implemented fix using BoxDecoration with larger border radius
    - Removed Hero animation to prevent transition issues
 
-3. **Card Description Text**
+4. **Card Description Text**
    - Users reported inconsistent styling for special abilities
    - Updated regex pattern to handle different spacing scenarios
    - Improved text processing for consistent formatting
 
-4. **Splash Screen and Loading Experience**
+5. **Splash Screen and Loading Experience**
    - Users reported splash screen not respecting dark mode
    - Users wanted a cleaner loading indicator without the logo
    - Updated native splash screen configuration to use appropriate images for each theme

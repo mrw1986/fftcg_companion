@@ -524,7 +524,7 @@ class FilterDialog extends ConsumerWidget {
                 : effectiveMax.toInt().toString(),
           ),
           activeColor: colorScheme.primary,
-          inactiveColor: colorScheme.surfaceVariant,
+          inactiveColor: colorScheme.surfaceContainerHighest,
           onChanged: (RangeValues values) {
             onChanged(values.start, values.end);
           },
