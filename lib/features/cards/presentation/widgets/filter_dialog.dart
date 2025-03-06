@@ -79,7 +79,7 @@ class FilterDialog extends ConsumerWidget {
                           (element) => ref
                               .read(filterProvider.notifier)
                               .toggleElement(element),
-                        ).animate().slideX().fadeIn(delay: 100.ms),
+                        ).animate().fadeIn(delay: 100.ms),
                         Divider(color: colorScheme.outlineVariant),
                         _buildFilterSection(
                           context,
@@ -89,7 +89,7 @@ class FilterDialog extends ConsumerWidget {
                           (type) => ref
                               .read(filterProvider.notifier)
                               .toggleType(type),
-                        ).animate().slideX().fadeIn(delay: 200.ms),
+                        ).animate().fadeIn(delay: 200.ms),
                         Divider(color: colorScheme.outlineVariant),
                         _buildFilterSection(
                           context,
@@ -100,7 +100,7 @@ class FilterDialog extends ConsumerWidget {
                               .read(filterProvider.notifier)
                               .toggleRarity(rarity),
                           // No need for display names since we're using full names
-                        ).animate().slideX().fadeIn(delay: 300.ms),
+                        ).animate().fadeIn(delay: 300.ms),
                         Divider(color: colorScheme.outlineVariant),
                         // Add Category filter section using Consumer for better reactivity
                         Consumer(
@@ -130,7 +130,7 @@ class FilterDialog extends ConsumerWidget {
                                   (category) => ref
                                       .read(filterProvider.notifier)
                                       .toggleCategory(category),
-                                ).animate().slideX().fadeIn(delay: 350.ms);
+                                ).animate().fadeIn(delay: 350.ms);
                               },
                               loading: () => const Center(
                                 child: Padding(
@@ -153,9 +153,9 @@ class FilterDialog extends ConsumerWidget {
                           filters.set,
                           ref,
                           colorScheme,
-                        ).animate().slideX().fadeIn(delay: 400.ms),
+                        ).animate().fadeIn(delay: 400.ms),
                         if (options.costRange.$1 != options.costRange.$2)
-                          _buildRangeSlider(
+                          _buildCollapsibleRangeSlider(
                             context,
                             'Cost',
                             options.costRange.$1.toDouble(),
@@ -167,9 +167,9 @@ class FilterDialog extends ConsumerWidget {
                                       min?.toInt(),
                                       max?.toInt(),
                                     ),
-                          ).animate().slideX().fadeIn(delay: 500.ms),
+                          ).animate().fadeIn(delay: 500.ms),
                         if (options.powerRange.$1 != options.powerRange.$2)
-                          _buildRangeSlider(
+                          _buildCollapsibleRangeSlider(
                             context,
                             'Power',
                             options.powerRange.$1.toDouble(),
@@ -181,7 +181,7 @@ class FilterDialog extends ConsumerWidget {
                                       min?.toInt(),
                                       max?.toInt(),
                                     ),
-                          ).animate().slideX().fadeIn(delay: 600.ms),
+                          ).animate().fadeIn(delay: 600.ms),
                         Divider(color: colorScheme.outlineVariant),
                         _buildSwitchRow(
                           context,
@@ -190,7 +190,7 @@ class FilterDialog extends ConsumerWidget {
                           (_) => ref
                               .read(filterProvider.notifier)
                               .toggleShowSealedProducts(),
-                        ).animate().slideX().fadeIn(delay: 700.ms),
+                        ).animate().fadeIn(delay: 700.ms),
                       ],
                     ),
                   ),
@@ -249,31 +249,35 @@ class FilterDialog extends ConsumerWidget {
     void Function(String) onToggle, {
     Map<String, String>? displayNames,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    // Check if any options from this section are selected
+    final hasSelectedOptions = selectedValues.isNotEmpty;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ExpansionTile(
+      title: Text(
+        title,
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      // Only expand if options from this section are selected
+      initiallyExpanded: hasSelectedOptions,
+      collapsedIconColor: colorScheme.onSurface,
+      iconColor: colorScheme.primary,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: options.map((option) {
-            final displayName = displayNames?[option] ?? option;
-            return FilterChip(
-              label: Text(displayName),
-              selected: selectedValues.contains(option),
-              onSelected: (_) => onToggle(option),
-              showCheckmark: true,
-            ).animate().scale(
-                  duration: 200.ms,
-                  delay: (50 * options.toList().indexOf(option)).ms,
-                );
-          }).toList(),
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: options.map((option) {
+              final displayName = displayNames?[option] ?? option;
+              return FilterChip(
+                label: Text(displayName),
+                selected: selectedValues.contains(option),
+                onSelected: (_) => onToggle(option),
+                showCheckmark: true,
+              );
+            }).toList(),
+          ).animate().fadeIn(duration: 150.ms),
         ),
       ],
     );
@@ -290,29 +294,38 @@ class FilterDialog extends ConsumerWidget {
         ref.watch(filterOptionsNotifierProvider.notifier);
     final groupedSets = filterOptionsNotifier.getGroupedSets();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    // Check if any sets are selected
+    final hasSelectedSets = selectedValues.isNotEmpty;
+
+    return ExpansionTile(
+      title: Text(
+        'Sets',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      // Only expand if sets are selected
+      initiallyExpanded: hasSelectedSets,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Text(
-            'Sets',
-            style: Theme.of(context).textTheme.titleMedium,
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ...SetCategory.values.map((category) {
+                final sets = groupedSets[category] ?? [];
+                if (sets.isEmpty) return const SizedBox.shrink();
+
+                return _buildSetCategory(
+                  context,
+                  category,
+                  sets,
+                  selectedValues,
+                  ref,
+                  colorScheme,
+                );
+              }),
+            ],
           ),
         ),
-        ...SetCategory.values.map((category) {
-          final sets = groupedSets[category] ?? [];
-          if (sets.isEmpty) return const SizedBox.shrink();
-
-          return _buildSetCategory(
-            context,
-            category,
-            sets,
-            selectedValues,
-            ref,
-            colorScheme,
-          );
-        }),
       ],
     );
   }
@@ -389,12 +402,9 @@ class FilterDialog extends ConsumerWidget {
                     ? colorScheme.onPrimaryContainer
                     : colorScheme.onSurfaceVariant,
               ),
-            ).animate().scale(
-                  duration: 200.ms,
-                  delay: (50 * index).ms,
-                );
+            );
           },
-        ),
+        ).animate().fadeIn(duration: 150.ms),
       ],
     );
   }
@@ -423,6 +433,43 @@ class FilterDialog extends ConsumerWidget {
     );
   }
 
+  Widget _buildCollapsibleRangeSlider(
+    BuildContext context,
+    String title,
+    double min,
+    double max,
+    double? currentMin,
+    double? currentMax,
+    void Function(double?, double?) onChanged,
+  ) {
+    // Check if the range has been modified from default
+    final isRangeModified = (currentMin != null && currentMin > min) ||
+        (currentMax != null && currentMax < max);
+
+    return ExpansionTile(
+      title: Text(
+        title,
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      // Expand if range has been modified
+      initiallyExpanded: isRangeModified,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: _buildRangeSlider(
+            context,
+            title,
+            min,
+            max,
+            currentMin,
+            currentMax,
+            onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildRangeSlider(
     BuildContext context,
     String title,
@@ -440,38 +487,24 @@ class FilterDialog extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+        // Display the range value in a chip
+        Align(
+          alignment: Alignment.center,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: textTheme.titleMedium,
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    title == 'Power'
-                        ? '${(effectiveMin / 1000).toInt()}k - ${(effectiveMax / 1000).toInt()}k'
-                        : '${effectiveMin.toInt()} - ${effectiveMax.toInt()}',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
+            child: Text(
+              title == 'Power'
+                  ? '${(effectiveMin / 1000).toInt()}k - ${(effectiveMax / 1000).toInt()}k'
+                  : '${effectiveMin.toInt()} - ${effectiveMax.toInt()}',
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
@@ -490,6 +523,8 @@ class FilterDialog extends ConsumerWidget {
                 ? '${(effectiveMax / 1000).toInt()}k'
                 : effectiveMax.toInt().toString(),
           ),
+          activeColor: colorScheme.primary,
+          inactiveColor: colorScheme.surfaceVariant,
           onChanged: (RangeValues values) {
             onChanged(values.start, values.end);
           },
