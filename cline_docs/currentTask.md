@@ -378,3 +378,43 @@ Impact:
    - Provide better fallback mechanisms
    - Improve error reporting and recovery
    - Add retry functionality for failed image loads
+
+## Recent Changes
+
+### Fixed Native Splash Screen to Match Custom Splash Screen
+
+Location:
+
+- pubspec.yaml
+- lib/main.dart
+- lib/app/app.dart
+
+Current Issue:
+
+- The native splash screen was showing the logo in a circular container on Android 12+ devices
+- The custom splash screen was showing the logo directly against the background
+- Having both a native splash screen and a custom splash screen was redundant
+
+Solution:
+
+1. Updated the native splash screen configuration in pubspec.yaml:
+   - Set the background color to "#000000" (black) to match the logo's background
+   - Used a properly sized image (logo_transparent_splash.png) specifically designed for the splash screen
+   - Configured Android 12+ splash screen to use the approach without an icon background
+   - Ensured the full logo with "COMPANION" text is visible in the splash screen
+
+2. Removed the custom splash screen:
+   - Removed CustomSplashScreen widget from app.dart
+   - Removed the import for the custom splash screen
+
+3. Implemented proper native splash screen handling:
+   - Added flutter_native_splash package to dependencies (moved from dev_dependencies)
+   - Added FlutterNativeSplash.preserve() at the start of the app to keep the splash screen visible
+   - Added FlutterNativeSplash.remove() after initialization to remove the splash screen
+
+Impact:
+
+- Consistent splash screen experience across all Android versions
+- Simplified code by removing redundant custom splash screen
+- Better performance by using the native splash screen API
+- Improved user experience with a seamless transition from splash to app

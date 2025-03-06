@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:talker_riverpod_logger/talker_riverpod_logger.dart';
@@ -18,9 +19,6 @@ import 'package:fftcg_companion/core/storage/cache_persistence.dart';
 final _container = ProviderContainer();
 
 Future<void> initializeApp() async {
-  // Initialize Flutter bindings
-  WidgetsFlutterBinding.ensureInitialized();
-
   // Configure Talker for logging
   talker.configure(
     settings: TalkerSettings(
@@ -42,15 +40,16 @@ Future<void> initializeApp() async {
           'settings'), // Settings box should be dynamic to store different types
       Hive.openBox('cache_metadata'),
     ]);
-// Initialize Firebase
+
+    // Initialize Firebase
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-// Initialize CachePersistence
+    // Initialize CachePersistence
     await CachePersistence.initialize();
 
-// Initialize image cache
+    // Initialize image cache
     CardImageCacheManager.initCache();
 
     talker.debug('Basic initialization completed');
@@ -61,6 +60,10 @@ Future<void> initializeApp() async {
 }
 
 Future<void> main() async {
+  // Preserve the native splash screen until initialization is complete
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
   await runZonedGuarded(() async {
     await initializeApp();
 
@@ -92,6 +95,9 @@ Future<void> main() async {
         child: const FFTCGCompanionApp(),
       ),
     );
+
+    // Remove the native splash screen after the app is initialized
+    FlutterNativeSplash.remove();
 
     // Dispose the temporary container after app is running
     _container.dispose();

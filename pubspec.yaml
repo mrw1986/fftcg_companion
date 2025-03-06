@@ -43,6 +43,7 @@ dependencies:
   flutter_svg: ^2.0.16
   shimmer: ^3.0.0
   fl_chart: ^0.70.1
+  flutter_native_splash: ^2.4.4
 
   # Utils
   freezed_annotation: ^2.4.4
@@ -82,7 +83,6 @@ dev_dependencies:
   # Development Tools
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
-  flutter_native_splash: ^2.4.4
 
 flutter:
   uses-material-design: true
@@ -106,15 +106,17 @@ flutter_launcher_icons:
     generate: false
 
 flutter_native_splash:
-  color: "#FFFFFF"
-  image: assets/images/logo_transparent.png
-  color_dark: "#1E1E1E"
-  image_dark: assets/images/logo_black.png
+  color: "#000000"
+  image: assets/images/logo_transparent_splash.png
+  color_dark: "#000000"
+  image_dark: assets/images/logo_transparent_splash.png
   android_12:
-    color: "#FFFFFF"
-    image: assets/images/logo_transparent.png
-    color_dark: "#1E1E1E"
-    image_dark: assets/images/logo_black.png
+    # For Android 12, we're using the approach without an icon background
+    # The image should be 1152×1152 pixels, and fit within a circle 768 pixels in diameter
+    color: "#000000"
+    image: assets/images/logo_transparent_splash.png
+    color_dark: "#000000"
+    image_dark: assets/images/logo_transparent_splash.png
   ios: true
   web: false
   android: true

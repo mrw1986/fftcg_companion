@@ -117,6 +117,8 @@
    - Added Category filter using the filters.category document values
    - Updated Card model to use fullCardNumber for display and sorting
    - Modified sorting logic to ensure non-cards always appear at the bottom regardless of sort type
+   - Replaced custom splash screen with properly configured native splash screen
+   - Fixed Android 12+ splash screen to show the full logo with "COMPANION" text
 
 2. **Performance Optimizations**
    - Improved image caching
