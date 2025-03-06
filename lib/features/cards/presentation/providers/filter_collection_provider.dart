@@ -25,19 +25,28 @@ class FilterCollectionNotifier extends AsyncNotifier<FilterCollection> {
     try {
       // Check memory cache first
       if (_memoryCache != null) {
+        talker.debug('Using in-memory filter collection cache');
         return _memoryCache!;
       }
 
       // Check local storage cache
-      final cachedData = await _hiveStorage
-          .get<Map<String, dynamic>>(_filterCollectionCacheKey);
-      if (cachedData != null) {
-        final cache = FilterCollectionCache.fromJson(cachedData);
-        _memoryCache = cache.filters;
-        return cache.filters;
+      try {
+        final cachedData = await _hiveStorage
+            .get<Map<String, dynamic>>(_filterCollectionCacheKey);
+        if (cachedData != null) {
+          talker.debug('Using Hive-cached filter collection');
+          final cache = FilterCollectionCache.fromJson(cachedData);
+          _memoryCache = cache.filters;
+          return cache.filters;
+        }
+      } catch (hiveError) {
+        // Log but continue if Hive fails
+        talker.warning(
+            'Error accessing Hive cache for filter collection: $hiveError');
       }
 
       // Fetch from Firestore
+      talker.info('Fetching filter collection from Firestore');
       final filters = await _fetchFromFirestore();
       await _updateCache(filters);
       return filters;
@@ -101,7 +110,14 @@ class FilterCollectionNotifier extends AsyncNotifier<FilterCollection> {
       filters: filters,
       lastUpdated: DateTime.now(),
     );
-    await _hiveStorage.put(_filterCollectionCacheKey, cache.toJson());
+
+    try {
+      await _hiveStorage.put(_filterCollectionCacheKey, cache.toJson());
+      talker.debug('Successfully cached filter collection');
+    } catch (e) {
+      // Just log the error but don't fail - we still have the memory cache
+      talker.warning('Failed to cache filter collection to Hive: $e');
+    }
   }
 
   Future<void> refreshFilters() async {

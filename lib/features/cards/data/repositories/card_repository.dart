@@ -882,20 +882,27 @@ class CardRepository extends _$CardRepository {
       indices.add(i);
     }
 
-    // Sort indices if needed
+    // Create a separate list for non-cards to ensure they're always at the bottom
+    final regularCards = <Card>[];
+    final nonCards = <Card>[];
+
+    // Separate non-cards from regular cards
+    for (final index in indices) {
+      final card = cards[index];
+      if (card.isNonCard) {
+        nonCards.add(card);
+      } else {
+        regularCards.add(card);
+      }
+    }
+
+    // Log the separation for debugging
+    talker.debug(
+        'Regular cards: ${regularCards.length}, Non-cards: ${nonCards.length}');
+
+    // Sort regular cards if needed
     if (filters.sortField != null) {
-      indices.sort((a, b) {
-        final cardA = cards[a];
-        final cardB = cards[b];
-
-        // ALWAYS check for non-cards first, regardless of sort field
-        // Non-cards (sealed products) should always appear at the bottom
-        if (cardA.isNonCard != cardB.isNonCard) {
-          talker.debug(
-              'Sorting non-card at top level: ${cardA.name} (isNonCard=${cardA.isNonCard}) vs ${cardB.name} (isNonCard=${cardB.isNonCard})');
-          return cardA.isNonCard ? 1 : -1;
-        }
-
+      regularCards.sort((cardA, cardB) {
         // Check if either card is a crystal card
         final aIsCrystal = cardA.number?.startsWith('C-') ?? false;
         final bIsCrystal = cardB.number?.startsWith('C-') ?? false;
@@ -922,9 +929,6 @@ class CardRepository extends _$CardRepository {
           return cardB.compareByNumber(cardA);
         } else {
           // For all other sorts, use the standard comparison
-          // We already checked for non-cards at the top level
-
-          // Use standard comparison for cards of the same type
           final comparison = switch (filters.sortField) {
             'number' => cardA.compareByNumber(cardB),
             'name' => cardA.compareByName(cardB),
@@ -941,12 +945,34 @@ class CardRepository extends _$CardRepository {
       });
     }
 
-    // Create filtered list using sorted indices
-    final result = indices.map((i) => cards[i]).toList();
+    // Sort non-cards if needed
+    if (filters.sortField != null && nonCards.isNotEmpty) {
+      nonCards.sort((cardA, cardB) {
+        // Sort non-cards by name
+        if (filters.sortField == 'name') {
+          final nameA = cardA.cleanName.toLowerCase();
+          final nameB = cardB.cleanName.toLowerCase();
+          final nameComparison = filters.sortDescending
+              ? nameB.compareTo(nameA)
+              : nameA.compareTo(nameB);
+          return nameComparison;
+        }
+
+        // Default to sorting by name for non-cards
+        return cardA.cleanName
+            .toLowerCase()
+            .compareTo(cardB.cleanName.toLowerCase());
+      });
+    }
+
+    // Combine the lists, with regular cards first and non-cards at the bottom
+    final result = [...regularCards, ...nonCards];
 
     // Debug log the first few cards to check sorting
     talker.debug('Filtered cards: ${result.length} (from ${cards.length})');
     talker.debug('Non-cards in original list: $nonCardCount');
+    talker.debug(
+        'Regular cards in result: ${regularCards.length}, Non-cards in result: ${nonCards.length}');
 
     // Log the first 5 cards and last 5 cards to check sorting
     if (result.isNotEmpty) {
@@ -962,6 +988,24 @@ class CardRepository extends _$CardRepository {
           talker.debug(
               '  ${i + 1}. ${result[i].name} (isNonCard=${result[i].isNonCard})');
         }
+      }
+    }
+
+    // Verify non-cards are at the bottom
+    if (nonCards.isNotEmpty && regularCards.isNotEmpty) {
+      final firstNonCardIndex = result.indexWhere((card) => card.isNonCard);
+      final lastRegularCardIndex =
+          result.lastIndexWhere((card) => !card.isNonCard);
+
+      if (firstNonCardIndex < lastRegularCardIndex) {
+        talker.error(
+            'Sorting error: Non-card found before regular card! This should never happen.');
+        // Force correct order by re-sorting
+        result.sort(
+            (a, b) => a.isNonCard == b.isNonCard ? 0 : (a.isNonCard ? 1 : -1));
+      } else {
+        talker.debug(
+            'Sorting verified: All non-cards are at the bottom of the results');
       }
     }
 

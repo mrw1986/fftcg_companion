@@ -137,19 +137,20 @@ class FilteredSearchNotifier extends AsyncNotifier<List<models.Card>> {
         return 0;
       }
 
-      // Sort results by relevance first, then by the current sort criteria
-      results.sort((a, b) {
+      // Separate non-cards from regular cards for better sorting control
+      final regularCards = results.where((card) => !card.isNonCard).toList();
+      final nonCards = results.where((card) => card.isNonCard).toList();
+
+      talker.debug(
+          'Search results: ${regularCards.length} regular cards, ${nonCards.length} non-cards');
+
+      // Sort regular cards by relevance first, then by the current sort criteria
+      regularCards.sort((a, b) {
         final relevanceA = getRelevance(a);
         final relevanceB = getRelevance(b);
 
         // If both have same relevance, sort based on current filters
         if (relevanceA == relevanceB) {
-          // First check if either card is a non-card (sealed product)
-          if (a.isNonCard != b.isNonCard) {
-            // Non-cards (sealed products) should always appear at the bottom
-            return a.isNonCard ? 1 : -1;
-          }
-
           if (filters != null && filters.sortField != null) {
             final comparison = switch (filters.sortField) {
               'number' => a.compareByNumber(b),
@@ -172,7 +173,41 @@ class FilteredSearchNotifier extends AsyncNotifier<List<models.Card>> {
         return relevanceB.compareTo(relevanceA);
       });
 
-      return results;
+      // Sort non-cards by name
+      nonCards.sort((a, b) {
+        if (filters != null && filters.sortField == 'name') {
+          final nameA = a.cleanName.toLowerCase();
+          final nameB = b.cleanName.toLowerCase();
+          return filters.sortDescending
+              ? nameB.compareTo(nameA)
+              : nameA.compareTo(nameB);
+        }
+        return a.cleanName.toLowerCase().compareTo(b.cleanName.toLowerCase());
+      });
+
+      // Combine the lists with regular cards first, non-cards at the bottom
+      final sortedResults = [...regularCards, ...nonCards];
+
+      // Verify non-cards are at the bottom
+      if (nonCards.isNotEmpty && regularCards.isNotEmpty) {
+        final firstNonCardIndex =
+            sortedResults.indexWhere((card) => card.isNonCard);
+        final lastRegularCardIndex =
+            sortedResults.lastIndexWhere((card) => !card.isNonCard);
+
+        if (firstNonCardIndex < lastRegularCardIndex) {
+          talker.error(
+              'Sorting error in search results: Non-card found before regular card!');
+          // Force correct order by re-sorting
+          sortedResults.sort((a, b) =>
+              a.isNonCard == b.isNonCard ? 0 : (a.isNonCard ? 1 : -1));
+        } else {
+          talker.debug(
+              'Search results sorting verified: All non-cards are at the bottom');
+        }
+      }
+
+      return sortedResults;
     } catch (e, stack) {
       talker.error('Error searching within filtered cards', e, stack);
       return [];

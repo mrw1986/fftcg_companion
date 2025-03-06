@@ -15,9 +15,10 @@
    - Theme provider for dynamic theme switching
 
 3. **Storage Layer**
-   - Hive for local storage and caching
+   - Hive for local storage and caching with memory cache fallback
    - Card cache for efficient data access
    - Cache persistence for offline functionality
+   - Resilient storage operations with error recovery
 
 4. **Networking**
    - Firestore service for cloud data
@@ -122,11 +123,17 @@
    - Reduced unnecessary rebuilds
    - Optimized search functionality
    - Enhanced animation performance
+   - Added memory cache layer to reduce Hive access
+   - Implemented resilient storage operations with fallback mechanisms
 
 3. **Bug Fixes**
    - Fixed card description text styling issues
    - Resolved card corner rounding problems in dark mode
    - Improved error handling for image loading
+   - Fixed search visibility issues
+   - Resolved Hive box type mismatch errors
+   - Fixed non-card items sorting to the top when filtering by set
+   - Enhanced error recovery for storage operations
    - Fixed search visibility issues
 
 ## User Feedback Integration

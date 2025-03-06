@@ -154,6 +154,57 @@ Impact:
   4. Updated the Card model to use fullCardNumber for display and sorting
   5. Modified the sorting logic to ensure non-cards always appear at the bottom regardless of sort type
 
+### 8. Fix Hive Storage Issues (Completed)
+
+Location:
+
+- lib/core/storage/hive_storage.dart
+- lib/core/storage/hive_provider.dart
+- lib/features/cards/data/repositories/card_repository.dart
+
+Current Issue:
+
+- Hive boxes were being opened with inconsistent types
+- The 'cards' box was being opened as both ```Box<Card>``` and ```Box<Map>```
+- Error messages showed "Box not found: filter_collection" and "The box 'cards' is already open and of type Box<Map<dynamic, dynamic>>"
+- Non-card items (sealed products) were sorting to the top when filtering by set
+
+Solution:
+
+1. Enhanced HiveStorage class:
+   - Added an in-memory cache layer to reduce direct Hive access
+   - Fixed box initialization to handle type conflicts
+   - Made all operations (get, put, delete, clear) resilient to failures
+   - Removed unused methods and variables
+   - Added better error handling throughout the code
+
+2. Updated HiveProvider:
+   - Added retry mechanism for initialization failures
+   - Improved error handling and logging
+   - Added fallback to memory cache when Hive operations fail
+
+3. Fixed Card Repository Sorting:
+   - Changed approach in applyLocalFilters to work directly with Card objects instead of indices
+   - Separated non-card items from regular cards before sorting
+   - Sorted each group separately with appropriate sort criteria
+   - Combined the lists with regular cards first, non-cards at the bottom
+   - Added verification to ensure non-cards are always at the bottom
+
+Files Modified:
+
+- lib/core/storage/hive_storage.dart
+- lib/core/storage/hive_provider.dart
+- lib/features/cards/data/repositories/card_repository.dart
+
+Impact:
+
+- Eliminated Hive errors related to box type mismatches
+- Improved app stability with better error handling
+- Enhanced performance with memory cache layer
+- Fixed sorting issue with non-card items
+- Ensured non-cards always appear at the bottom of results regardless of sort type
+- App continues to function even when Hive operations fail temporarily
+
 ## Testing Strategy
 
 1. Special Ability Styling Test
