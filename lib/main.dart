@@ -59,48 +59,53 @@ Future<void> initializeApp() async {
   }
 }
 
-Future<void> main() async {
-  // Preserve the native splash screen until initialization is complete
-  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+void main() {
+  // Ensure Flutter bindings are initialized in the same zone as runApp
+  runZonedGuarded(() async {
+    // Preserve the native splash screen until initialization is complete
+    final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+    FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
-  await runZonedGuarded(() async {
-    await initializeApp();
+    try {
+      await initializeApp();
 
-    // Configure error handling
-    FlutterError.onError = (FlutterErrorDetails details) {
-      talker.handle(details.exception, details.stack);
-    };
+      // Configure error handling
+      FlutterError.onError = (FlutterErrorDetails details) {
+        talker.handle(details.exception, details.stack);
+      };
 
-    PlatformDispatcher.instance.onError = (error, stack) {
-      talker.handle(error, stack);
-      return true;
-    };
+      PlatformDispatcher.instance.onError = (error, stack) {
+        talker.handle(error, stack);
+        return true;
+      };
 
-    runApp(
-      ProviderScope(
-        observers: [
-          TalkerRiverpodObserver(
-            talker: talker,
-            settings: const TalkerRiverpodLoggerSettings(
-              enabled: true,
-              printProviderAdded: false,
-              printProviderUpdated: false,
-              printProviderDisposed: false,
-              printProviderFailed: true,
-              printStateFullData: false,
+      runApp(
+        ProviderScope(
+          observers: [
+            TalkerRiverpodObserver(
+              talker: talker,
+              settings: const TalkerRiverpodLoggerSettings(
+                enabled: true,
+                printProviderAdded: false,
+                printProviderUpdated: false,
+                printProviderDisposed: false,
+                printProviderFailed: true,
+                printStateFullData: false,
+              ),
             ),
-          ),
-        ],
-        child: const FFTCGCompanionApp(),
-      ),
-    );
+          ],
+          child: const FFTCGCompanionApp(),
+        ),
+      );
 
-    // Remove the native splash screen after the app is initialized
-    FlutterNativeSplash.remove();
+      // Remove the native splash screen after the app is initialized
+      FlutterNativeSplash.remove();
 
-    // Dispose the temporary container after app is running
-    _container.dispose();
+      // Dispose the temporary container after app is running
+      _container.dispose();
+    } catch (e, stack) {
+      talker.error('Error during app initialization', e, stack);
+    }
   }, (error, stackTrace) {
     talker.handle(error, stackTrace);
   });

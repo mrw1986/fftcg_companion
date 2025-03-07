@@ -25,6 +25,12 @@
    - Cache-first strategy for improved performance
    - Error handling and retry mechanisms
 
+5. **Authentication**
+   - Firebase Authentication integration
+   - Support for Google Sign-In, Email/Password, and Anonymous authentication
+   - Account linking for anonymous to permanent account conversion
+   - Authentication state management with Riverpod
+
 ### Feature Modules
 
 1. **Cards Feature**
@@ -52,6 +58,10 @@
 
 5. **Profile Feature**
    - User preferences and settings
+   - User authentication and account management
+   - Login, registration, and password reset
+   - Anonymous authentication with upgrade path
+   - Google Sign-In integration
    - Profile management
    - Application settings
 
@@ -84,7 +94,8 @@
 
 1. **Firebase/Firestore**
    - Used for card database
-   - Authentication (if implemented)
+   - Firebase Authentication for user management
+   - Google Sign-In integration
    - Analytics and crash reporting
 
 2. **Image Handling**
@@ -100,7 +111,17 @@
 
 ## Recent Significant Changes
 
-1. **UI Improvements**
+1. **Authentication Implementation**
+   - Added Firebase Authentication integration with Google Sign-In, Email/Password, and Anonymous authentication
+   - Created authentication service and Riverpod providers for state management
+   - Implemented login, registration, and account management UI
+   - Added password reset functionality
+   - Implemented anonymous to permanent account conversion
+   - Updated Profile page to show different options based on authentication state
+   - Added account management features
+   - Integrated authentication state with the app's navigation system
+
+2. **UI Improvements**
    - Implemented swipe navigation in card details page with intuitive controls
    - Added navigation buttons on sides of card image for easy browsing
    - Implemented PageView for smooth transitions between cards
@@ -124,7 +145,7 @@
    - Replaced custom splash screen with properly configured native splash screen
    - Fixed Android 12+ splash screen to show the full logo with "COMPANION" text
 
-2. **Performance Optimizations**
+3. **Performance Optimizations**
    - Improved image caching
    - Reduced unnecessary rebuilds
    - Optimized search functionality
@@ -132,7 +153,7 @@
    - Added memory cache layer to reduce Hive access
    - Implemented resilient storage operations with fallback mechanisms
 
-3. **Bug Fixes**
+4. **Bug Fixes**
    - Fixed card description text styling issues
    - Resolved card corner rounding problems in dark mode
    - Improved error handling for image loading

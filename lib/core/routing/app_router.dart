@@ -9,6 +9,10 @@ import '../../features/cards/presentation/pages/cards_page.dart';
 import '../../features/cards/presentation/pages/card_details_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/pages/theme_settings_page.dart';
+import '../../features/profile/presentation/pages/login_page.dart';
+import '../../features/profile/presentation/pages/register_page.dart';
+import '../../features/profile/presentation/pages/reset_password_page.dart';
+import '../../features/profile/presentation/pages/account_page.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -81,6 +85,34 @@ final routerProvider = Provider<GoRouter>((ref) {
                     textColor: Colors.white,
                     cardColor: Color(0xFF1E1E1E),
                   ),
+                ),
+              ),
+              GoRoute(
+                path: 'login',
+                pageBuilder: (context, state) => MaterialPage(
+                  key: state.pageKey,
+                  child: const LoginPage(),
+                ),
+              ),
+              GoRoute(
+                path: 'register',
+                pageBuilder: (context, state) => MaterialPage(
+                  key: state.pageKey,
+                  child: const RegisterPage(),
+                ),
+              ),
+              GoRoute(
+                path: 'reset-password',
+                pageBuilder: (context, state) => MaterialPage(
+                  key: state.pageKey,
+                  child: const ResetPasswordPage(),
+                ),
+              ),
+              GoRoute(
+                path: 'account',
+                pageBuilder: (context, state) => MaterialPage(
+                  key: state.pageKey,
+                  child: const AccountPage(),
                 ),
               ),
             ],

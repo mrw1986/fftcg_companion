@@ -2,135 +2,134 @@
 
 ## Objective
 
-Implement swipe navigation in card details page
+Implement Firebase Authentication in the FFTCG Companion app with automatic anonymous authentication
 
 ## Context
 
-The card details page needed enhancement to allow users to navigate between cards without returning to the card list. This would improve the user experience by making it easier to browse through cards, especially when viewing filtered or search results.
+The app needed user authentication to maintain user settings, collections, decks, and other user-specific data across devices. We implemented Firebase Authentication with three authentication methods:
 
-The implementation needed to:
+1. Google Sign-In
+2. Email/Password authentication
+3. Anonymous authentication (automatic)
 
-1. Allow swiping between cards in the card details view
-2. Respect the current filtered card list (including search results and applied filters)
-3. Provide intuitive navigation controls
-4. Maintain the existing card details functionality
-5. Work in both portrait and landscape orientations
+This implementation allows users to:
+
+- Create accounts with email/password or Google Sign-In
+- Use the app anonymously without explicitly choosing to do so (automatic)
+- Upgrade from anonymous to permanent accounts without losing data
+- Manage their account settings
+- Sign in across multiple devices with the same account
 
 ## Implementation Plan
 
-### 1. Implement Swipe Navigation in Card Details Page
+### 1. Create Authentication Service
 
-Location: lib/features/cards/presentation/pages/card_details_page.dart
+Location: lib/core/services/auth_service.dart
 
-Current Issue:
+- Created a service class to handle all Firebase Authentication operations
+- Implemented methods for each authentication provider
+- Added user state management and persistence
+- Implemented error handling for authentication operations
+- Added methods to link anonymous accounts to permanent accounts
 
-- Users had to return to the card list to view different cards
-- No way to navigate between cards in the details view
-- Difficult to browse through filtered or search results
+### 2. Create Authentication Provider
 
-Solution:
+Location: lib/core/providers/auth_provider.dart
 
-1. Convert CardDetailsPage to a ConsumerStatefulWidget:
-   - Changed from StatelessWidget to ConsumerStatefulWidget to manage state
-   - Added state variables to track current card, index, and card list
-   - Implemented PageController for handling swipe navigation
+- Created Riverpod providers for authentication state
+- Implemented AuthState class to represent different authentication states
+- Added methods to expose authentication functionality to the UI
 
-2. Fetch and maintain filtered card list:
-   - Used filteredSearchNotifierProvider to get the current filtered card list
-   - Found the index of the current card in the list
-   - Initialized PageController to the current index
+### 3. Implement Automatic Anonymous Authentication
 
-3. Implemented PageView for swiping:
-   - Added PageView.builder to allow horizontal swiping between cards
-   - Updated state when page changes to track current card and index
-   - Maintained existing layout structure within PageView
+Location: lib/core/providers/auto_auth_provider.dart
 
-4. Added navigation controls:
-   - Created _buildNavigationOverlay method for navigation buttons
-   - Positioned previous/next buttons on the sides of the card image
-   - Made buttons semi-transparent to not obstruct the card image
-   - Only showed previous button when not on the first card
-   - Only showed next button when not on the last card
+- Created a provider that automatically signs in anonymously if the user is not already signed in
+- Integrated the auto-auth provider with the app initialization
+- Removed explicit "Continue without an account" buttons from the UI
 
-5. Updated layouts to include navigation overlay:
-   - Modified _buildWideLayout to include navigation overlay
-   - Ensured navigation controls work in both portrait and landscape orientations
+### 4. Create Authentication UI
 
-Files Modified:
+- Created login page: lib/features/profile/presentation/pages/login_page.dart
+- Created registration page: lib/features/profile/presentation/pages/register_page.dart
+- Created password reset page: lib/features/profile/presentation/pages/reset_password_page.dart
+- Created account management page: lib/features/profile/presentation/pages/account_page.dart
+- Updated profile page to show different options based on authentication state
 
-- lib/features/cards/presentation/pages/card_details_page.dart
-- lib/core/routing/app_router.dart (updated to use new constructor)
+### 5. Update Router
 
-Impact:
+Location: lib/core/routing/app_router.dart
 
-- Users can now swipe left/right to navigate between cards
-- Navigation respects the current filtered card list, including search results and applied filters
-- Intuitive navigation controls on the sides of the card image
-- Smooth transitions between cards with animations
-- Improved user experience for browsing through cards
-- Seamless integration between filtering, searching, and sorting
+- Added routes for new authentication pages
+- Updated imports to include new pages
+
+### 6. Update Main.dart
+
+Location: lib/main.dart
+
+- Added Firebase Authentication import
+- Ensured Firebase is properly initialized
+
+### 7. Fix Account Linking Issues
+
+- Modified login flow to check if the user is anonymous before signing in
+- If the user is anonymous, link the new credentials to the anonymous account instead of creating a new account
+- This ensures that user data from anonymous sessions is preserved when upgrading to a permanent account
+
+## Files Modified
+
+1. lib/core/services/auth_service.dart (new)
+2. lib/core/providers/auth_provider.dart (new)
+3. lib/core/providers/auto_auth_provider.dart (new)
+4. lib/features/profile/presentation/pages/login_page.dart (new)
+5. lib/features/profile/presentation/pages/register_page.dart (new)
+6. lib/features/profile/presentation/pages/reset_password_page.dart (new)
+7. lib/features/profile/presentation/pages/account_page.dart (new)
+8. lib/features/profile/presentation/pages/profile_page.dart (updated)
+9. lib/core/routing/app_router.dart (updated)
+10. lib/main.dart (updated)
+11. lib/app/app.dart (updated)
+
+## Impact
+
+- Users are automatically signed in anonymously when they first open the app
+- Users can create accounts and sign in using multiple authentication methods
+- Anonymous users can upgrade to permanent accounts without losing their data
+- User data can be synchronized across devices
+- The Profile page shows different options based on authentication state
+- Account management features are now available
 
 ## Current Status
 
-- Swipe navigation has been successfully implemented in the card details page
-- Users can now navigate between cards without returning to the card list
-- Navigation controls are intuitive and visually appealing
-- The implementation respects the current filtered card list, including search results and applied filters
-- The feature works in both portrait and landscape orientations
-- The navigation buttons are positioned on the sides of the card image for easy access
-- Smooth transitions between cards enhance the user experience
+- Firebase Authentication has been implemented with Google Sign-In, Email/Password, and Anonymous authentication
+- Automatic anonymous authentication has been implemented
+- UI for authentication has been created
+- Router has been updated to include new authentication routes
+- Main.dart and app.dart have been updated to initialize Firebase Authentication and auto-auth
+- Account linking has been fixed to preserve user data when upgrading from anonymous to permanent accounts
 
 ## Testing Strategy
 
-1. Swipe Navigation Test
-   - Test swiping left and right to navigate between cards
-   - Verify that the correct card is displayed after swiping
-   - Check that the page controller updates the current index correctly
-   - Test edge cases (first card, last card)
-   - Verify that swiping respects the current filtered card list
+1. Authentication Flow Test
+   - Test each authentication provider (Google, Email/Password)
+   - Verify that automatic anonymous authentication works
+   - Verify user state persistence
+   - Test upgrading from anonymous to permanent accounts
 
-2. Navigation Controls Test
-   - Verify that previous/next buttons appear in the correct positions
-   - Check that previous button is hidden on the first card
-   - Check that next button is hidden on the last card
-   - Test clicking the navigation buttons to move between cards
-   - Verify smooth transitions when using the buttons
+2. UI Test
+   - Verify that the Profile page shows different options based on authentication state
+   - Test login, registration, and password reset forms
+   - Verify form validation works correctly
 
-3. Layout Compatibility Test
-   - Test in portrait orientation
-   - Test in landscape orientation
-   - Verify that navigation controls are properly positioned in both orientations
-   - Check that the card image and details are displayed correctly
-
-4. Integration Test
-   - Apply filters and verify that swiping navigates through filtered cards
-   - Search for cards and verify that swiping navigates through search results
-   - Sort cards and verify that swiping respects the sort order
-   - Verify that all operations work together seamlessly
-
-## Success Criteria
-
-- Users can swipe left/right to navigate between cards
-- Navigation buttons are properly positioned and visible
-- Previous button is hidden on the first card
-- Next button is hidden on the last card
-- Swiping respects the current filtered card list
-- Navigation works in both portrait and landscape orientations
-- Transitions between cards are smooth and animated
-- The feature enhances the overall user experience
+3. Error Handling Test
+   - Test error handling for invalid credentials
+   - Test error handling for network issues
+   - Verify user feedback for errors
 
 ## Next Steps
 
-1. Improve image loading performance
-   - Optimize image caching for faster loading
-   - Reduce animation overhead for smoother transitions
-   - Implement progressive image loading techniques
-
-2. Enhance error handling for image loading
-   - Provide better fallback mechanisms
-   - Improve error reporting and recovery
-   - Add retry functionality for failed image loads
-
-3. Consider adding card index indicator
-   - Show current position in the filtered card list (e.g., "Card 5 of 20")
-   - Provide visual feedback about navigation progress
+1. Implement Firestore security rules to protect user data
+2. Update collection and deck features to associate data with user accounts
+3. Implement data migration when converting from anonymous to permanent accounts
+4. Add user profile customization options
+5. Implement email verification

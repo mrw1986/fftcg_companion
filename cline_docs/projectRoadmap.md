@@ -24,6 +24,12 @@
   - [x] Efficient provider initialization
   - [x] Consistent loading indicators
   - [x] Error handling and recovery
+- [x] User authentication
+  - [x] Google Sign-In integration
+  - [x] Email/Password authentication
+  - [x] Anonymous authentication
+  - [x] Account management
+  - [x] Profile settings
 - [ ] Collection tracking
 - [ ] Deck builder
 - [ ] Card scanner
@@ -124,6 +130,14 @@
   - Ensured navigation respects current filtered card list
   - Added smooth transitions between cards
   - Improved UI with semi-transparent navigation controls
+- Implemented Firebase Authentication:
+  - Created authentication service for Google Sign-In, Email/Password, and Anonymous authentication
+  - Implemented Riverpod providers for authentication state management
+  - Created login, registration, and account management UI
+  - Added password reset functionality
+  - Implemented anonymous to permanent account conversion
+  - Updated Profile page to show different options based on authentication state
+  - Added account management features
 
 ### In Progress
 
