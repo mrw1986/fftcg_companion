@@ -3,9 +3,11 @@ import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fftcg_companion/app/theme/contrast_extension.dart';
 
+/// Provides theme data for the application
 class AppTheme {
-  static final _visualDensity = VisualDensity.adaptivePlatformDensity;
+  static final _visualDensity = FlexColorScheme.comfortablePlatformDensity;
 
+  /// Default light theme
   static ThemeData get light {
     return FlexThemeData.light(
       scheme: FlexScheme.deepPurple,
@@ -18,7 +20,20 @@ class AppTheme {
         useM2StyleDividerInM3: true,
         alignedDropdown: true,
         useInputDecoratorThemeInDialogs: true,
+        // Ensure buttons have good contrast
+        textButtonSchemeColor: SchemeColor.primary,
+        elevatedButtonSchemeColor: SchemeColor.primary,
+        outlinedButtonSchemeColor: SchemeColor.primary,
+        toggleButtonsSchemeColor: SchemeColor.primary,
+        inputDecoratorSchemeColor: SchemeColor.primary,
+        fabSchemeColor: SchemeColor.primary,
       ),
+      keyColors: FlexKeyColors(
+        useSecondary: true,
+        useTertiary: true,
+        keepPrimary: true,
+      ),
+      tones: FlexTones.material(Brightness.light),
       visualDensity: _visualDensity,
       useMaterial3: true,
       swapLegacyOnMaterial3: true,
@@ -26,6 +41,7 @@ class AppTheme {
     );
   }
 
+  /// Default dark theme
   static ThemeData get dark {
     return FlexThemeData.dark(
       scheme: FlexScheme.deepPurple,
@@ -37,7 +53,20 @@ class AppTheme {
         useM2StyleDividerInM3: true,
         alignedDropdown: true,
         useInputDecoratorThemeInDialogs: true,
+        // Ensure buttons have good contrast
+        textButtonSchemeColor: SchemeColor.primary,
+        elevatedButtonSchemeColor: SchemeColor.primary,
+        outlinedButtonSchemeColor: SchemeColor.primary,
+        toggleButtonsSchemeColor: SchemeColor.primary,
+        inputDecoratorSchemeColor: SchemeColor.primary,
+        fabSchemeColor: SchemeColor.primary,
       ),
+      keyColors: FlexKeyColors(
+        useSecondary: true,
+        useTertiary: true,
+        keepPrimary: true,
+      ),
+      tones: FlexTones.material(Brightness.dark),
       visualDensity: _visualDensity,
       useMaterial3: true,
       swapLegacyOnMaterial3: true,
@@ -45,18 +74,14 @@ class AppTheme {
     );
   }
 
+  /// Light theme with custom primary color
   static ThemeData lightCustomColor(Color color) {
-    // Ensure the color has appropriate contrast for light mode
-    final luminance = color.computeLuminance();
-    final safeColor = luminance > 0.9
-        ? HSLColor.fromColor(color).withLightness(0.7).toColor()
-        : color;
-
-    // Create a color scheme with appropriate contrast
+    // Create a FlexSchemeColor from the primary color
+    final schemeColor = _createSchemeColor(color, Brightness.light);
 
     // Create the base theme
     final baseTheme = FlexThemeData.light(
-      colors: FlexSchemeColor.from(primary: safeColor),
+      colors: schemeColor,
       surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
       blendLevel: 7,
       subThemesData: const FlexSubThemesData(
@@ -78,7 +103,7 @@ class AppTheme {
         useTertiary: true,
         keepPrimary: true,
       ),
-      tones: FlexTones.jolly(Brightness.light),
+      tones: FlexTones.material(Brightness.light),
       visualDensity: _visualDensity,
       useMaterial3: true,
       swapLegacyOnMaterial3: true,
@@ -103,18 +128,14 @@ class AppTheme {
     );
   }
 
+  /// Dark theme with custom primary color
   static ThemeData darkCustomColor(Color color) {
-    // Ensure the color has appropriate contrast for dark mode
-    final luminance = color.computeLuminance();
-    final safeColor = luminance < 0.1
-        ? HSLColor.fromColor(color).withLightness(0.3).toColor()
-        : color;
-
-    // Create a color scheme with appropriate contrast
+    // Create a FlexSchemeColor from the primary color
+    final schemeColor = _createSchemeColor(color, Brightness.dark);
 
     // Create the base theme
     final baseTheme = FlexThemeData.dark(
-      colors: FlexSchemeColor.from(primary: safeColor),
+      colors: schemeColor,
       surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
       blendLevel: 13,
       subThemesData: const FlexSubThemesData(
@@ -135,7 +156,7 @@ class AppTheme {
         useTertiary: true,
         keepPrimary: true,
       ),
-      tones: FlexTones.jolly(Brightness.dark),
+      tones: FlexTones.material(Brightness.dark),
       visualDensity: _visualDensity,
       useMaterial3: true,
       swapLegacyOnMaterial3: true,
@@ -157,6 +178,32 @@ class AppTheme {
         displayColor: contrastExtension.onBackgroundWithContrast,
       ),
       extensions: [contrastExtension],
+    );
+  }
+
+  /// Creates a FlexSchemeColor from a primary color
+  static FlexSchemeColor _createSchemeColor(
+      Color color, Brightness brightness) {
+    // Ensure the color has appropriate contrast for the given brightness
+    Color safeColor = color;
+    final luminance = color.computeLuminance();
+
+    if (brightness == Brightness.light && luminance > 0.9) {
+      // If too light in light mode, adjust to a safer color
+      safeColor = HSLColor.fromColor(color)
+          .withLightness(0.7) // Reduce lightness to ensure readability
+          .toColor();
+    } else if (brightness == Brightness.dark && luminance < 0.1) {
+      // If too dark in dark mode, adjust to a safer color
+      safeColor = HSLColor.fromColor(color)
+          .withLightness(0.3) // Increase lightness to ensure readability
+          .toColor();
+    }
+
+    // Generate a complete scheme from the primary color
+    return FlexSchemeColor.from(
+      primary: safeColor,
+      brightness: brightness,
     );
   }
 }

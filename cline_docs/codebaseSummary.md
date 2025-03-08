@@ -13,6 +13,10 @@
    - Supports both light and dark modes
    - Custom theme extensions for consistent styling
    - Theme provider for dynamic theme switching
+   - Custom theme color selection with color picker
+   - Predefined color schemes from FlexColorScheme
+   - Contrast extension for ensuring text readability
+   - Persistent theme settings using Hive storage
 
 3. **Storage Layer**
    - Hive for local storage and caching with memory cache fallback
@@ -59,6 +63,7 @@
 5. **Profile Feature**
    - User preferences and settings
    - User authentication and account management
+   - Theme customization with color picker and mode selection
    - Login, registration, and password reset
    - Anonymous authentication with upgrade path
    - Google Sign-In integration
@@ -110,6 +115,16 @@
    - Animated transitions for search and filtering
 
 ## Recent Significant Changes
+
+1. **Theme System Enhancement**
+   - Added ThemeSettingsPage for customizing app appearance
+   - Implemented color picker for selecting custom theme colors
+   - Added predefined color schemes from FlexColorScheme
+   - Created contrast extension to ensure text readability
+   - Implemented theme mode selection (light, dark, system)
+   - Added persistent theme settings using Hive storage
+   - Updated router to include theme settings route
+   - Ensured colors have appropriate contrast in both light and dark modes
 
 1. **Authentication Implementation**
    - Added Firebase Authentication integration with Google Sign-In, Email/Password, and Anonymous authentication
@@ -203,6 +218,20 @@
    - Simplified loading indicator to show only a progress spinner
 
 ## Upcoming Development Focus
+
+1. **Collection Management Implementation**
+   - Implement collection tracking functionality
+   - Create UI for adding/removing cards from collection
+   - Add collection statistics
+   - Implement card condition and purchase info tracking
+   - Ensure proper integration with user authentication
+
+2. **Deck Builder Implementation**
+   - Create deck building interface
+   - Implement deck validation rules
+   - Add deck statistics and analysis
+   - Support different deck formats
+   - Enable deck sharing functionality
 
 1. **Performance Improvements**
    - Further optimize image loading

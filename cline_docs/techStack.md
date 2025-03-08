@@ -20,6 +20,19 @@
 ### UI/UX Components
 
 - flutter_native_splash for branded launch screen
+- flex_color_scheme for comprehensive theming
+  - Material 3 design support
+  - Predefined color schemes
+  - Custom color scheme generation
+  - Light and dark theme variants
+- flex_color_picker for theme color customization
+  - Color wheel selection
+  - Predefined color palettes
+  - Copy/paste color support
+  - Material design color selection
+- Custom theme extensions
+  - ContrastExtension for ensuring text readability
+  - Automatic contrast adjustment for accessibility
 - Shared loading indicators
 - Page-level loading states
 - Error handling components
@@ -44,14 +57,20 @@
   - Incremental sync support
   - Hash-based change detection
 - Firebase Storage for card images
-- Firebase Authentication (planned)
+- Firebase Authentication
+  - Google Sign-In integration
+  - Email/Password authentication
+  - Anonymous authentication
+  - Account linking
+  - Password reset functionality
 
 ### Local Storage
 
 - Hive for local caching
   - Card data caching
   - Search results caching
-  - User preferences
+  - User preferences and settings
+  - Theme settings persistence
   - Custom adapters for complex types
   - Version-based cache management
 
@@ -171,8 +190,17 @@
 ### Planned Additions
 
 - Camera integration for card scanning
+- Collection management
+  - Card tracking with quantities
+  - Card condition tracking
+  - Purchase information
+  - Collection statistics
+- Deck building
+  - Deck creation and editing
+  - Format validation
+  - Deck statistics
+  - Sharing capabilities
 - Price tracking APIs
-- User authentication
 - Cloud synchronization
 - Advanced text processing features
 

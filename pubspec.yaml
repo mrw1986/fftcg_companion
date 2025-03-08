@@ -35,7 +35,7 @@ dependencies:
   google_sign_in: ^6.2.2
 
   # UI Components
-  flex_color_scheme: ^8.1.0
+  flex_color_scheme: ^8.1.1
   flex_color_picker: ^3.7.0
   flutter_animate: ^4.5.2
   cached_network_image: ^3.4.1

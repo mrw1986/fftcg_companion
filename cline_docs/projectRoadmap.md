@@ -30,6 +30,12 @@
   - [x] Anonymous authentication
   - [x] Account management
   - [x] Profile settings
+- [x] Theme customization
+  - [x] Light/dark mode support
+  - [x] System theme integration
+  - [x] Custom theme color selection
+  - [x] Predefined color schemes
+  - [x] Contrast guarantees for accessibility
 - [ ] Collection tracking
 - [ ] Deck builder
 - [ ] Card scanner
@@ -138,6 +144,14 @@
   - Implemented anonymous to permanent account conversion
   - Updated Profile page to show different options based on authentication state
   - Added account management features
+- Implemented theme customization system:
+  - Created theme settings page with mode selection (Light, Dark, System)
+  - Added color picker for custom theme colors
+  - Implemented predefined color schemes from FlexColorScheme
+  - Created contrast extension to ensure text readability
+  - Added theme persistence using Hive storage
+  - Implemented safe color adjustments for better visibility
+  - Updated router to include theme settings route
 
 ### In Progress
 
