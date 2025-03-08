@@ -98,6 +98,18 @@ service cloud.firestore {
       allow update: if isOwner(resource.data.userId) && isValidDeck();
       allow delete: if isOwner(resource.data.userId);
     }
+    
+    // Filters Collection
+    match /filters/{document=**} {
+      allow read: if true;
+      allow write: if isCloudFunction() || isAuthorizedUser();
+    }
+    
+    // User Documents
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId);
+    }
 
     // User Settings
     match /users/{userId}/settings/{document=**} {

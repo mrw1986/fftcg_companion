@@ -52,22 +52,42 @@ class UserRepository {
   }
 
   /// Create a user from Firebase Auth user
-  Future<UserModel> createUserFromAuth(User authUser) async {
+  ///
+  /// [additionalData] Optional additional data to store with the user
+  Future<UserModel> createUserFromAuth(
+    User authUser, {
+    Map<String, dynamic>? additionalData,
+  }) async {
     // Check if user already exists
     final existingUser = await getUserById(authUser.uid);
     if (existingUser != null) {
-      // Update last login time
+      // Update last login time and any additional data
+      Map<String, dynamic> updatedSettings = {...existingUser.settings};
+
+      // Add device ID to settings if provided
+      if (additionalData != null) {
+        updatedSettings = {...updatedSettings, ...additionalData};
+      }
+
       final updatedUser = existingUser.copyWith(
         lastLogin: Timestamp.now(),
         displayName: authUser.displayName ?? existingUser.displayName,
         email: authUser.email ?? existingUser.email,
         photoURL: authUser.photoURL ?? existingUser.photoURL,
+        settings: updatedSettings,
       );
       await createOrUpdateUser(updatedUser);
       return updatedUser;
     }
 
     // Create new user
+    Map<String, dynamic> settings = {};
+
+    // Add device ID to settings if provided
+    if (additionalData != null) {
+      settings = {...settings, ...additionalData};
+    }
+
     final newUser = UserModel(
       id: authUser.uid,
       displayName: authUser.displayName,
@@ -75,6 +95,7 @@ class UserRepository {
       photoURL: authUser.photoURL,
       createdAt: Timestamp.now(),
       lastLogin: Timestamp.now(),
+      settings: settings,
     );
     await createOrUpdateUser(newUser);
     return newUser;

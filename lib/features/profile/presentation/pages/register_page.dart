@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fftcg_companion/app/theme/contrast_extension.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/shared/widgets/google_sign_in_button.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
+import 'package:fftcg_companion/shared/widgets/styled_button.dart';
+import 'package:fftcg_companion/shared/widgets/themed_logo.dart';
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
@@ -111,22 +114,39 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 24),
-                  Image.asset(
-                    'assets/images/logo_transparent.png',
-                    height: 150,
-                  ),
+                  const ThemedLogo(height: 150),
                   const SizedBox(height: 24),
                   if (isAnonymous)
                     Container(
                       padding: const EdgeInsets.all(16),
                       margin: const EdgeInsets.only(bottom: 24),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withAlpha(51), // 0.2 * 255 = 51
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Theme.of(context)
+                                  .extension<ContrastExtension>()
+                                  ?.primaryWithContrast ??
+                              Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withAlpha(128),
+                          width: 1,
+                        ),
                       ),
-                      child: const Text(
+                      child: Text(
                         'You\'re currently using the app without an account. Complete your registration to save your collection, decks, and settings.',
-                        style: TextStyle(fontSize: 16),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context)
+                                  .extension<ContrastExtension>()
+                                  ?.onSurfaceWithContrast ??
+                              Theme.of(context).colorScheme.onSurface,
+                        ),
                       ),
                     ),
                   if (_errorMessage != null)
@@ -140,7 +160,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       child: Text(
                         _errorMessage!,
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                          color: Theme.of(context)
+                                  .extension<ContrastExtension>()
+                                  ?.onSurfaceWithContrast ??
+                              Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
@@ -203,13 +227,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           },
                         ),
                         const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: _registerWithEmailAndPassword,
-                          style: ElevatedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(50),
-                          ),
-                          child: Text(
-                            isAnonymous ? 'Complete Registration' : 'Register',
+                        Center(
+                          child: StyledButton(
+                            onPressed: _registerWithEmailAndPassword,
+                            text: isAnonymous
+                                ? 'Complete Registration'
+                                : 'Register',
                           ),
                         ),
                       ],
@@ -217,9 +240,22 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   ),
                   if (!isAnonymous) ...[
                     const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () => context.go('/profile/login'),
-                      child: const Text('Already have an account? Login'),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        TextButton(
+                          onPressed: () => context.go('/profile/login'),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            foregroundColor: Theme.of(context)
+                                    .extension<ContrastExtension>()
+                                    ?.primaryWithContrast ??
+                                Theme.of(context).colorScheme.primary,
+                          ),
+                          child: const Text('Already have an account? Login'),
+                        ),
+                      ],
                     ),
                   ],
                   const SizedBox(height: 24),

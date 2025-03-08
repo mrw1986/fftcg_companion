@@ -1,5 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:fftcg_companion/core/providers/auto_auth_provider.dart';
+import 'package:fftcg_companion/core/services/anonymous_auth_persistence.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/profile/data/repositories/user_repository.dart';
 
 /// Service class for handling Firebase Authentication operations
@@ -7,6 +11,12 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final UserRepository _userRepository = UserRepository();
+  final AnonymousAuthPersistence _anonymousAuthPersistence =
+      AnonymousAuthPersistence();
+  final Ref? _ref;
+
+  /// Creates an AuthService
+  AuthService([this._ref]);
 
   /// Get the current authenticated user
   User? get currentUser => _auth.currentUser;
@@ -23,10 +33,49 @@ class AuthService {
   /// Sign in anonymously
   Future<UserCredential> signInAnonymously() async {
     try {
-      final credential = await _auth.signInAnonymously();
+      // Check if we have a saved anonymous user or device ID
+      final hasSavedUser =
+          await _anonymousAuthPersistence.hasSavedAnonymousUser();
 
-      // Create user in Firestore
-      await _userRepository.createUserFromAuth(credential.user!);
+      UserCredential credential;
+
+      if (hasSavedUser) {
+        // Get the device-specific anonymous ID
+        final anonymousId =
+            await _anonymousAuthPersistence.getSavedAnonymousUserId();
+
+        if (anonymousId != null && anonymousId.startsWith('anon_')) {
+          // This is a device-generated ID, not a Firebase UID
+          // We need to create a new anonymous user but will associate it with this device
+          talker.debug('Creating anonymous user with device-specific ID');
+          credential = await _auth.signInAnonymously();
+        } else {
+          // We have a saved Firebase anonymous user
+          talker.debug('Using existing anonymous user');
+          credential = await _auth.signInAnonymously();
+        }
+      } else {
+        // Create a new anonymous user
+        talker.debug('Creating new anonymous user');
+        credential = await _auth.signInAnonymously();
+      }
+
+      // Save the anonymous user credentials with device ID
+      await _anonymousAuthPersistence.saveAnonymousUser();
+
+      // Create user in Firestore with device ID for better tracking
+      final deviceId = await _anonymousAuthPersistence.getDeviceId();
+
+      // Add the device ID to the user's custom claims or metadata
+      // This helps track the same user across reinstalls
+      if (deviceId != null) {
+        await _userRepository.createUserFromAuth(
+          credential.user!,
+          additionalData: {'deviceId': deviceId},
+        );
+      } else {
+        await _userRepository.createUserFromAuth(credential.user!);
+      }
 
       return credential;
     } catch (e) {
@@ -158,8 +207,23 @@ class AuthService {
   /// Sign out
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
-      await _auth.signOut();
+      // Set the skip auto-auth flag to prevent creating a new anonymous user
+      if (_ref != null) {
+        _ref!.read(skipAutoAuthProvider.notifier).state = true;
+      }
+
+      // If the user is anonymous, just delete the user instead of signing out
+      // This prevents the auto-auth provider from creating a new anonymous user
+      if (isAnonymous) {
+        // Clear the saved anonymous user credentials
+        await _anonymousAuthPersistence.clearSavedAnonymousUser();
+
+        // Delete the anonymous user
+        await _auth.currentUser?.delete();
+      } else {
+        await _googleSignIn.signOut();
+        await _auth.signOut();
+      }
     } catch (e) {
       throw _handleAuthException(e);
     }

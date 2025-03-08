@@ -91,6 +91,8 @@ flutter:
     - assets/images/
     - assets/images/elements/
     - assets/images/description/
+    - assets/images/google_branding/
+    - assets/images/google_branding/signin-assets/
 
 flutter_launcher_icons:
   android: "ic_launcher"

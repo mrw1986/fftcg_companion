@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fftcg_companion/app/theme/contrast_extension.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/shared/widgets/google_sign_in_button.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
+import 'package:fftcg_companion/shared/widgets/styled_button.dart';
+import 'package:fftcg_companion/shared/widgets/themed_logo.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -107,10 +110,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 24),
-                  Image.asset(
-                    'assets/images/logo_transparent.png',
-                    height: 150,
-                  ),
+                  const ThemedLogo(height: 150),
                   const SizedBox(height: 24),
                   if (_errorMessage != null)
                     Container(
@@ -123,7 +123,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       child: Text(
                         _errorMessage!,
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                          color: Theme.of(context)
+                                  .extension<ContrastExtension>()
+                                  ?.onSurfaceWithContrast ??
+                              Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
@@ -168,24 +172,49 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           },
                         ),
                         const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: _signInWithEmailAndPassword,
-                          style: ElevatedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(50),
+                        Center(
+                          child: StyledButton(
+                            onPressed: _signInWithEmailAndPassword,
+                            text: 'Login',
                           ),
-                          child: const Text('Login'),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () => context.go('/profile/register'),
-                    child: const Text('Don\'t have an account? Register'),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () => context.go('/profile/register'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          foregroundColor: Theme.of(context)
+                                  .extension<ContrastExtension>()
+                                  ?.primaryWithContrast ??
+                              Theme.of(context).colorScheme.primary,
+                        ),
+                        child: const Text('Don\'t have an account? Register'),
+                      ),
+                    ],
                   ),
-                  TextButton(
-                    onPressed: () => context.go('/profile/reset-password'),
-                    child: const Text('Forgot password?'),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () => context.go('/profile/reset-password'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          foregroundColor: Theme.of(context)
+                                  .extension<ContrastExtension>()
+                                  ?.primaryWithContrast ??
+                              Theme.of(context).colorScheme.primary,
+                        ),
+                        child: const Text('Forgot password?'),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
                   const Divider(thickness: 1),
