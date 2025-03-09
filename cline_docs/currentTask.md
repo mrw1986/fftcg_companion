@@ -70,7 +70,7 @@ Location: lib/core/providers/auto_auth_provider.dart
 - Created account management page: lib/features/profile/presentation/pages/account_page.dart
 - Updated profile page to show different options based on authentication state
 
-### 5. Update Router
+### 5. Update Authentication Routes
 
 Location: lib/core/routing/app_router.dart
 
@@ -125,8 +125,9 @@ Location: lib/features/profile/presentation/pages/theme_settings_page.dart
 - Implemented color picker for custom theme colors
 - Added predefined color schemes from FlexColorScheme
 - Ensured colors have appropriate contrast in both light and dark modes
+- Fixed null check error when accessing FlexColor.schemes by adding null safety check and fallback
 
-### 5. Update Router
+### 5. Update Theme Routes
 
 Location: lib/core/routing/app_router.dart
 
@@ -187,6 +188,9 @@ Location: lib/core/routing/app_router.dart
 ## Theme Customization Status
 
 - Theme customization has been implemented with light, dark, and system modes
+- Fixed null check error in ThemeSettingsPage when accessing FlexColor.schemes
+  - Added null safety check when accessing predefined color schemes
+  - Provided fallback to Material scheme when a scheme is not available
 - Custom color selection has been implemented with a color picker
 - Predefined color schemes have been added
 - Theme settings are persisted using Hive storage

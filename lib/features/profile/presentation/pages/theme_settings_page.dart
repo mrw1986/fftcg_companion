@@ -127,8 +127,10 @@ class ThemeSettingsPage extends ConsumerWidget {
                     itemBuilder: (context, index) {
                       final scheme = FlexScheme.values[index];
                       final schemeColors = brightness == Brightness.light
-                          ? FlexColor.schemes[scheme]!.light
-                          : FlexColor.schemes[scheme]!.dark;
+                          ? FlexColor.schemes[scheme]?.light ??
+                              FlexColor.schemes[FlexScheme.material]!.light
+                          : FlexColor.schemes[scheme]?.dark ??
+                              FlexColor.schemes[FlexScheme.material]!.dark;
 
                       return InkWell(
                         onTap: () {

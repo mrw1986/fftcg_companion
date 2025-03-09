@@ -77,6 +77,7 @@
    - Cached locally using Hive
    - Displayed in grid/list views
    - Detailed view shows comprehensive card information
+
 2. **Search Flow**
    - User activates search with animated transition
    - Search query is entered in expanding search field
@@ -86,7 +87,6 @@
    - Search results can be sorted using any sort criteria
    - All operations are performed client-side for better performance
    - Cards remain visible during search operations
-   - Search history is maintained
    - Search history is maintained
 
 3. **Collection Management Flow**
@@ -126,7 +126,7 @@
    - Updated router to include theme settings route
    - Ensured colors have appropriate contrast in both light and dark modes
 
-1. **Authentication Implementation**
+2. **Authentication Implementation**
    - Added Firebase Authentication integration with Google Sign-In, Email/Password, and Anonymous authentication
    - Created authentication service and Riverpod providers for state management
    - Implemented login, registration, and account management UI
@@ -136,7 +136,7 @@
    - Added account management features
    - Integrated authentication state with the app's navigation system
 
-2. **UI Improvements**
+3. **UI Improvements**
    - Implemented swipe navigation in card details page with intuitive controls
    - Added navigation buttons on sides of card image for easy browsing
    - Implemented PageView for smooth transitions between cards
@@ -160,7 +160,7 @@
    - Replaced custom splash screen with properly configured native splash screen
    - Fixed Android 12+ splash screen to show the full logo with "COMPANION" text
 
-3. **Performance Optimizations**
+4. **Performance Optimizations**
    - Improved image caching
    - Reduced unnecessary rebuilds
    - Optimized search functionality
@@ -168,9 +168,12 @@
    - Added memory cache layer to reduce Hive access
    - Implemented resilient storage operations with fallback mechanisms
 
-4. **Bug Fixes**
+5. **Bug Fixes**
    - Fixed card description text styling issues
    - Resolved card corner rounding problems in dark mode
+   - Fixed null check error in ThemeSettingsPage when accessing FlexColor.schemes
+     - Added null safety check when accessing predefined color schemes
+     - Provided fallback to Material scheme when a scheme is not available
    - Improved error handling for image loading
    - Fixed search visibility issues
    - Resolved Hive box type mismatch errors
@@ -233,19 +236,19 @@
    - Support different deck formats
    - Enable deck sharing functionality
 
-1. **Performance Improvements**
+3. **Performance Improvements**
    - Further optimize image loading
    - Reduce animation overhead
    - Implement progressive image loading techniques
    - Improve overall app responsiveness
 
-2. **Error Handling**
+4. **Error Handling**
    - Enhance error reporting
    - Improve recovery mechanisms
    - Add retry functionality for failed image loads
    - Better user feedback for errors
 
-3. **Additional UI Enhancements**
+5. **Additional UI Enhancements**
    - Refine animation timings for optimal user experience
    - Implement additional micro-interactions
    - Improve accessibility features
