@@ -168,51 +168,13 @@ class _CardsPageState extends ConsumerState<CardsPage>
             isSearching: _isSearching,
             onSearchToggle: _toggleSearch,
             onFilterTap: _showFilterDialog,
+            onSortTap: _showSortBottomSheet,
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.read(cardsNotifierProvider.notifier).refresh(),
         child: cardContentWidget,
-      ),
-      floatingActionButton: Consumer(
-        builder: (context, ref, child) {
-          final cardsState = ref.watch(cardsNotifierProvider);
-          final filteredSearchState = ref.watch(filteredSearchProvider);
-          final colorScheme = Theme.of(context).colorScheme;
-          final isLoading =
-              cardsState.isLoading || filteredSearchState.isLoading;
-
-          return Stack(
-            alignment: Alignment.center,
-            children: [
-              FloatingActionButton.extended(
-                onPressed: isLoading ? null : _showSortBottomSheet,
-                icon: const Icon(Icons.sort),
-                label: const Text('Sort'),
-                tooltip: isLoading ? 'Loading...' : 'Sort cards',
-                elevation: isLoading ? 0 : 4,
-                backgroundColor: isLoading
-                    ? colorScheme.surfaceContainerHighest
-                    : colorScheme.primaryContainer,
-                foregroundColor: isLoading
-                    ? colorScheme.onSurfaceVariant
-                    : colorScheme.onPrimaryContainer,
-              ),
-              if (isLoading)
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      colorScheme.primary,
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
       ),
     );
   }

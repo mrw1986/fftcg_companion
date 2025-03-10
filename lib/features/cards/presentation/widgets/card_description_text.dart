@@ -205,8 +205,52 @@ class CardDescriptionText extends StatelessWidget {
       }
     }
 
+    // Helper function to add dull icon
+    void addDullIcon() {
+      spans.add(WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Container(
+          width: _iconSize,
+          height: _iconSize,
+          margin: EdgeInsets.symmetric(
+            horizontal: _iconMarginH,
+            vertical: _iconMarginV,
+          ),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Theme.of(context).colorScheme.onSurface,
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(_roundedSquareBorderRadius),
+          ),
+          child: ColorFiltered(
+            colorFilter: ColorFilter.mode(
+              Theme.of(context).colorScheme.onSurface,
+              BlendMode.srcIn,
+            ),
+            child: Image.asset(
+              'assets/images/description/dull.png',
+              width: _iconSize,
+              height: _iconSize,
+            ),
+          ),
+        ),
+      ));
+      spans.add(WidgetSpan(
+        child: SizedBox(width: _iconSpacing),
+      ));
+    }
+
     for (int i = 0; i < text.length; i++) {
       final char = text[i];
+
+      // Check for "T:" pattern which should be replaced with dull icon
+      if (i < text.length - 1 && text.substring(i, i + 2) == "T:") {
+        addCurrentText();
+        addDullIcon();
+        i++; // Skip the ":" character
+        continue;
+      }
 
       if (char == '[') {
         addCurrentText();
@@ -271,38 +315,7 @@ class CardDescriptionText extends StatelessWidget {
         }
         // Handle dull icon
         else if (content == 'Dull') {
-          spans.add(WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Container(
-              width: _iconSize,
-              height: _iconSize,
-              margin: EdgeInsets.symmetric(
-                horizontal: _iconMarginH,
-                vertical: _iconMarginV,
-              ),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  width: 1,
-                ),
-                borderRadius: BorderRadius.circular(_roundedSquareBorderRadius),
-              ),
-              child: ColorFiltered(
-                colorFilter: ColorFilter.mode(
-                  Theme.of(context).colorScheme.onSurface,
-                  BlendMode.srcIn,
-                ),
-                child: Image.asset(
-                  'assets/images/description/dull.png',
-                  width: _iconSize,
-                  height: _iconSize,
-                ),
-              ),
-            ),
-          ));
-          spans.add(WidgetSpan(
-            child: SizedBox(width: _iconSpacing),
-          ));
+          addDullIcon();
         }
         // Handle CP cost ([1], [2], [X], etc.)
         else if (RegExp(r'^\d+$').hasMatch(content) || content == 'X') {

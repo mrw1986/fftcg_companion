@@ -20,7 +20,8 @@ class CollectionStatsCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.fromLTRB(
+            16.0, 16.0, 16.0, 8.0), // Reduced bottom padding
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

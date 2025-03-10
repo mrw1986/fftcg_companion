@@ -6,7 +6,8 @@ import '../../domain/providers/collection_providers.dart';
 import '../../domain/providers/view_preferences_provider.dart';
 import '../widgets/collection_content.dart';
 import '../widgets/collection_stats_card.dart';
-import '../widgets/collection_filter_bar.dart';
+import '../widgets/collection_sort_bottom_sheet.dart';
+import '../widgets/collection_filter_dialog.dart';
 
 /// Main page for displaying the user's collection
 class CollectionPage extends ConsumerStatefulWidget {
@@ -45,6 +46,9 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     final searchedCollection = ref.watch(searchedCollectionProvider);
     final statsAsync = ref.watch(collectionStatsProvider);
     final viewPrefs = ref.watch(collectionViewPreferencesProvider);
+    final currentSize = viewPrefs.type == ViewType.grid
+        ? viewPrefs.gridSize
+        : viewPrefs.listSize;
 
     return Scaffold(
       appBar: AppBar(
@@ -70,6 +74,34 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             onPressed: _toggleSearch,
           ),
 
+          // Filter button
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            tooltip: 'Filter',
+            onPressed: () => _showFilterDialog(context, ref),
+          ),
+
+          // Sort button
+          IconButton(
+            icon: const Icon(Icons.sort),
+            tooltip: 'Sort',
+            onPressed: () => _showSortOptions(context, ref),
+          ),
+
+          // Card labels toggle
+          IconButton(
+            icon: Icon(
+              viewPrefs.showLabels ? Icons.label : Icons.label_off,
+            ),
+            tooltip:
+                viewPrefs.showLabels ? 'Hide Card Labels' : 'Show Card Labels',
+            onPressed: () {
+              ref
+                  .read(collectionViewPreferencesProvider.notifier)
+                  .toggleLabels();
+            },
+          ),
+
           // View type toggle
           IconButton(
             icon: Icon(
@@ -89,7 +121,15 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
 
           // View size toggle
           IconButton(
-            icon: const Icon(Icons.format_size),
+            icon: Icon(
+              Icons.text_fields,
+              size: switch (currentSize) {
+                ViewSize.small => 18.0,
+                ViewSize.normal => 24.0,
+                ViewSize.large => 30.0,
+              },
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
             tooltip: 'Change Size',
             onPressed: () {
               if (viewPrefs.type == ViewType.grid) {
@@ -102,27 +142,10 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                     .cycleListSize();
               }
             },
-          ),
-
-          // Card labels toggle
-          IconButton(
-            icon: Icon(
-              viewPrefs.showLabels ? Icons.label : Icons.label_off,
+            constraints: const BoxConstraints(
+              minWidth: 48.0,
+              minHeight: 48.0,
             ),
-            tooltip:
-                viewPrefs.showLabels ? 'Hide Card Labels' : 'Show Card Labels',
-            onPressed: () {
-              ref
-                  .read(collectionViewPreferencesProvider.notifier)
-                  .toggleLabels();
-            },
-          ),
-
-          // Sort button
-          IconButton(
-            icon: const Icon(Icons.sort),
-            tooltip: 'Sort',
-            onPressed: () => _showSortOptions(context, ref),
           ),
         ],
       ),
@@ -135,7 +158,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             // Stats section
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.fromLTRB(
+                    16.0, 8.0, 16.0, 8.0), // Reduced top and bottom padding
                 child: statsAsync.when(
                   data: (stats) => CollectionStatsCard(stats: stats),
                   loading: () => const SizedBox(
@@ -147,22 +171,11 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
               ),
             ),
 
-            // Filter bar
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: CollectionFilterBar(
-                  onFilterChanged: (_) {
-                    // The filter provider is already updated by the filter bar
-                  },
-                ),
-              ),
-            ),
-
             // Collection content
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 16.0),
+              child: Transform.translate(
+                offset:
+                    const Offset(0, -8), // Negative offset to move content up
                 child: collectionAsync.when(
                   data: (_) => CollectionContent(
                     collection: searchedCollection,
@@ -194,126 +207,25 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     );
   }
 
-  void _showSortOptions(BuildContext context, WidgetRef ref) {
-    final currentSort = ref.read(collectionSortProvider);
-    final colorScheme = Theme.of(context).colorScheme;
+  void _showFilterDialog(BuildContext context, WidgetRef ref) {
+    showDialog<(dynamic, Map<String, dynamic>)>(
+      context: context,
+      builder: (context) => const CollectionFilterDialog(),
+    ).then((result) {
+      if (result != null) {
+        // The filter providers are already updated by the dialog
+        // We just need to ensure the UI reflects the changes
+      }
+    });
+  }
 
+  void _showSortOptions(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black54,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        child: TweenAnimationBuilder<double>(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-          tween: Tween(begin: 1.0, end: 0.0),
-          builder: (context, value, child) => Transform.translate(
-            offset: Offset(0, 200 * value),
-            child: child,
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  title: const Text('Sort By'),
-                  tileColor: colorScheme.surfaceContainerHighest,
-                ),
-                _buildSortOption(
-                  context,
-                  ref,
-                  'Last Modified',
-                  'lastModified',
-                  currentSort,
-                ),
-                _buildSortOption(
-                  context,
-                  ref,
-                  'Card Number',
-                  'cardId',
-                  currentSort,
-                ),
-                _buildSortOption(
-                  context,
-                  ref,
-                  'Regular Quantity',
-                  'regularQty',
-                  currentSort,
-                ),
-                _buildSortOption(
-                  context,
-                  ref,
-                  'Foil Quantity',
-                  'foilQty',
-                  currentSort,
-                ),
-                _buildSortOption(
-                  context,
-                  ref,
-                  'Total Quantity',
-                  'totalQty',
-                  currentSort,
-                ),
-                _buildSortOption(
-                  context,
-                  ref,
-                  'Price (Market)',
-                  'marketPrice',
-                  currentSort,
-                ),
-                _buildSortOption(
-                  context,
-                  ref,
-                  'Price (Low)',
-                  'lowPrice',
-                  currentSort,
-                ),
-                _buildSortOption(
-                  context,
-                  ref,
-                  'Price (Mid)',
-                  'midPrice',
-                  currentSort,
-                ),
-                _buildSortOption(
-                  context,
-                  ref,
-                  'Price (High)',
-                  'highPrice',
-                  currentSort,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSortOption(
-    BuildContext context,
-    WidgetRef ref,
-    String label,
-    String value,
-    String currentSort,
-  ) {
-    final isSelected = currentSort == value;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return ListTile(
-      title: Text(label),
-      trailing:
-          isSelected ? Icon(Icons.check, color: colorScheme.primary) : null,
-      tileColor: isSelected ? colorScheme.surfaceContainerLow : null,
-      onTap: () {
-        ref.read(collectionSortProvider.notifier).state = value;
-        Navigator.pop(context);
-      },
+      builder: (context) => const CollectionSortBottomSheet(),
     );
   }
 

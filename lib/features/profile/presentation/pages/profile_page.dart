@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fftcg_companion/app/theme/contrast_extension.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
-import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart';
 import 'package:fftcg_companion/features/profile/presentation/providers/splash_screen_provider.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 
@@ -12,7 +11,6 @@ class ProfilePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final viewPrefs = ref.watch(viewPreferencesProvider);
     final splashPrefs = ref.watch(splashScreenPreferencesProvider);
     final authState = ref.watch(authStateProvider);
 
@@ -49,15 +47,6 @@ class ProfilePage extends ConsumerWidget {
             title: const Text('Theme Settings'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go('/profile/theme'),
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.label_outlined),
-            title: const Text('Show Card Labels'),
-            subtitle: const Text('Display card names and numbers on grid view'),
-            value: viewPrefs.showLabels,
-            onChanged: (_) {
-              ref.read(viewPreferencesProvider.notifier).toggleLabels();
-            },
           ),
           SwitchListTile(
             secondary: const Icon(Icons.image_outlined),

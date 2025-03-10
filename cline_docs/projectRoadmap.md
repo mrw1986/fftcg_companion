@@ -48,6 +48,18 @@
   - [x] Card labels toggle
   - [x] Enhanced search functionality
   - [x] Improved UI consistency with Cards feature
+  - [x] Fixed layout issues with nested scrollable widgets
+- [x] Card details page improvements
+  - [x] Fixed "T:" styling in card descriptions
+  - [x] Improved layout with navigation buttons and FAB
+  - [x] Fixed white borders in full-screen image viewer
+- [x] UI consistency improvements
+  - [x] Replicated card label toggle in both Cards and Collection pages
+  - [x] Fixed Collection sorting query for all sort methods
+  - [x] Removed extra divider lines in filter dialogs
+  - [x] Updated View Size button with dynamic sizing
+  - [x] Adjusted padding for more compact layout
+  - [x] Fixed filter functionality in Collection page
 - [ ] Deck builder
 - [ ] Card scanner
 - [ ] Price tracking
@@ -202,6 +214,28 @@
   - Added price sorting options (market, low, mid, high)
   - Fixed search functionality in collection edit page
   - Ensured consistent UI between cards and collection features
+- Fixed Collection UI layout issues:
+  - Removed nested scrollable widgets in collection content
+  - Changed CollectionGrid to use a non-scrollable GridView with shrinkWrap and NeverScrollableScrollPhysics
+  - Updated CollectionList to use a non-scrollable ListView with shrinkWrap and NeverScrollableScrollPhysics
+  - Simplified CollectionContent to properly handle the view type without passing scrollController to child widgets
+  - Removed unused _scrollToTop method from CollectionPage
+  - Replaced deprecated withOpacity with withAlpha for better performance
+- Fixed Card Details Page UI issues:
+  - Fixed "T:" styling in card descriptions to show the dull.png image
+  - Improved layout with navigation buttons and FAB
+  - Fixed white borders in the full-screen image viewer using CornerMaskWidget
+  - Increased card image size for better visibility
+- Improved UI consistency between Cards and Collection pages:
+  - Replicated the card label toggle from the Collection page to the Card Database page with independent state for each
+  - Fixed the Collection sorting query to properly handle ascending/descending sorting
+  - Removed the extra divider lines between sections in both the Collection filter dialog and Card filter dialog
+  - Updated the View Size button in the Collection page to dynamically change its size based on the selected size
+  - Adjusted padding between UI elements for a more compact and visually appealing layout
+  - Reduced the space between the appbar and Collection Stats card
+  - Reduced the space between the Collection Stats card and card images using Transform.translate with negative offset
+  - Fixed the filter functionality in the Collection page to properly apply both collection-specific filters and card filters
+  - Improved the overall user experience with more consistent UI elements and behavior
 
 ### In Progress
 

@@ -45,6 +45,7 @@
    - Animated search interface
    - Integrated search, filter, and sort functionality
    - Action buttons for adding to collection, favorites, and wishlist
+   - Card label toggle for showing/hiding card names and numbers
 
 2. **Collection Feature**
    - User's card collection management
@@ -52,7 +53,7 @@
    - Add/remove cards from collection
    - Card condition tracking (NM, LP, MP, HP, DMG)
    - Purchase information tracking (price, date)
-   - Professional grading support (PSA, BGS, CGC)
+   - Professional grading support (PSA, BGS, and CGC)
    - Grid and list view options with customizable sizes
    - Filtering by card type (regular, foil, graded)
    - Sorting by various criteria (last modified, card ID, quantity)
@@ -136,7 +137,31 @@
 
 ## Recent Significant Changes
 
-1. **Collection UI Improvements**
+1. **UI Consistency Improvements**
+   - Replicated the card label toggle from the Collection page to the Card Database page with independent state for each
+   - Fixed the Collection sorting query to properly handle ascending/descending sorting
+   - Removed the extra divider lines between sections in both the Collection filter dialog and Card filter dialog
+   - Updated the View Size button in the Collection page to dynamically change its size based on the selected size
+   - Adjusted padding between UI elements for a more compact and visually appealing layout
+   - Reduced the space between the appbar and Collection Stats card
+   - Reduced the space between the Collection Stats card and card images using Transform.translate with negative offset
+   - Fixed the filter functionality in the Collection page to properly apply both collection-specific filters and card filters
+   - Improved the overall user experience with more consistent UI elements and behavior
+
+2. **Card Details Page UI Improvements**
+   - Fixed "T:" styling in card descriptions to show the dull.png image
+   - Improved layout with navigation buttons and FAB
+     - Moved navigation buttons outside the card image
+     - Implemented a FAB menu for "Add to Collection", "Favorite", and "Wishlist" actions
+     - Increased card image size (55% in normal layout, 85% in wide layout)
+   - Fixed white borders in the full-screen image viewer
+     - Implemented the CornerMaskWidget to handle white corners in card images
+     - Used a black background with proper border radius
+     - Maintained the ClipRRect for consistent corner rounding
+     - Used BoxFit.cover to ensure the image fills the entire container
+     - Preserved Hero animation for smooth transitions
+
+3. **Collection UI Improvements**
    - Updated collection grid to match cards grid implementation
    - Added card labels toggle in collection page
    - Improved collection card display with quantity indicators
@@ -148,7 +173,7 @@
    - Fixed search functionality in collection edit page
    - Ensured consistent UI between cards and collection features
 
-2. **Card Details Page Enhancement**
+4. **Card Details Page Enhancement**
    - Added action buttons below the card image
    - Implemented "Add to Collection" button that navigates to the Collection Edit page with the selected card
    - Added placeholder "Favorite" button with star icon and toggle functionality
@@ -156,7 +181,7 @@
    - Ensured buttons are visually consistent with the app's design language
    - Improved layout to accommodate the new action buttons
 
-3. **Collection Edit Page Enhancement**
+5. **Collection Edit Page Enhancement**
    - Added integrated card search functionality
    - Implemented search bar in the app bar when in search mode
    - Created search results list with card images and details
@@ -165,7 +190,7 @@
    - Ensured seamless integration with existing collection management features
    - Added support for direct navigation from Card Details page
 
-4. **Collection Feature Implementation**
+6. **Collection Feature Implementation**
    - Created collection data models with support for regular and foil cards
    - Added card condition tracking with standardized condition codes
    - Implemented purchase information tracking with price and date
@@ -182,7 +207,7 @@
    - Fixed nested scrollable widgets issue in collection content
    - Fixed layout issues by converting sliver widgets to regular widgets in collection grid and list
 
-5. **Theme System Enhancement**
+7. **Theme System Enhancement**
    - Added ThemeSettingsPage for customizing app appearance
    - Implemented color picker for selecting custom theme colors
    - Added predefined color schemes from FlexColorScheme
@@ -192,7 +217,7 @@
    - Updated router to include theme settings route
    - Ensured colors have appropriate contrast in both light and dark modes
 
-6. **Authentication Implementation**
+8. **Authentication Implementation**
    - Added Firebase Authentication integration with Google Sign-In, Email/Password, and Anonymous authentication
    - Created authentication service and Riverpod providers for state management
    - Implemented login, registration, and account management UI
@@ -202,7 +227,7 @@
    - Added account management features
    - Integrated authentication state with the app's navigation system
 
-7. **UI Improvements**
+9. **UI Improvements**
    - Implemented swipe navigation in card details page with intuitive controls
    - Added navigation buttons on sides of card image for easy browsing
    - Implemented PageView for smooth transitions between cards
@@ -226,32 +251,32 @@
    - Replaced custom splash screen with properly configured native splash screen
    - Fixed Android 12+ splash screen to show the full logo with "COMPANION" text
 
-8. **Performance Optimizations**
-   - Improved image caching
-   - Reduced unnecessary rebuilds
-   - Optimized search functionality
-   - Enhanced animation performance
-   - Added memory cache layer to reduce Hive access
-   - Implemented resilient storage operations with fallback mechanisms
-   - Replaced deprecated withOpacity with withAlpha for better performance
-   - Fixed nested scrollable widgets to prevent layout issues
-   - Improved scrolling performance by using NeverScrollableScrollPhysics for nested scrollable widgets
+10. **Performance Optimizations**
+    - Improved image caching
+    - Reduced unnecessary rebuilds
+    - Optimized search functionality
+    - Enhanced animation performance
+    - Added memory cache layer to reduce Hive access
+    - Implemented resilient storage operations with fallback mechanisms
+    - Replaced deprecated withOpacity with withAlpha for better performance
+    - Fixed nested scrollable widgets to prevent layout issues
+    - Improved scrolling performance by using NeverScrollableScrollPhysics for nested scrollable widgets
 
-9. **Bug Fixes**
-   - Fixed card description text styling issues
-   - Resolved card corner rounding problems in dark mode
-   - Fixed null check error in ThemeSettingsPage when accessing FlexColor.schemes
-     - Added null safety check when accessing predefined color schemes
-     - Provided fallback to Material scheme when a scheme is not available
-   - Improved error handling for image loading
-   - Fixed search visibility issues
-   - Resolved Hive box type mismatch errors
-   - Fixed non-card items sorting to the top when filtering by set
-   - Enhanced error recovery for storage operations
-   - Fixed search visibility issues
-   - Replaced deprecated withOpacity with withAlpha for better performance
-   - Fixed nested scrollable widgets in collection content to prevent "Vertical viewport was given unbounded height" errors
-   - Fixed "A RenderPadding expected a child of type RenderBox but received a child of type RenderSliverFillRemainingWithScrollable" error by converting sliver widgets to regular widgets
+11. **Bug Fixes**
+    - Fixed card description text styling issues
+    - Resolved card corner rounding problems in dark mode
+    - Fixed null check error in ThemeSettingsPage when accessing FlexColor.schemes
+      - Added null safety check when accessing predefined color schemes
+      - Provided fallback to Material scheme when a scheme is not available
+    - Improved error handling for image loading
+    - Fixed search visibility issues
+    - Resolved Hive box type mismatch errors
+    - Fixed non-card items sorting to the top when filtering by set
+    - Enhanced error recovery for storage operations
+    - Fixed search visibility issues
+    - Replaced deprecated withOpacity with withAlpha for better performance
+    - Fixed nested scrollable widgets in collection content to prevent "Vertical viewport was given unbounded height" errors
+    - Fixed "A RenderPadding expected a child of type RenderBox but received a child of type RenderSliverFillRemainingWithScrollable" error by converting sliver widgets to regular widgets
 
 ## User Feedback Integration
 
@@ -301,8 +326,11 @@
 
 5. **Card Details Page**
    - Users reported white corners on card images in dark mode
-   - Implemented fix using BoxDecoration with larger border radius
-   - Removed Hero animation to prevent transition issues
+   - Users reported inconsistent styling for "T:" in card descriptions
+   - Implemented fix using CornerMaskWidget to handle white corners
+   - Fixed "T:" styling to show the dull.png image
+   - Improved layout with navigation buttons and FAB
+   - Increased card image size for better visibility
 
 6. **Card Description Text**
    - Users reported inconsistent styling for special abilities
@@ -315,6 +343,14 @@
    - Updated native splash screen configuration to use appropriate images for each theme
    - Modified custom splash screen to properly detect system brightness
    - Simplified loading indicator to show only a progress spinner
+
+8. **UI Consistency**
+   - Users reported inconsistent UI between Cards and Collection pages
+   - Users wanted the same features available in both sections
+   - Replicated the card label toggle from the Collection page to the Card Database page
+   - Fixed the Collection sorting query to properly handle all sort methods
+   - Adjusted padding between UI elements for a more compact layout
+   - Improved the overall user experience with more consistent UI elements and behavior
 
 ## Upcoming Development Focus
 

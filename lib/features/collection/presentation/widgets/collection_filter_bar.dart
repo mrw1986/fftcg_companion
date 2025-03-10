@@ -28,31 +28,17 @@ class CollectionFilterBar extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.filter_list,
-                  color: colorScheme.primary,
-                  size: 20,
+            if (currentFilters.isNotEmpty)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    ref.read(collectionFilterProvider.notifier).state = {};
+                    onFilterChanged?.call({});
+                  },
+                  child: const Text('Clear All'),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'Filters',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const Spacer(),
-                if (currentFilters.isNotEmpty)
-                  TextButton(
-                    onPressed: () {
-                      ref.read(collectionFilterProvider.notifier).state = {};
-                      onFilterChanged?.call({});
-                    },
-                    child: const Text('Clear All'),
-                  ),
-              ],
-            ),
+              ),
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,

@@ -1,33 +1,17 @@
-// lib/features/cards/presentation/widgets/filter_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_options_provider.dart';
-import 'package:fftcg_companion/features/cards/presentation/providers/set_card_count_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_collection_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/set_card_count_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
+import '../../domain/providers/collection_providers.dart';
 
-/// A provider to prefetch filter options before showing the dialog
-/// This helps reduce the loading time when opening the filter dialog
-final prefetchFilterOptionsProvider = FutureProvider.autoDispose((ref) async {
-  // Start loading filter options
-  final options = await ref.watch(filterOptionsNotifierProvider.future);
-
-  // Prefetch a few set counts to warm up the cache
-  final allSetIds = options.set.toList();
-
-  // Only prefetch a few sets to avoid too many concurrent requests
-  for (final setId in allSetIds.take(10)) {
-    ref.read(filteredSetCardCountCacheProvider(setId).future).ignore();
-  }
-
-  talker.debug('Prefetched filter options and some set counts');
-  return options;
-});
-
-class FilterDialog extends ConsumerWidget {
-  const FilterDialog({super.key});
+/// Collection filter dialog that combines Cards filter options with Collection-specific filters
+class CollectionFilterDialog extends ConsumerWidget {
+  const CollectionFilterDialog({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -35,7 +19,8 @@ class FilterDialog extends ConsumerWidget {
     ref.watch(prefetchFilterOptionsProvider);
 
     final filterOptions = ref.watch(filterOptionsNotifierProvider);
-    final filters = ref.watch(filterProvider);
+    final cardsFilters = ref.watch(filterProvider);
+    final collectionFilters = ref.watch(collectionFilterProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final size = MediaQuery.of(context).size;
 
@@ -58,7 +43,7 @@ class FilterDialog extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Filter Cards',
+                'Filter Collection',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: colorScheme.onSurface,
                     ),
@@ -71,11 +56,19 @@ class FilterDialog extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Collection-specific filters
+                        _buildCollectionFiltersSection(
+                          context,
+                          ref,
+                          collectionFilters,
+                        ).animate().fadeIn(delay: 50.ms),
+
+                        // Card filters from the Cards page
                         _buildFilterSection(
                           context,
                           'Elements',
                           options.elements,
-                          filters.elements,
+                          cardsFilters.elements,
                           (element) => ref
                               .read(filterProvider.notifier)
                               .toggleElement(element),
@@ -84,7 +77,7 @@ class FilterDialog extends ConsumerWidget {
                           context,
                           'Types',
                           options.types,
-                          filters.types,
+                          cardsFilters.types,
                           (type) => ref
                               .read(filterProvider.notifier)
                               .toggleType(type),
@@ -93,11 +86,10 @@ class FilterDialog extends ConsumerWidget {
                           context,
                           'Rarities',
                           options.rarities,
-                          filters.rarities,
+                          cardsFilters.rarities,
                           (rarity) => ref
                               .read(filterProvider.notifier)
                               .toggleRarity(rarity),
-                          // No need for display names since we're using full names
                         ).animate().fadeIn(delay: 300.ms),
                         // Add Category filter section using Consumer for better reactivity
                         Consumer(
@@ -122,7 +114,7 @@ class FilterDialog extends ConsumerWidget {
                                   'Categories',
                                   collection.category
                                       .toSet(), // Use the values from the category document
-                                  filters
+                                  cardsFilters
                                       .categories, // Current selected categories
                                   (category) => ref
                                       .read(filterProvider.notifier)
@@ -146,7 +138,7 @@ class FilterDialog extends ConsumerWidget {
                         _buildGroupedSetsSection(
                           context,
                           options.set,
-                          filters.set,
+                          cardsFilters.set,
                           ref,
                           colorScheme,
                         ).animate().fadeIn(delay: 400.ms),
@@ -156,8 +148,8 @@ class FilterDialog extends ConsumerWidget {
                             'Cost',
                             options.costRange.$1.toDouble(),
                             options.costRange.$2.toDouble(),
-                            filters.minCost?.toDouble(),
-                            filters.maxCost?.toDouble(),
+                            cardsFilters.minCost?.toDouble(),
+                            cardsFilters.maxCost?.toDouble(),
                             (min, max) =>
                                 ref.read(filterProvider.notifier).setCostRange(
                                       min?.toInt(),
@@ -170,8 +162,8 @@ class FilterDialog extends ConsumerWidget {
                             'Power',
                             options.powerRange.$1.toDouble(),
                             options.powerRange.$2.toDouble(),
-                            filters.minPower?.toDouble(),
-                            filters.maxPower?.toDouble(),
+                            cardsFilters.minPower?.toDouble(),
+                            cardsFilters.maxPower?.toDouble(),
                             (min, max) =>
                                 ref.read(filterProvider.notifier).setPowerRange(
                                       min?.toInt(),
@@ -181,7 +173,7 @@ class FilterDialog extends ConsumerWidget {
                         _buildSwitchRow(
                           context,
                           'Show Sealed Products',
-                          filters.showSealedProducts,
+                          cardsFilters.showSealedProducts,
                           (_) => ref
                               .read(filterProvider.notifier)
                               .toggleShowSealedProducts(),
@@ -205,7 +197,10 @@ class FilterDialog extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: () => ref.read(filterProvider.notifier).reset(),
+                    onPressed: () {
+                      ref.read(filterProvider.notifier).reset();
+                      ref.read(collectionFilterProvider.notifier).state = {};
+                    },
                     child: Text('Reset',
                         style: TextStyle(color: colorScheme.primary)),
                   ),
@@ -215,7 +210,11 @@ class FilterDialog extends ConsumerWidget {
                         style: TextStyle(color: colorScheme.primary)),
                   ),
                   FilledButton(
-                    onPressed: () => Navigator.pop(context, filters),
+                    onPressed: () => Navigator.pop(
+                      context,
+                      (cardsFilters, collectionFilters),
+                      // Apply both filters when the Apply button is pressed
+                    ),
                     style: FilledButton.styleFrom(
                       backgroundColor: colorScheme.primary,
                       foregroundColor: colorScheme.onPrimary,
@@ -236,6 +235,175 @@ class FilterDialog extends ConsumerWidget {
     );
   }
 
+  Widget _buildCollectionFiltersSection(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> collectionFilters,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ExpansionTile(
+      title: Text(
+        'Collection Filters',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      initiallyExpanded: true,
+      collapsedIconColor: colorScheme.onSurface,
+      iconColor: colorScheme.primary,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildCollectionFilterChip(
+                    context,
+                    ref,
+                    'Regular',
+                    'type',
+                    'regular',
+                    Icons.copy,
+                    collectionFilters,
+                  ),
+                  _buildCollectionFilterChip(
+                    context,
+                    ref,
+                    'Foil',
+                    'type',
+                    'foil',
+                    Icons.star,
+                    collectionFilters,
+                  ),
+                  _buildCollectionFilterChip(
+                    context,
+                    ref,
+                    'Graded',
+                    'graded',
+                    true,
+                    Icons.verified,
+                    collectionFilters,
+                  ),
+                ],
+              ),
+              if (collectionFilters.containsKey('graded') &&
+                  collectionFilters['graded'] == true)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: _buildGradingCompanyDropdown(
+                    context,
+                    ref,
+                    collectionFilters,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCollectionFilterChip(
+    BuildContext context,
+    WidgetRef ref,
+    String label,
+    String filterKey,
+    dynamic filterValue,
+    IconData icon,
+    Map<String, dynamic> collectionFilters,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isSelected = collectionFilters[filterKey] == filterValue;
+
+    return FilterChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: isSelected
+                ? colorScheme.onPrimaryContainer
+                : colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 4),
+          Text(label),
+        ],
+      ),
+      selected: isSelected,
+      onSelected: (selected) {
+        final newFilters = Map<String, dynamic>.from(collectionFilters);
+        if (selected) {
+          newFilters[filterKey] = filterValue;
+        } else {
+          newFilters.remove(filterKey);
+        }
+        ref.read(collectionFilterProvider.notifier).state = newFilters;
+      },
+      backgroundColor: colorScheme.surface,
+      selectedColor: colorScheme.primaryContainer,
+      checkmarkColor: colorScheme.onPrimaryContainer,
+      showCheckmark: false,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isSelected
+              ? colorScheme.primaryContainer
+              : colorScheme.outlineVariant,
+          width: 1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGradingCompanyDropdown(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> collectionFilters,
+  ) {
+    return DropdownButtonFormField<String?>(
+      value: collectionFilters['gradingCompany'],
+      decoration: InputDecoration(
+        labelText: 'Grading Company',
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      items: const [
+        DropdownMenuItem<String?>(
+          value: null,
+          child: Text('Any Company'),
+        ),
+        DropdownMenuItem<String?>(
+          value: 'PSA',
+          child: Text('PSA'),
+        ),
+        DropdownMenuItem<String?>(
+          value: 'BGS',
+          child: Text('BGS'),
+        ),
+        DropdownMenuItem<String?>(
+          value: 'CGC',
+          child: Text('CGC'),
+        ),
+      ],
+      onChanged: (value) {
+        final newFilters = Map<String, dynamic>.from(collectionFilters);
+        if (value == null) {
+          newFilters.remove('gradingCompany');
+        } else {
+          newFilters['gradingCompany'] = value;
+        }
+        ref.read(collectionFilterProvider.notifier).state = newFilters;
+      },
+    );
+  }
+
+  // Reuse the filter section widgets from the Cards filter dialog
   Widget _buildFilterSection(
     BuildContext context,
     String title,
@@ -390,6 +558,7 @@ class FilterDialog extends ConsumerWidget {
               selected: selectedValues.contains(setId),
               onSelected: (_) =>
                   ref.read(filterProvider.notifier).toggleSet(setId),
+              // This applies the set filter
               backgroundColor: colorScheme.surfaceContainerHighest,
               selectedColor: colorScheme.primaryContainer,
               labelStyle: TextStyle(
@@ -525,83 +694,6 @@ class FilterDialog extends ConsumerWidget {
           },
         ),
       ],
-    );
-  }
-}
-
-/// A StatefulWidget to maintain the card count during set selection
-class SetCardCountDisplay extends StatefulWidget {
-  final String setId;
-  final AsyncValue<int> cardCount;
-  final ColorScheme colorScheme;
-
-  const SetCardCountDisplay({
-    super.key,
-    required this.setId,
-    required this.cardCount,
-    required this.colorScheme,
-  });
-
-  @override
-  State<SetCardCountDisplay> createState() => _SetCardCountDisplayState();
-}
-
-class _SetCardCountDisplayState extends State<SetCardCountDisplay> {
-  // Store the count once we have it
-  int? _cachedCount;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Initialize cached count if data is already available
-    if (widget.cardCount.hasValue) {
-      _cachedCount = widget.cardCount.value;
-    }
-  }
-
-  @override
-  void didUpdateWidget(SetCardCountDisplay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    // Update cached count when data is available
-    if (widget.cardCount.hasValue && !widget.cardCount.isLoading) {
-      _cachedCount = widget.cardCount.value;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // If we have a cached count, use it
-    if (_cachedCount != null) {
-      return Text(
-        '($_cachedCount)',
-        style: Theme.of(context).textTheme.bodySmall,
-      );
-    }
-
-    // Otherwise, show loading or error state
-    return widget.cardCount.when(
-      data: (count) {
-        // Store the count for future use
-        _cachedCount = count;
-        return Text(
-          '($count)',
-          style: Theme.of(context).textTheme.bodySmall,
-        );
-      },
-      loading: () => Text(
-        '(...)',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: widget.colorScheme.onSurfaceVariant.withAlpha(128),
-            ),
-      ),
-      error: (_, __) => Text(
-        '(!)',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: widget.colorScheme.error,
-            ),
-      ),
     );
   }
 }

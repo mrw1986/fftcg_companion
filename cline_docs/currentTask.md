@@ -20,6 +20,14 @@ Improve the Collection UI to match the Cards UI for consistency and enhance the 
 
 Fix layout issues in the Collection UI by resolving nested scrollable widgets problem
 
+## Current Objective 2 (Completed)
+
+Fix UI issues in the card details page and improve the full-screen image viewer
+
+## Current Objective 3 (Completed)
+
+Fix UI consistency issues between Cards and Collection pages and improve the overall user experience
+
 ## Theme Customization Context (Completed)
 
 The app needed a comprehensive theming system to provide a personalized user experience and ensure good readability in both light and dark modes. We implemented a theme customization system with the following features:
@@ -39,7 +47,7 @@ The app needed a comprehensive collection management system to allow users to tr
 3. Purchase information tracking with price and date
 4. Professional grading support for PSA, BGS, and CGC
 5. Collection statistics
-6. Grid and list view options with customizable sizes
+6. Grid and list views with customizable sizes
 7. Filtering by card type (regular, foil, graded)
 8. Sorting by various criteria (last modified, card ID, quantity)
 9. Search functionality within collection
@@ -78,6 +86,33 @@ The Collection UI had layout issues due to nested scrollable widgets, causing "V
 4. Simplified CollectionContent to properly handle the view type without passing scrollController to child widgets
 5. Removed unused _scrollToTop method from CollectionPage
 6. Replaced deprecated withOpacity with withAlpha for better performance
+
+## Card Details Page UI Fix Context (Completed)
+
+The Card Details page had UI issues with description text styling and white borders in the full-screen image viewer. We implemented the following fixes:
+
+1. Fixed "T:" styling in card descriptions to show the dull.png image
+2. Improved the layout with navigation buttons and FAB
+   - Moved navigation buttons outside the card image
+   - Implemented a FAB menu for "Add to Collection", "Favorite", and "Wishlist" actions
+   - Increased card image size (55% in normal layout, 85% in wide layout)
+3. Fixed white borders in the full-screen image viewer
+   - Implemented the CornerMaskWidget to handle white corners in card images
+   - Used a black background with proper border radius
+   - Maintained the ClipRRect for consistent corner rounding
+   - Used BoxFit.cover to ensure the image fills the entire container
+
+## UI Consistency Improvement Context (Completed)
+
+The app had several UI consistency issues between the Cards and Collection pages that needed to be addressed. We implemented the following improvements:
+
+1. Replicated the card label toggle from the Collection page to the Card Database page with independent state for each
+2. Fixed the Collection sorting query to properly handle ascending/descending sorting
+3. Removed the extra divider lines between sections in both the Collection filter dialog and Card filter dialog
+4. Updated the View Size button in the Collection page to dynamically change its size based on the selected size
+5. Adjusted padding between UI elements for a more compact and visually appealing layout
+6. Fixed the filter functionality in the Collection page to properly apply both collection-specific filters and card filters
+7. Improved the overall user experience with more consistent UI elements and behavior
 
 ## Theme Customization Implementation Plan (Completed)
 
@@ -207,6 +242,77 @@ Location: lib/features/collection/presentation/widgets/collection_card.dart
 
 - Replaced deprecated withOpacity with withAlpha for better performance
 
+## Card Details Page UI Fix Implementation Plan (Completed)
+
+### 1. Fix Card Description Text
+
+Location: lib/features/cards/presentation/widgets/card_description_text.dart
+
+- Enhanced the _processTextWithBrackets method to detect "T:" pattern
+- Added support to replace "T:" with the dull.png image
+- Ensured proper styling and alignment of the dull icon
+
+### 2. Improve Card Details Page Layout
+
+Location: lib/features/cards/presentation/pages/card_details_page.dart
+
+- Moved navigation buttons outside the card image
+- Implemented a FAB menu for "Add to Collection", "Favorite", and "Wishlist" actions
+- Increased card image size (55% in normal layout, 85% in wide layout)
+- Enhanced the layout to better utilize screen space
+
+### 3. Fix Full-Screen Image Viewer
+
+Location: lib/features/cards/presentation/pages/card_details_page.dart
+
+- Implemented the CornerMaskWidget to handle white corners in card images
+- Used a black background with proper border radius
+- Maintained the ClipRRect for consistent corner rounding
+- Used BoxFit.cover to ensure the image fills the entire container
+- Ensured proper Hero animation for smooth transitions
+
+## UI Consistency Improvement Implementation Plan (Completed)
+
+### 1. Fix Card Label Toggle
+
+Location: lib/features/cards/presentation/widgets/card_app_bar_actions.dart, lib/features/collection/presentation/pages/collection_page.dart
+
+- Replicated the card label toggle from the Collection page to the Card Database page
+- Ensured independent state for each page using separate providers
+- Implemented consistent toggle behavior and visual appearance
+
+### 2. Fix Collection Sorting
+
+Location: lib/features/collection/domain/providers/collection_providers.dart
+
+- Fixed the Collection sorting query to properly handle ascending/descending sorting
+- Implemented comprehensive filtering system for both collection-specific filters and card filters
+- Ensured proper integration between different filter types
+
+### 3. Fix Filter Dialog Dividers
+
+Location: lib/features/cards/presentation/widgets/filter_dialog.dart, lib/features/collection/presentation/widgets/collection_filter_dialog.dart
+
+- Removed the extra divider lines between sections in both dialogs
+- Ensured consistent appearance between the Collection filter dialog and Card filter dialog
+
+### 4. Update View Size Button
+
+Location: lib/features/collection/presentation/pages/collection_page.dart
+
+- Updated the View Size button to dynamically change its size based on the selected size
+- Matched the style of the Cards page for consistency
+- Implemented proper size transitions
+
+### 5. Adjust UI Padding
+
+Location: lib/features/collection/presentation/pages/collection_page.dart, lib/features/collection/presentation/widgets/collection_stats_card.dart
+
+- Reduced the space between the appbar and Collection Stats card
+- Reduced the space between the Collection Stats card and card images
+- Used Transform.translate with negative offset for tighter layout
+- Adjusted padding in the Collection Stats card for better visual appearance
+
 ## Theme Customization Status (Completed)
 
 - Theme customization has been implemented with light, dark, and system modes
@@ -258,6 +364,30 @@ Location: lib/features/collection/presentation/widgets/collection_card.dart
 - Deprecated withOpacity has been replaced with withAlpha for better performance
 - Cards now display correctly in the collection UI
 - Layout errors have been resolved
+
+## Card Details Page UI Fix Status (Completed)
+
+- "T:" styling in card descriptions has been fixed to show the dull.png image
+- Layout has been improved with navigation buttons and FAB
+  - Navigation buttons have been moved outside the card image
+  - FAB menu has been implemented for "Add to Collection", "Favorite", and "Wishlist" actions
+  - Card image size has been increased (55% in normal layout, 85% in wide layout)
+- White borders in the full-screen image viewer have been fixed
+  - CornerMaskWidget has been implemented to handle white corners in card images
+  - Black background with proper border radius has been used
+  - ClipRRect has been maintained for consistent corner rounding
+  - BoxFit.cover has been used to ensure the image fills the entire container
+  - Hero animation has been preserved for smooth transitions
+
+## UI Consistency Improvement Status (Completed)
+
+- Card label toggle has been replicated from the Collection page to the Card Database page with independent state for each
+- Collection sorting query has been fixed to properly handle ascending/descending sorting
+- Extra divider lines between sections in both filter dialogs have been removed
+- View Size button in the Collection page has been updated to dynamically change its size based on the selected size
+- Padding between UI elements has been adjusted for a more compact and visually appealing layout
+- Filter functionality in the Collection page has been fixed to properly apply both collection-specific filters and card filters
+- Overall user experience has been improved with more consistent UI elements and behavior
 
 ## Theme Customization Testing Strategy (Completed)
 
@@ -337,6 +467,53 @@ Location: lib/features/collection/presentation/widgets/collection_card.dart
    - Test that card labels are displayed correctly
    - Verify that quantity indicators are displayed correctly
    - Test that graded badges are displayed correctly
+
+## Card Details Page UI Fix Testing Strategy (Completed)
+
+1. Description Text Test
+   - Verify that "T:" is properly replaced with the dull.png image
+   - Test that the dull icon is properly aligned with the text
+   - Verify that other special formatting (EX BURST, [S], etc.) still works correctly
+   - Test with various card descriptions to ensure consistent styling
+
+2. Layout Test
+   - Verify that navigation buttons are properly positioned
+   - Test that the FAB menu expands and collapses correctly
+   - Verify that the card image is properly sized in both layouts
+   - Test that the layout adapts correctly to different screen sizes
+
+3. Full-Screen Image Viewer Test
+   - Verify that white borders are eliminated in the full-screen view
+   - Test that the CornerMaskWidget properly handles white corners
+   - Verify that the Hero animation works smoothly
+   - Test pinch-to-zoom functionality
+   - Verify that the image fills the available space while maintaining aspect ratio
+
+## UI Consistency Improvement Testing Strategy (Completed)
+
+1. Card Label Toggle Test
+   - Verify that the card label toggle works correctly in both the Cards and Collection pages
+   - Test that the state is independent for each page
+   - Verify that the toggle button appearance is consistent between pages
+   - Test that the toggle behavior is consistent between pages
+
+2. Filter Dialog Test
+   - Verify that the filter dialogs have consistent appearance between the Cards and Collection pages
+   - Test that the divider lines are removed in both dialogs
+   - Verify that all filters work correctly in the Collection page
+   - Test that both collection-specific filters and card filters can be applied together
+
+3. View Size Button Test
+   - Verify that the View Size button dynamically changes its size based on the selected size
+   - Test that the button appearance is consistent between the Cards and Collection pages
+   - Verify that the size transitions work correctly
+   - Test that the button behavior is consistent between pages
+
+4. Layout Test
+   - Verify that the padding between UI elements is consistent and visually appealing
+   - Test that the space between the appbar and Collection Stats card is reduced
+   - Verify that the space between the Collection Stats card and card images is reduced
+   - Test that the overall layout is compact and efficient
 
 ## Next Steps
 

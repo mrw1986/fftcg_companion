@@ -7,12 +7,14 @@ class CardAppBarActions extends ConsumerWidget {
   final bool isSearching;
   final VoidCallback onSearchToggle;
   final VoidCallback onFilterTap;
+  final VoidCallback onSortTap;
 
   const CardAppBarActions({
     super.key,
     required this.isSearching,
     required this.onSearchToggle,
     required this.onFilterTap,
+    required this.onSortTap,
   });
 
   @override
@@ -46,23 +48,46 @@ class CardAppBarActions extends ConsumerWidget {
           },
         ),
 
-        // Filter Button - Always visible
+        // Filter Button
         IconButton(
           icon: const Icon(Icons.filter_list),
+          tooltip: 'Filter',
           onPressed: onFilterTap,
         ),
 
-        // View Type Toggle - Always visible
+        // Sort Button
+        IconButton(
+          icon: const Icon(Icons.sort),
+          tooltip: 'Sort',
+          onPressed: onSortTap,
+        ),
+
+        // Card Labels Toggle
+        IconButton(
+          icon: Icon(
+            viewPrefs.showLabels ? Icons.label : Icons.label_off,
+          ),
+          tooltip:
+              viewPrefs.showLabels ? 'Hide Card Labels' : 'Show Card Labels',
+          onPressed: () {
+            ref.read(viewPreferencesProvider.notifier).toggleLabels();
+          },
+        ),
+
+        // View Type Toggle
         IconButton(
           icon: Icon(
             viewPrefs.type == ViewType.grid ? Icons.view_list : Icons.grid_view,
           ),
+          tooltip: viewPrefs.type == ViewType.grid
+              ? 'Switch to List View'
+              : 'Switch to Grid View',
           onPressed: () {
             ref.read(viewPreferencesProvider.notifier).toggleViewType();
           },
         ),
 
-        // Size Toggle - Always visible
+        // Size Toggle
         IconButton(
           icon: Icon(
             Icons.text_fields,

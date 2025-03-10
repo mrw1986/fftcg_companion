@@ -1,6 +1,7 @@
 // lib/features/cards/presentation/pages/card_details_page.dart
 import 'dart:math';
 import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:fftcg_companion/core/widgets/corner_mask_painter.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/card_description_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,6 +29,7 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
   bool _isLoading = true;
   bool _isFavorite = false;
   bool _isInWishlist = false;
+  bool _isFabExpanded = false;
 
   @override
   void initState() {
@@ -87,6 +89,7 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
           setState(() {
             _currentIndex = index;
             _currentCard = _allCards[index];
+            _isFabExpanded = false; // Close FAB menu on page change
           });
         },
         itemBuilder: (context, index) {
@@ -96,7 +99,121 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
               : _buildNormalLayout(context, card);
         },
       ),
+      floatingActionButton: _buildFab(context, _currentCard),
     );
+  }
+
+  void _openFullScreenImage(BuildContext context, models.Card card) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => FullScreenImageViewer(
+          imageUrl: card.getBestImageUrl() ?? '',
+          cardName: card.name,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFab(BuildContext context, models.Card card) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return _isFabExpanded
+        ? Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Add to Collection option
+              FloatingActionButton.extended(
+                heroTag: 'fab_collection',
+                onPressed: () {
+                  context.push('/collection/add?cardId=${card.productId}');
+                },
+                label: const Text('Add to Collection'),
+                icon: const Icon(Icons.add),
+                backgroundColor: colorScheme.primaryContainer,
+                foregroundColor: colorScheme.onPrimaryContainer,
+              ),
+              const SizedBox(height: 8),
+
+              // Favorite option
+              FloatingActionButton.small(
+                heroTag: 'fab_favorite',
+                onPressed: () {
+                  setState(() {
+                    _isFavorite = !_isFavorite;
+                    _isFabExpanded = false;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _isFavorite
+                            ? 'Added to favorites'
+                            : 'Removed from favorites',
+                      ),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                },
+                backgroundColor: _isFavorite
+                    ? Colors.amber
+                    : colorScheme.surfaceContainerHighest,
+                foregroundColor:
+                    _isFavorite ? Colors.white : colorScheme.onSurfaceVariant,
+                child: Icon(_isFavorite ? Icons.star : Icons.star_border),
+              ),
+              const SizedBox(height: 8),
+
+              // Wishlist option
+              FloatingActionButton.small(
+                heroTag: 'fab_wishlist',
+                onPressed: () {
+                  setState(() {
+                    _isInWishlist = !_isInWishlist;
+                    _isFabExpanded = false;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _isInWishlist
+                            ? 'Added to wishlist'
+                            : 'Removed from wishlist',
+                      ),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                },
+                backgroundColor: _isInWishlist
+                    ? colorScheme.tertiary
+                    : colorScheme.surfaceContainerHighest,
+                foregroundColor:
+                    _isInWishlist ? Colors.white : colorScheme.onSurfaceVariant,
+                child: Icon(
+                    _isInWishlist ? Icons.bookmark : Icons.bookmark_border),
+              ),
+              const SizedBox(height: 8),
+
+              // Main FAB (close)
+              FloatingActionButton(
+                heroTag: 'fab_main',
+                onPressed: () {
+                  setState(() {
+                    _isFabExpanded = false;
+                  });
+                },
+                backgroundColor: colorScheme.primary,
+                child: const Icon(Icons.close),
+              ),
+            ],
+          )
+        : FloatingActionButton(
+            heroTag: 'fab_main',
+            onPressed: () {
+              setState(() {
+                _isFabExpanded = true;
+              });
+            },
+            backgroundColor: colorScheme.primary,
+            child: const Icon(Icons.add),
+          );
   }
 
   Widget _buildEnhancedBackButton(BuildContext context) {
@@ -124,160 +241,74 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
     );
   }
 
-  Widget _buildNavigationOverlay(BuildContext context) {
-    return Stack(
+  Widget _buildNavigationButtons(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         // Previous button - positioned on left side
         if (_currentIndex > 0)
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8.0),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      _pageController.previousPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(40),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.black38,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.chevron_left,
-                        color: Colors.white,
-                        size: 40,
-                      ),
-                    ),
+          Padding(
+            padding: const EdgeInsets.only(left: 4.0),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  _pageController.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                borderRadius: BorderRadius.circular(40),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black38,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.chevron_left,
+                    color: Colors.white,
+                    size: 40,
                   ),
                 ),
               ),
             ),
-          ),
+          )
+        else
+          const SizedBox(width: 64), // Placeholder to maintain layout
 
         // Next button - positioned on right side
         if (_currentIndex < _allCards.length - 1)
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      _pageController.nextPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(40),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.black38,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.chevron_right,
-                        color: Colors.white,
-                        size: 40,
-                      ),
-                    ),
+          Padding(
+            padding: const EdgeInsets.only(right: 4.0),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  _pageController.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                borderRadius: BorderRadius.circular(40),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black38,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.chevron_right,
+                    color: Colors.white,
+                    size: 40,
                   ),
                 ),
               ),
             ),
-          ),
+          )
+        else
+          const SizedBox(width: 64), // Placeholder to maintain layout
       ],
-    );
-  }
-
-  Widget _buildActionButtons(BuildContext context, models.Card card) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Add to Collection button
-          ElevatedButton.icon(
-            icon: const Icon(Icons.add),
-            label: const Text('Add to Collection'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.primaryContainer,
-              foregroundColor: colorScheme.onPrimaryContainer,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-            onPressed: () {
-              context.push('/collection/add?cardId=${card.productId}');
-            },
-          ),
-          const SizedBox(width: 12),
-
-          // Favorite button
-          IconButton(
-            icon: Icon(
-              _isFavorite ? Icons.star : Icons.star_border,
-              color: _isFavorite ? Colors.amber : null,
-            ),
-            tooltip: _isFavorite ? 'Remove from Favorites' : 'Add to Favorites',
-            onPressed: () {
-              setState(() {
-                _isFavorite = !_isFavorite;
-              });
-              // This is a placeholder - no actual functionality yet
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    _isFavorite
-                        ? 'Added to favorites'
-                        : 'Removed from favorites',
-                  ),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
-            },
-          ),
-
-          // Wishlist button
-          IconButton(
-            icon: Icon(
-              _isInWishlist ? Icons.bookmark : Icons.bookmark_border,
-              color: _isInWishlist ? colorScheme.tertiary : null,
-            ),
-            tooltip: _isInWishlist ? 'Remove from Wishlist' : 'Add to Wishlist',
-            onPressed: () {
-              setState(() {
-                _isInWishlist = !_isInWishlist;
-              });
-              // This is a placeholder - no actual functionality yet
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    _isInWishlist
-                        ? 'Added to wishlist'
-                        : 'Removed from wishlist',
-                  ),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
     );
   }
 
@@ -287,7 +318,7 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
     final statusBarHeight = MediaQuery.of(context).padding.top;
 
     // Use a percentage of screen height to ensure the card is fully visible
-    final maxCardHeight = screenHeight * 0.8;
+    final maxCardHeight = screenHeight * 0.85; // Increased from 0.8 to 0.85
 
     // Calculate card width based on the standard card aspect ratio (223/311)
     final cardWidth = maxCardHeight * (223 / 311);
@@ -312,19 +343,26 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
                             child: SizedBox(
                               width: cardWidth,
                               height: maxCardHeight,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color:
-                                      Theme.of(context).scaffoldBackgroundColor,
-                                  borderRadius: BorderRadius.circular(16.0),
-                                  image: DecorationImage(
-                                    image: NetworkImage(
-                                        card.getBestImageUrl() ?? ''),
-                                    fit: BoxFit.contain,
-                                    onError: (_, __) {
-                                      talker.error(
-                                          'Failed to load high-res image for card: ${card.productId}');
-                                    },
+                              child: GestureDetector(
+                                onTap: () =>
+                                    _openFullScreenImage(context, card),
+                                child: Hero(
+                                  tag: 'card_image_${card.productId}',
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .scaffoldBackgroundColor,
+                                      borderRadius: BorderRadius.circular(16.0),
+                                      image: DecorationImage(
+                                        image: NetworkImage(
+                                            card.getBestImageUrl() ?? ''),
+                                        fit: BoxFit.contain,
+                                        onError: (_, __) {
+                                          talker.error(
+                                              'Failed to load high-res image for card: ${card.productId}');
+                                        },
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -332,11 +370,13 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
                           ),
                         ),
                       ),
-                      _buildActionButtons(context, card),
+                      // Navigation buttons below the card image
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16.0),
+                        child: _buildNavigationButtons(context),
+                      ),
                     ],
                   ),
-                  // Add navigation overlay on top of the card image
-                  _buildNavigationOverlay(context),
                 ],
               ),
             ),
@@ -366,9 +406,7 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
     final statusBarHeight = MediaQuery.of(context).padding.top;
 
     // Use a percentage of screen height to ensure the card is visible on all devices
-    // including foldable phones with unusual aspect ratios
-    final maxCardHeight =
-        screenHeight * 0.45; // Reduced to make room for action buttons
+    final maxCardHeight = screenHeight * 0.55; // Increased from 0.5 to 0.55
 
     // Calculate card width based on the standard card aspect ratio (223/311)
     // but constrained by the maximum height
@@ -385,44 +423,60 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
         CustomScrollView(
           slivers: [
             SliverAppBar(
-              expandedHeight: cardHeight + topPadding,
+              expandedHeight: cardHeight +
+                  topPadding +
+                  60, // Added extra space for navigation buttons
               pinned: true,
+              collapsedHeight:
+                  60, // Ensure there's space for the back button when collapsed
               automaticallyImplyLeading: false,
               flexibleSpace: Stack(
                 children: [
                   FlexibleSpaceBar(
-                    background: Padding(
-                      padding: EdgeInsets.only(top: topPadding),
-                      child: Center(
-                        child: SizedBox(
-                          width: cardWidth,
-                          height: cardHeight,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).scaffoldBackgroundColor,
-                              borderRadius: BorderRadius.circular(16.0),
-                              image: DecorationImage(
-                                image:
-                                    NetworkImage(card.getBestImageUrl() ?? ''),
-                                fit: BoxFit.contain,
-                                onError: (_, __) {
-                                  talker.error(
-                                      'Failed to load high-res image for card: ${card.productId}');
-                                },
+                    background: Column(
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.only(top: topPadding),
+                          child: Center(
+                            child: SizedBox(
+                              width: cardWidth,
+                              height: cardHeight,
+                              child: GestureDetector(
+                                onTap: () =>
+                                    _openFullScreenImage(context, card),
+                                child: Hero(
+                                  tag: 'card_image_${card.productId}',
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .scaffoldBackgroundColor,
+                                      borderRadius: BorderRadius.circular(16.0),
+                                      image: DecorationImage(
+                                        image: NetworkImage(
+                                            card.getBestImageUrl() ?? ''),
+                                        fit: BoxFit.contain,
+                                        onError: (_, __) {
+                                          talker.error(
+                                              'Failed to load high-res image for card: ${card.productId}');
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
+                        // Navigation buttons below the card image
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: _buildNavigationButtons(context),
+                        ),
+                      ],
                     ),
                   ),
-                  // Add navigation overlay on top of the card image
-                  _buildNavigationOverlay(context),
                 ],
               ),
-            ),
-            SliverToBoxAdapter(
-              child: _buildActionButtons(context, card),
             ),
             SliverToBoxAdapter(
               child: Padding(
@@ -537,6 +591,102 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class FullScreenImageViewer extends StatelessWidget {
+  final String imageUrl;
+  final String cardName;
+
+  const FullScreenImageViewer({
+    super.key,
+    required this.imageUrl,
+    required this.cardName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Standard card aspect ratio is 223:311 (width:height)
+    const cardAspectRatio = 223 / 311;
+
+    // Get screen dimensions
+    final screenSize = MediaQuery.of(context).size;
+    final screenWidth = screenSize.width;
+    final screenHeight =
+        screenSize.height - kToolbarHeight - MediaQuery.of(context).padding.top;
+
+    // Calculate the maximum width and height while maintaining aspect ratio
+    // Use almost the full screen width with minimal padding
+    final availableWidth = screenWidth * 0.98; // 98% of screen width
+    final availableHeight = screenHeight * 0.98; // 98% of screen height
+
+    // Calculate dimensions based on available space and aspect ratio
+    double cardWidth;
+    double cardHeight;
+
+    // If height is the limiting factor
+    final heightBasedWidth = availableHeight * cardAspectRatio;
+    if (heightBasedWidth <= availableWidth) {
+      cardHeight = availableHeight;
+      cardWidth = heightBasedWidth;
+    } else {
+      // Width is the limiting factor
+      cardWidth = availableWidth;
+      cardHeight = cardWidth / cardAspectRatio;
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(cardName),
+        elevation: 0,
+      ),
+      body: GestureDetector(
+        onTap: () => Navigator.of(context).pop(),
+        child: Center(
+          child: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4.0,
+            child: Container(
+              width: cardWidth,
+              height: cardHeight,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(16.0),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16.0),
+                child: Hero(
+                  tag: 'card_image_${imageUrl.hashCode}',
+                  child: CornerMaskWidget(
+                    backgroundColor: Colors.black,
+                    cornerRadius: 16.0,
+                    child: Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      errorBuilder: (context, error, stackTrace) {
+                        talker.error('Failed to load high-res image for card');
+                        return const Center(
+                          child: Icon(
+                            Icons.error_outline,
+                            color: Colors.white,
+                            size: 48,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

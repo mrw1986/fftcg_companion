@@ -4,6 +4,7 @@ import '../../data/repositories/collection_repository.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/card_cache_provider.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
+import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
 
 /// Repository provider
 final collectionRepositoryProvider = Provider<CollectionRepository>((ref) {
@@ -133,13 +134,20 @@ final collectionSortProvider = StateProvider<String>((ref) {
 final filteredCollectionProvider = Provider<List<CollectionItem>>((ref) {
   final collectionAsync = ref.watch(userCollectionProvider);
   final filter = ref.watch(collectionFilterProvider);
+  final cardsFilter = ref.watch(filterProvider);
   final sort = ref.watch(collectionSortProvider);
+  final cardCacheAsync = ref.watch(collectionCardCacheProvider);
 
   return collectionAsync.when(
     data: (collection) {
       // Apply filters
       var filtered = collection;
 
+      // Parse sort field and direction
+      bool sortDescending = sort.contains(':desc');
+      String sortField = sort.split(':').first;
+
+      // Apply collection-specific filters
       if (filter.containsKey('type')) {
         if (filter['type'] == 'regular') {
           filtered = filtered.where((item) => item.regularQty > 0).toList();
@@ -161,30 +169,182 @@ final filteredCollectionProvider = Provider<List<CollectionItem>>((ref) {
         }
       }
 
-      // Apply sorting
-      filtered.sort((a, b) {
-        switch (sort) {
-          case 'cardId':
-            return a.cardId.compareTo(b.cardId);
-          case 'regularQty':
-            return b.regularQty.compareTo(a.regularQty);
-          case 'foilQty':
-            return b.foilQty.compareTo(a.foilQty);
-          case 'totalQty':
-            final totalA = a.regularQty + a.foilQty;
-            final totalB = b.regularQty + b.foilQty;
-            return totalB.compareTo(totalA);
-          case 'marketPrice':
-          case 'lowPrice':
-          case 'midPrice':
-          case 'highPrice':
-            // Price sorting will be implemented later
-            return b.lastModified.compareTo(a.lastModified);
-          case 'lastModified':
-          default:
-            return b.lastModified.compareTo(a.lastModified);
+      // Apply card filters if we have cached cards
+      if (filtered.isNotEmpty &&
+          cardCacheAsync.hasValue &&
+          cardCacheAsync.value != null) {
+        final cards = cardCacheAsync.value!;
+        final cardMap = {
+          for (var card in cards) card.productId.toString(): card
+        };
+
+        // Filter by elements
+        if (cardsFilter.elements.isNotEmpty) {
+          filtered = filtered.where((item) {
+            final card = cardMap[item.cardId];
+            if (card == null) return false;
+
+            for (final element in cardsFilter.elements) {
+              if (card.elements.contains(element)) {
+                return true;
+              }
+            }
+            return false;
+          }).toList();
         }
-      });
+
+        // Filter by types
+        if (cardsFilter.types.isNotEmpty) {
+          filtered = filtered.where((item) {
+            final card = cardMap[item.cardId];
+            if (card == null) return false;
+
+            return card.cardType != null &&
+                cardsFilter.types.contains(card.cardType);
+          }).toList();
+        }
+
+        // Filter by rarities
+        if (cardsFilter.rarities.isNotEmpty) {
+          filtered = filtered.where((item) {
+            final card = cardMap[item.cardId];
+            if (card == null) return false;
+
+            return card.rarity != null &&
+                cardsFilter.rarities.contains(card.rarity);
+          }).toList();
+        }
+
+        // Filter by categories
+        if (cardsFilter.categories.isNotEmpty) {
+          filtered = filtered.where((item) {
+            final card = cardMap[item.cardId];
+            if (card == null) return false;
+
+            return card.category != null &&
+                cardsFilter.categories.contains(card.category);
+          }).toList();
+        }
+
+        // Filter by sets
+        if (cardsFilter.set.isNotEmpty) {
+          filtered = filtered.where((item) {
+            final card = cardMap[item.cardId];
+            if (card == null) return false;
+
+            // Check if any of the card's sets are in the filter sets
+            for (final setId in card.set) {
+              if (cardsFilter.set.contains(setId)) {
+                return true;
+              }
+            }
+            return false;
+          }).toList();
+        }
+
+        // Filter by cost
+        if (cardsFilter.minCost != null || cardsFilter.maxCost != null) {
+          filtered = filtered.where((item) {
+            final card = cardMap[item.cardId];
+            if (card == null) return false;
+
+            final cost = card.cost;
+            if (cost == null) return false;
+
+            if (cardsFilter.minCost != null && cost < cardsFilter.minCost!) {
+              return false;
+            }
+
+            if (cardsFilter.maxCost != null && cost > cardsFilter.maxCost!) {
+              return false;
+            }
+
+            return true;
+          }).toList();
+        }
+
+        // Filter by power
+        if (cardsFilter.minPower != null || cardsFilter.maxPower != null) {
+          filtered = filtered.where((item) {
+            final card = cardMap[item.cardId];
+            if (card == null) return false;
+
+            final power = card.power;
+            if (power == null) return false;
+
+            if (cardsFilter.minPower != null && power < cardsFilter.minPower!) {
+              return false;
+            }
+
+            if (cardsFilter.maxPower != null && power > cardsFilter.maxPower!) {
+              return false;
+            }
+
+            return true;
+          }).toList();
+        }
+
+        // Filter by sealed products
+        if (!cardsFilter.showSealedProducts) {
+          filtered = filtered.where((item) {
+            final card = cardMap[item.cardId];
+            if (card == null) return true; // Keep items without cards
+
+            return card.cardType != 'Sealed Product';
+          }).toList();
+        }
+      }
+
+      // Apply sorting
+      if (filtered.isNotEmpty) {
+        filtered = List<CollectionItem>.from(filtered); // Create a mutable copy
+
+        filtered.sort((a, b) {
+          switch (sortField) {
+            case 'cardId':
+              return sortDescending
+                  ? b.cardId.compareTo(a.cardId)
+                  : a.cardId.compareTo(b.cardId);
+            case 'regularQty':
+              // Sort by quantity, then by cardId for stable sorting
+              final qtyCompare = sortDescending
+                  ? a.regularQty.compareTo(b.regularQty)
+                  : b.regularQty.compareTo(a.regularQty);
+              return qtyCompare != 0
+                  ? qtyCompare
+                  : a.cardId.compareTo(b.cardId);
+            case 'foilQty':
+              final qtyCompare = sortDescending
+                  ? a.foilQty.compareTo(b.foilQty)
+                  : b.foilQty.compareTo(a.foilQty);
+              return qtyCompare != 0
+                  ? qtyCompare
+                  : a.cardId.compareTo(b.cardId);
+            case 'totalQty':
+              final totalA = a.regularQty + a.foilQty;
+              final totalB = b.regularQty + b.foilQty;
+              final qtyCompare = sortDescending
+                  ? totalA.compareTo(totalB)
+                  : totalB.compareTo(totalA);
+              return qtyCompare != 0
+                  ? qtyCompare
+                  : a.cardId.compareTo(b.cardId);
+            case 'marketPrice':
+            case 'lowPrice':
+            case 'midPrice':
+            case 'highPrice':
+              // Price sorting will be implemented later
+              return sortDescending
+                  ? a.lastModified.compareTo(b.lastModified)
+                  : b.lastModified.compareTo(a.lastModified);
+            case 'lastModified':
+            default:
+              return sortDescending
+                  ? a.lastModified.compareTo(b.lastModified)
+                  : b.lastModified.compareTo(a.lastModified);
+          }
+        });
+      }
 
       return filtered;
     },
