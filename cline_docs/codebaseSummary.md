@@ -44,11 +44,22 @@
    - Card metadata display
    - Animated search interface
    - Integrated search, filter, and sort functionality
+   - Action buttons for adding to collection, favorites, and wishlist
 
 2. **Collection Feature**
    - User's card collection management
    - Collection statistics and tracking
    - Add/remove cards from collection
+   - Card condition tracking (NM, LP, MP, HP, DMG)
+   - Purchase information tracking (price, date)
+   - Professional grading support (PSA, BGS, CGC)
+   - Grid and list view options with customizable sizes
+   - Filtering by card type (regular, foil, graded)
+   - Sorting by various criteria (last modified, card ID, quantity)
+   - Search functionality within collection
+   - Integrated card search when adding new cards to collection
+   - Card label toggle for showing/hiding card names and numbers
+   - Consistent UI with Cards feature for better user experience
 
 3. **Decks Feature**
    - Deck building and management
@@ -94,6 +105,12 @@
    - Collection is updated locally and in cloud
    - Statistics are recalculated
    - UI reflects changes immediately
+   - Users can track card condition, purchase info, and grading
+   - Collection can be filtered and sorted by various criteria
+   - Users can switch between grid and list views
+   - Users can search for cards to add to their collection
+   - Users can add cards directly from the card details page
+   - Users can toggle card labels on/off for better visibility
 
 ## External Dependencies
 
@@ -102,6 +119,7 @@
    - Firebase Authentication for user management
    - Google Sign-In integration
    - Analytics and crash reporting
+   - Firestore for user collection and deck storage
 
 2. **Image Handling**
    - Cached network image for efficient loading
@@ -113,10 +131,58 @@
    - Responsive layouts for different screen sizes
    - Animations for improved UX
    - Animated transitions for search and filtering
+   - FlexColorScheme for comprehensive theming
+   - FlexColorPicker for theme color customization
 
 ## Recent Significant Changes
 
-1. **Theme System Enhancement**
+1. **Collection UI Improvements**
+   - Updated collection grid to match cards grid implementation
+   - Added card labels toggle in collection page
+   - Improved collection card display with quantity indicators
+   - Enhanced collection search functionality to search by card name
+   - Fixed scrolling issues in collection content
+   - Added scroll to top functionality
+   - Improved sort options with animation and visual feedback
+   - Added price sorting options (market, low, mid, high)
+   - Fixed search functionality in collection edit page
+   - Ensured consistent UI between cards and collection features
+
+2. **Card Details Page Enhancement**
+   - Added action buttons below the card image
+   - Implemented "Add to Collection" button that navigates to the Collection Edit page with the selected card
+   - Added placeholder "Favorite" button with star icon and toggle functionality
+   - Added placeholder "Add to Wishlist" button with bookmark icon and toggle functionality
+   - Ensured buttons are visually consistent with the app's design language
+   - Improved layout to accommodate the new action buttons
+
+3. **Collection Edit Page Enhancement**
+   - Added integrated card search functionality
+   - Implemented search bar in the app bar when in search mode
+   - Created search results list with card images and details
+   - Added ability to select a card from search results
+   - Improved UX flow for adding new cards to collection
+   - Ensured seamless integration with existing collection management features
+   - Added support for direct navigation from Card Details page
+
+4. **Collection Feature Implementation**
+   - Created collection data models with support for regular and foil cards
+   - Added card condition tracking with standardized condition codes
+   - Implemented purchase information tracking with price and date
+   - Added professional grading support for PSA, BGS, and CGC
+   - Created collection repository with Firestore integration
+   - Implemented collection providers for state management
+   - Created collection UI with grid and list views
+   - Added collection statistics card
+   - Implemented filtering and sorting functionality
+   - Created detailed collection item view
+   - Added add/edit functionality for collection items
+   - Integrated with card cache for efficient image loading
+   - Updated router to include collection routes
+   - Fixed nested scrollable widgets issue in collection content
+   - Fixed layout issues by converting sliver widgets to regular widgets in collection grid and list
+
+5. **Theme System Enhancement**
    - Added ThemeSettingsPage for customizing app appearance
    - Implemented color picker for selecting custom theme colors
    - Added predefined color schemes from FlexColorScheme
@@ -126,7 +192,7 @@
    - Updated router to include theme settings route
    - Ensured colors have appropriate contrast in both light and dark modes
 
-2. **Authentication Implementation**
+6. **Authentication Implementation**
    - Added Firebase Authentication integration with Google Sign-In, Email/Password, and Anonymous authentication
    - Created authentication service and Riverpod providers for state management
    - Implemented login, registration, and account management UI
@@ -136,7 +202,7 @@
    - Added account management features
    - Integrated authentication state with the app's navigation system
 
-3. **UI Improvements**
+7. **UI Improvements**
    - Implemented swipe navigation in card details page with intuitive controls
    - Added navigation buttons on sides of card image for easy browsing
    - Implemented PageView for smooth transitions between cards
@@ -160,15 +226,18 @@
    - Replaced custom splash screen with properly configured native splash screen
    - Fixed Android 12+ splash screen to show the full logo with "COMPANION" text
 
-4. **Performance Optimizations**
+8. **Performance Optimizations**
    - Improved image caching
    - Reduced unnecessary rebuilds
    - Optimized search functionality
    - Enhanced animation performance
    - Added memory cache layer to reduce Hive access
    - Implemented resilient storage operations with fallback mechanisms
+   - Replaced deprecated withOpacity with withAlpha for better performance
+   - Fixed nested scrollable widgets to prevent layout issues
+   - Improved scrolling performance by using NeverScrollableScrollPhysics for nested scrollable widgets
 
-5. **Bug Fixes**
+9. **Bug Fixes**
    - Fixed card description text styling issues
    - Resolved card corner rounding problems in dark mode
    - Fixed null check error in ThemeSettingsPage when accessing FlexColor.schemes
@@ -180,6 +249,9 @@
    - Fixed non-card items sorting to the top when filtering by set
    - Enhanced error recovery for storage operations
    - Fixed search visibility issues
+   - Replaced deprecated withOpacity with withAlpha for better performance
+   - Fixed nested scrollable widgets in collection content to prevent "Vertical viewport was given unbounded height" errors
+   - Fixed "A RenderPadding expected a child of type RenderBox but received a child of type RenderSliverFillRemainingWithScrollable" error by converting sliver widgets to regular widgets
 
 ## User Feedback Integration
 
@@ -192,7 +264,19 @@
    - Made navigation controls visually appealing and non-intrusive
    - Implemented smooth transitions between cards
 
-2. **Search Experience**
+2. **Collection Management Workflow**
+   - Users wanted a more streamlined way to add cards to their collection
+   - Users needed to search for cards when adding to collection
+   - Users wanted to add cards directly from the card details page
+   - Added "Add to Collection" button on card details page
+   - Implemented integrated search in the collection edit page
+   - Created seamless flow between card browsing and collection management
+   - Added placeholder favorites and wishlist functionality for future implementation
+   - Improved collection grid to match cards grid implementation
+   - Added card labels toggle for better visibility
+   - Enhanced collection search functionality
+
+3. **Search Experience**
    - Users wanted a more intuitive search interface
    - Users requested ability to search within filtered cards
    - Users needed to sort search results
@@ -203,17 +287,29 @@
    - Added smooth transitions for all search-related UI elements
    - Ensured cards remain visible during search operations
 
-3. **Card Details Page**
+4. **Collection Management**
+   - Users wanted to track their card collection
+   - Users needed to track card condition and purchase information
+   - Users requested professional grading support
+   - Implemented comprehensive collection tracking system
+   - Added support for regular and foil cards
+   - Created condition tracking with standardized codes
+   - Added purchase information tracking with price and date
+   - Implemented professional grading support for PSA, BGS, and CGC
+   - Created intuitive UI for managing collection
+   - Added statistics to track collection progress
+
+5. **Card Details Page**
    - Users reported white corners on card images in dark mode
    - Implemented fix using BoxDecoration with larger border radius
    - Removed Hero animation to prevent transition issues
 
-4. **Card Description Text**
+6. **Card Description Text**
    - Users reported inconsistent styling for special abilities
    - Updated regex pattern to handle different spacing scenarios
    - Improved text processing for consistent formatting
 
-5. **Splash Screen and Loading Experience**
+7. **Splash Screen and Loading Experience**
    - Users reported splash screen not respecting dark mode
    - Users wanted a cleaner loading indicator without the logo
    - Updated native splash screen configuration to use appropriate images for each theme
@@ -222,12 +318,12 @@
 
 ## Upcoming Development Focus
 
-1. **Collection Management Implementation**
-   - Implement collection tracking functionality
-   - Create UI for adding/removing cards from collection
-   - Add collection statistics
-   - Implement card condition and purchase info tracking
-   - Ensure proper integration with user authentication
+1. **Favorites and Wishlist Implementation**
+   - Implement full functionality for favorites feature
+   - Create wishlist data models and repositories
+   - Add wishlist management UI
+   - Implement wishlist statistics and tracking
+   - Enable sharing wishlists with other users
 
 2. **Deck Builder Implementation**
    - Create deck building interface
@@ -236,20 +332,26 @@
    - Support different deck formats
    - Enable deck sharing functionality
 
-3. **Performance Improvements**
+3. **Card Scanner Implementation**
+   - Develop camera integration for card scanning
+   - Implement image recognition for cards
+   - Create quick add to collection from scan
+   - Add batch scanning for multiple cards
+
+4. **Price Tracking Implementation**
+   - Integrate with price APIs
+   - Add price history charts
+   - Implement price alerts
+   - Calculate collection value
+
+5. **Performance Improvements**
    - Further optimize image loading
    - Reduce animation overhead
    - Implement progressive image loading techniques
    - Improve overall app responsiveness
 
-4. **Error Handling**
+6. **Error Handling**
    - Enhance error reporting
    - Improve recovery mechanisms
    - Add retry functionality for failed image loads
    - Better user feedback for errors
-
-5. **Additional UI Enhancements**
-   - Refine animation timings for optimal user experience
-   - Implement additional micro-interactions
-   - Improve accessibility features
-   - Enhance dark mode experience

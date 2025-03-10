@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/presentation/providers/filtered_search_provider.dart';
+import 'package:go_router/go_router.dart';
 
 class CardDetailsPage extends ConsumerStatefulWidget {
   final models.Card initialCard;
@@ -25,6 +26,8 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
   List<models.Card> _allCards = [];
   int _currentIndex = 0;
   bool _isLoading = true;
+  bool _isFavorite = false;
+  bool _isInWishlist = false;
 
   @override
   void initState() {
@@ -201,6 +204,83 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
     );
   }
 
+  Widget _buildActionButtons(BuildContext context, models.Card card) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Add to Collection button
+          ElevatedButton.icon(
+            icon: const Icon(Icons.add),
+            label: const Text('Add to Collection'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.primaryContainer,
+              foregroundColor: colorScheme.onPrimaryContainer,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+            onPressed: () {
+              context.push('/collection/add?cardId=${card.productId}');
+            },
+          ),
+          const SizedBox(width: 12),
+
+          // Favorite button
+          IconButton(
+            icon: Icon(
+              _isFavorite ? Icons.star : Icons.star_border,
+              color: _isFavorite ? Colors.amber : null,
+            ),
+            tooltip: _isFavorite ? 'Remove from Favorites' : 'Add to Favorites',
+            onPressed: () {
+              setState(() {
+                _isFavorite = !_isFavorite;
+              });
+              // This is a placeholder - no actual functionality yet
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    _isFavorite
+                        ? 'Added to favorites'
+                        : 'Removed from favorites',
+                  ),
+                  duration: const Duration(seconds: 1),
+                ),
+              );
+            },
+          ),
+
+          // Wishlist button
+          IconButton(
+            icon: Icon(
+              _isInWishlist ? Icons.bookmark : Icons.bookmark_border,
+              color: _isInWishlist ? colorScheme.tertiary : null,
+            ),
+            tooltip: _isInWishlist ? 'Remove from Wishlist' : 'Add to Wishlist',
+            onPressed: () {
+              setState(() {
+                _isInWishlist = !_isInWishlist;
+              });
+              // This is a placeholder - no actual functionality yet
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    _isInWishlist
+                        ? 'Added to wishlist'
+                        : 'Removed from wishlist',
+                  ),
+                  duration: const Duration(seconds: 1),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildWideLayout(BuildContext context, models.Card card) {
     // Calculate dimensions for wide layout
     final screenHeight = MediaQuery.of(context).size.height;
@@ -223,28 +303,37 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
               flex: 2,
               child: Stack(
                 children: [
-                  Center(
-                    child: Padding(
-                      padding: EdgeInsets.only(top: topPadding),
-                      child: SizedBox(
-                        width: cardWidth,
-                        height: maxCardHeight,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).scaffoldBackgroundColor,
-                            borderRadius: BorderRadius.circular(16.0),
-                            image: DecorationImage(
-                              image: NetworkImage(card.getBestImageUrl() ?? ''),
-                              fit: BoxFit.contain,
-                              onError: (_, __) {
-                                talker.error(
-                                    'Failed to load high-res image for card: ${card.productId}');
-                              },
+                  Column(
+                    children: [
+                      Expanded(
+                        child: Center(
+                          child: Padding(
+                            padding: EdgeInsets.only(top: topPadding),
+                            child: SizedBox(
+                              width: cardWidth,
+                              height: maxCardHeight,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color:
+                                      Theme.of(context).scaffoldBackgroundColor,
+                                  borderRadius: BorderRadius.circular(16.0),
+                                  image: DecorationImage(
+                                    image: NetworkImage(
+                                        card.getBestImageUrl() ?? ''),
+                                    fit: BoxFit.contain,
+                                    onError: (_, __) {
+                                      talker.error(
+                                          'Failed to load high-res image for card: ${card.productId}');
+                                    },
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+                      _buildActionButtons(context, card),
+                    ],
                   ),
                   // Add navigation overlay on top of the card image
                   _buildNavigationOverlay(context),
@@ -278,7 +367,8 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
 
     // Use a percentage of screen height to ensure the card is visible on all devices
     // including foldable phones with unusual aspect ratios
-    final maxCardHeight = screenHeight * 0.55;
+    final maxCardHeight =
+        screenHeight * 0.45; // Reduced to make room for action buttons
 
     // Calculate card width based on the standard card aspect ratio (223/311)
     // but constrained by the maximum height
@@ -330,6 +420,9 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
                   _buildNavigationOverlay(context),
                 ],
               ),
+            ),
+            SliverToBoxAdapter(
+              child: _buildActionButtons(context, card),
             ),
             SliverToBoxAdapter(
               child: Padding(

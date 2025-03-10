@@ -58,6 +58,7 @@ class CollectionRepository {
     int? foilQty,
     Map<String, CardCondition>? condition,
     Map<String, PurchaseInfo>? purchaseInfo,
+    Map<String, GradingInfo>? gradingInfo,
   }) async {
     try {
       // Check if card already exists in collection
@@ -70,6 +71,7 @@ class CollectionRepository {
           foilQty: foilQty ?? existingCard.foilQty,
           condition: condition ?? existingCard.condition,
           purchaseInfo: purchaseInfo ?? existingCard.purchaseInfo,
+          gradingInfo: gradingInfo ?? existingCard.gradingInfo,
           lastModified: Timestamp.now(),
         );
 
@@ -85,6 +87,7 @@ class CollectionRepository {
           foilQty: foilQty ?? 0,
           condition: condition,
           purchaseInfo: purchaseInfo,
+          gradingInfo: gradingInfo,
           lastModified: Timestamp.now(),
         );
 
@@ -98,6 +101,7 @@ class CollectionRepository {
           foilQty: newCard.foilQty,
           condition: newCard.condition,
           purchaseInfo: newCard.purchaseInfo,
+          gradingInfo: newCard.gradingInfo,
           lastModified: newCard.lastModified,
         );
       }
@@ -126,11 +130,17 @@ class CollectionRepository {
       int uniqueCards = collection.length;
       int regularCards = 0;
       int foilCards = 0;
+      int gradedCards = 0;
 
       for (final card in collection) {
         regularCards += card.regularQty;
         foilCards += card.foilQty;
         totalCards += card.regularQty + card.foilQty;
+
+        // Count graded cards
+        if (card.gradingInfo.isNotEmpty) {
+          gradedCards++;
+        }
       }
 
       return {
@@ -138,6 +148,7 @@ class CollectionRepository {
         'uniqueCards': uniqueCards,
         'regularCards': regularCards,
         'foilCards': foilCards,
+        'gradedCards': gradedCards,
       };
     } catch (e) {
       // Log error
@@ -146,6 +157,7 @@ class CollectionRepository {
         'uniqueCards': 0,
         'regularCards': 0,
         'foilCards': 0,
+        'gradedCards': 0,
       };
     }
   }

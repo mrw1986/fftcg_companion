@@ -36,7 +36,18 @@
   - [x] Custom theme color selection
   - [x] Predefined color schemes
   - [x] Contrast guarantees for accessibility
-- [ ] Collection tracking
+- [x] Collection tracking
+  - [x] Card collection management
+  - [x] Regular and foil tracking
+  - [x] Card condition tracking
+  - [x] Purchase information
+  - [x] Grading information (PSA, BGS, CGC)
+  - [x] Collection statistics
+  - [x] Grid and list views
+  - [x] Filtering and sorting
+  - [x] Card labels toggle
+  - [x] Enhanced search functionality
+  - [x] Improved UI consistency with Cards feature
 - [ ] Deck builder
 - [ ] Card scanner
 - [ ] Price tracking
@@ -152,6 +163,45 @@
   - Added theme persistence using Hive storage
   - Implemented safe color adjustments for better visibility
   - Updated router to include theme settings route
+- Implemented collection management feature:
+  - Created collection data models with support for regular and foil cards
+  - Added card condition tracking with standardized condition codes
+  - Implemented purchase information tracking with price and date
+  - Added professional grading support for PSA, BGS, and CGC
+  - Created collection repository with Firestore integration
+  - Implemented collection providers for state management
+  - Created collection UI with grid and list views
+  - Added collection statistics card
+  - Implemented filtering and sorting functionality
+  - Created detailed collection item view
+  - Added add/edit functionality for collection items
+  - Integrated with card cache for efficient image loading
+  - Updated router to include collection routes
+- Enhanced card details page with action buttons:
+  - Added "Add to Collection" button that navigates to the Collection Edit page
+  - Implemented "Favorite" button with star icon and toggle functionality
+  - Added "Add to Wishlist" button with bookmark icon and toggle functionality
+  - Ensured buttons are visually consistent with the app's design language
+  - Improved layout to accommodate the new action buttons
+- Improved collection management workflow:
+  - Added integrated card search in the collection edit page
+  - Implemented search bar in the app bar when in search mode
+  - Created search results list with card images and details
+  - Added ability to select a card from search results
+  - Improved UX flow for adding new cards to collection
+  - Ensured seamless integration with existing collection management features
+  - Added support for direct navigation from Card Details page
+- Improved Collection UI to match Cards UI:
+  - Updated collection grid to match cards grid implementation
+  - Added card labels toggle in collection page
+  - Improved collection card display with quantity indicators
+  - Enhanced collection search functionality to search by card name
+  - Fixed scrolling issues in collection content
+  - Added scroll to top functionality
+  - Improved sort options with animation and visual feedback
+  - Added price sorting options (market, low, mid, high)
+  - Fixed search functionality in collection edit page
+  - Ensured consistent UI between cards and collection features
 
 ### In Progress
 
@@ -162,13 +212,17 @@
 
 ### Future Tasks
 
-- Implement collection management
-- Add deck building features
+- Implement deck building features
 - Develop card scanning functionality
 - Add price tracking system
 - Consider loading progress indicators
 - Add initialization performance metrics
 - Enhance error handling for image loading
+- Implement favorites and wishlist features
+- Add advanced filtering options for collection
+- Implement batch operations for collection management
+- Add collection import/export functionality
+- Add collection sharing functionality
 
 ## Scalability Considerations
 

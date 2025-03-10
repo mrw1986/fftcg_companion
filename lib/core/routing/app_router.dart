@@ -13,7 +13,11 @@ import '../../features/profile/presentation/pages/login_page.dart';
 import '../../features/profile/presentation/pages/register_page.dart';
 import '../../features/profile/presentation/pages/reset_password_page.dart';
 import '../../features/profile/presentation/pages/account_page.dart';
+import '../../features/collection/presentation/pages/collection_page.dart';
+import '../../features/collection/presentation/pages/collection_item_detail_page.dart';
+import '../../features/collection/presentation/pages/collection_edit_page.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
+import 'package:fftcg_companion/features/collection/domain/models/collection_item.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
@@ -36,9 +40,43 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/collection',
-            builder: (context, state) => const Scaffold(
-              body: Center(child: Text('Collection Screen')),
-            ),
+            builder: (context, state) => const CollectionPage(),
+            routes: [
+              GoRoute(
+                path: 'add',
+                builder: (context, state) {
+                  final cardId = state.uri.queryParameters['cardId'] ?? '';
+                  final startWithSearch =
+                      state.uri.queryParameters['search'] == 'true';
+                  return CollectionEditPage(
+                    cardId: cardId.isNotEmpty ? cardId : null,
+                    startWithSearch: startWithSearch,
+                  );
+                },
+              ),
+              GoRoute(
+                path: 'edit/:cardId',
+                builder: (context, state) {
+                  final cardId = state.pathParameters['cardId'] ?? '';
+                  final item = state.extra as CollectionItem?;
+                  return CollectionEditPage(
+                    cardId: cardId,
+                    existingItem: item,
+                  );
+                },
+              ),
+              GoRoute(
+                path: ':cardId',
+                builder: (context, state) {
+                  final cardId = state.pathParameters['cardId'] ?? '';
+                  final item = state.extra as CollectionItem?;
+                  return CollectionItemDetailPage(
+                    cardId: cardId,
+                    initialItem: item,
+                  );
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/decks',

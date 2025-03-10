@@ -19,6 +19,56 @@ enum CardCondition {
   }
 }
 
+/// Represents a grading company
+enum GradingCompany {
+  psa('PSA'),
+  bgs('BGS'),
+  cgc('CGC');
+
+  final String name;
+  const GradingCompany(this.name);
+
+  factory GradingCompany.fromName(String name) {
+    return GradingCompany.values.firstWhere(
+      (e) => e.name == name,
+      orElse: () => GradingCompany.psa,
+    );
+  }
+}
+
+/// Represents grading information for a card
+class GradingInfo {
+  final GradingCompany company;
+  final String grade;
+  final Timestamp? gradedDate;
+  final String? certNumber;
+
+  GradingInfo({
+    required this.company,
+    required this.grade,
+    this.gradedDate,
+    this.certNumber,
+  });
+
+  factory GradingInfo.fromMap(Map<String, dynamic> map) {
+    return GradingInfo(
+      company: GradingCompany.fromName(map['company']),
+      grade: map['grade'],
+      gradedDate: map['gradedDate'],
+      certNumber: map['certNumber'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'company': company.name,
+      'grade': grade,
+      'gradedDate': gradedDate,
+      'certNumber': certNumber,
+    };
+  }
+}
+
 /// Represents purchase information for a card
 class PurchaseInfo {
   final double price;
@@ -53,6 +103,7 @@ class CollectionItem {
   final int foilQty;
   final Map<String, CardCondition> condition;
   final Map<String, PurchaseInfo> purchaseInfo;
+  final Map<String, GradingInfo> gradingInfo;
   final Timestamp lastModified;
 
   CollectionItem({
@@ -63,9 +114,11 @@ class CollectionItem {
     this.foilQty = 0,
     Map<String, CardCondition>? condition,
     Map<String, PurchaseInfo>? purchaseInfo,
+    Map<String, GradingInfo>? gradingInfo,
     Timestamp? lastModified,
   })  : condition = condition ?? {},
         purchaseInfo = purchaseInfo ?? {},
+        gradingInfo = gradingInfo ?? {},
         lastModified = lastModified ?? Timestamp.now();
 
   /// Create a CollectionItem from a Map (usually from Firestore)
@@ -97,6 +150,18 @@ class CollectionItem {
       }
     }
 
+    // Parse grading info map
+    final gradingInfoMap = <String, GradingInfo>{};
+    if (map['gradingInfo'] != null) {
+      final gradingData = map['gradingInfo'] as Map<String, dynamic>;
+      if (gradingData['regular'] != null) {
+        gradingInfoMap['regular'] = GradingInfo.fromMap(gradingData['regular']);
+      }
+      if (gradingData['foil'] != null) {
+        gradingInfoMap['foil'] = GradingInfo.fromMap(gradingData['foil']);
+      }
+    }
+
     return CollectionItem(
       id: id,
       userId: map['userId'],
@@ -105,6 +170,7 @@ class CollectionItem {
       foilQty: map['foilQty'] ?? 0,
       condition: conditionMap,
       purchaseInfo: purchaseInfoMap,
+      gradingInfo: gradingInfoMap,
       lastModified: map['lastModified'] ?? Timestamp.now(),
     );
   }
@@ -129,6 +195,15 @@ class CollectionItem {
       purchaseInfoMap['foil'] = purchaseInfo['foil']!.toMap();
     }
 
+    // Convert grading info to map
+    final gradingInfoMap = <String, Map<String, dynamic>>{};
+    if (gradingInfo.containsKey('regular')) {
+      gradingInfoMap['regular'] = gradingInfo['regular']!.toMap();
+    }
+    if (gradingInfo.containsKey('foil')) {
+      gradingInfoMap['foil'] = gradingInfo['foil']!.toMap();
+    }
+
     return {
       'userId': userId,
       'cardId': cardId,
@@ -136,6 +211,7 @@ class CollectionItem {
       'foilQty': foilQty,
       'condition': conditionMap.isEmpty ? null : conditionMap,
       'purchaseInfo': purchaseInfoMap.isEmpty ? null : purchaseInfoMap,
+      'gradingInfo': gradingInfoMap.isEmpty ? null : gradingInfoMap,
       'lastModified': lastModified,
     };
   }
@@ -148,6 +224,7 @@ class CollectionItem {
     int? foilQty,
     Map<String, CardCondition>? condition,
     Map<String, PurchaseInfo>? purchaseInfo,
+    Map<String, GradingInfo>? gradingInfo,
     Timestamp? lastModified,
   }) {
     return CollectionItem(
@@ -158,6 +235,7 @@ class CollectionItem {
       foilQty: foilQty ?? this.foilQty,
       condition: condition ?? this.condition,
       purchaseInfo: purchaseInfo ?? this.purchaseInfo,
+      gradingInfo: gradingInfo ?? this.gradingInfo,
       lastModified: lastModified ?? Timestamp.now(),
     );
   }

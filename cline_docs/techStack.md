@@ -63,6 +63,10 @@
   - Anonymous authentication
   - Account linking
   - Password reset functionality
+- Firestore for user data
+  - Collection management
+  - User preferences
+  - Deck storage (planned)
 
 ### Local Storage
 
@@ -71,6 +75,7 @@
   - Search results caching
   - User preferences and settings
   - Theme settings persistence
+  - View preferences persistence
   - Custom adapters for complex types
   - Version-based cache management
 
@@ -185,16 +190,46 @@
 - Efficient state management
 - Memory leak prevention
 
+## Feature Implementations
+
+### Collection Management System
+
+- Data Models
+  - CollectionItem model for user's card collection
+  - Support for regular and foil cards
+  - Card condition tracking (NM, LP, MP, HP, DMG)
+  - Purchase information tracking (price, date)
+  - Professional grading support (PSA, BGS, CGC)
+  - Firestore integration with efficient document structure
+
+- UI Components
+  - Grid and list views with customizable sizes
+  - Card labels toggle for showing/hiding card names and numbers
+  - Collection statistics card
+  - Filtering by card type (regular, foil, graded)
+  - Sorting by various criteria (last modified, card ID, quantity, price)
+  - Search functionality within collection
+  - Collection edit page with integrated card search
+  - Collection item detail page
+  - Consistent UI with Cards feature
+
+- State Management
+  - AsyncNotifierProvider for collection data
+  - StateProvider for search, filter, and sort preferences
+  - FutureProvider for collection statistics
+  - Provider for filtered and searched collection
+
+- Firestore Integration
+  - Efficient document structure for collection items
+  - Real-time updates for collection changes
+  - Offline support for collection management
+  - Batch operations for multiple card updates
+
 ## Future Considerations
 
 ### Planned Additions
 
 - Camera integration for card scanning
-- Collection management
-  - Card tracking with quantities
-  - Card condition tracking
-  - Purchase information
-  - Collection statistics
 - Deck building
   - Deck creation and editing
   - Format validation
@@ -203,6 +238,10 @@
 - Price tracking APIs
 - Cloud synchronization
 - Advanced text processing features
+- Favorites and wishlist features
+- Collection import/export functionality
+- Collection sharing capabilities
+- Batch operations for collection management
 
 ### Scalability
 

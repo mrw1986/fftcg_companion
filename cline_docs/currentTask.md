@@ -2,29 +2,25 @@
 
 ## Previous Objective (Completed)
 
-Implement Firebase Authentication in the FFTCG Companion app with automatic anonymous authentication
-
-## Current Objective
-
 Implement theme customization in the FFTCG Companion app with support for light/dark modes and custom theme colors
 
-## Authentication Context (Completed)
+## Current Objective (Completed)
 
-The app needed user authentication to maintain user settings, collections, decks, and other user-specific data across devices. We implemented Firebase Authentication with three authentication methods:
+Implement collection management feature in the FFTCG Companion app with support for tracking card quantities, conditions, purchase information, and grading
 
-1. Google Sign-In
-2. Email/Password authentication
-3. Anonymous authentication (automatic)
+## New Objective (Completed)
 
-This implementation allows users to:
+Enhance the card details page with action buttons and improve the collection management workflow with integrated card search
 
-- Create accounts with email/password or Google Sign-In
-- Use the app anonymously without explicitly choosing to do so (automatic)
-- Upgrade from anonymous to permanent accounts without losing data
-- Manage their account settings
-- Sign in across multiple devices with the same account
+## Latest Objective (Completed)
 
-## Theme Customization Context
+Improve the Collection UI to match the Cards UI for consistency and enhance the search functionality
+
+## Recent Objective (Completed)
+
+Fix layout issues in the Collection UI by resolving nested scrollable widgets problem
+
+## Theme Customization Context (Completed)
 
 The app needed a comprehensive theming system to provide a personalized user experience and ensure good readability in both light and dark modes. We implemented a theme customization system with the following features:
 
@@ -34,63 +30,56 @@ The app needed a comprehensive theming system to provide a personalized user exp
 4. Contrast guarantees for text readability
 5. Persistent theme settings across app restarts
 
-## Authentication Implementation Plan (Completed)
+## Collection Management Context (Completed)
 
-### 1. Create Authentication Service
+The app needed a comprehensive collection management system to allow users to track their card collection, including quantities, conditions, purchase information, and professional grading. We implemented a collection management system with the following features:
 
-Location: lib/core/services/auth_service.dart
+1. Collection tracking for regular and foil cards
+2. Card condition tracking with standardized condition codes (NM, LP, MP, HP, DMG)
+3. Purchase information tracking with price and date
+4. Professional grading support for PSA, BGS, and CGC
+5. Collection statistics
+6. Grid and list view options with customizable sizes
+7. Filtering by card type (regular, foil, graded)
+8. Sorting by various criteria (last modified, card ID, quantity)
+9. Search functionality within collection
 
-- Created a service class to handle all Firebase Authentication operations
-- Implemented methods for each authentication provider
-- Added user state management and persistence
-- Implemented error handling for authentication operations
-- Added methods to link anonymous accounts to permanent accounts
+## Card Details and Collection Workflow Enhancement Context (Completed)
 
-### 2. Create Authentication Provider
+The app needed a more streamlined workflow for adding cards to the collection and better integration between the card details page and collection management. We implemented the following enhancements:
 
-Location: lib/core/providers/auth_provider.dart
+1. Action buttons on the card details page (Add to Collection, Favorite, Add to Wishlist)
+2. Integrated card search in the collection edit page
+3. Direct navigation from card details to collection edit
+4. Placeholder functionality for favorites and wishlist features
 
-- Created Riverpod providers for authentication state
-- Implemented AuthState class to represent different authentication states
-- Added methods to expose authentication functionality to the UI
+## Collection UI Improvement Context (Completed)
 
-### 3. Implement Automatic Anonymous Authentication
+The Collection UI needed to be more consistent with the Cards UI for a better user experience. We implemented the following improvements:
 
-Location: lib/core/providers/auto_auth_provider.dart
+1. Updated collection grid to match cards grid implementation
+2. Added card labels toggle in collection page
+3. Improved collection card display with quantity indicators
+4. Enhanced collection search functionality to search by card name
+5. Fixed scrolling issues in collection content
+6. Added scroll to top functionality
+7. Improved sort options with animation and visual feedback
+8. Added price sorting options (market, low, mid, high)
+9. Fixed search functionality in collection edit page
+10. Ensured consistent UI between cards and collection features
 
-- Created a provider that automatically signs in anonymously if the user is not already signed in
-- Integrated the auto-auth provider with the app initialization
-- Removed explicit "Continue without an account" buttons from the UI
+## Collection UI Layout Fix Context (Completed)
 
-### 4. Create Authentication UI
+The Collection UI had layout issues due to nested scrollable widgets, causing "Vertical viewport was given unbounded height" errors and preventing cards from displaying. We implemented the following fixes:
 
-- Created login page: lib/features/profile/presentation/pages/login_page.dart
-- Created registration page: lib/features/profile/presentation/pages/register_page.dart
-- Created password reset page: lib/features/profile/presentation/pages/reset_password_page.dart
-- Created account management page: lib/features/profile/presentation/pages/account_page.dart
-- Updated profile page to show different options based on authentication state
+1. Removed nested scrollable widgets in collection content
+2. Changed CollectionGrid to use a non-scrollable GridView with shrinkWrap and NeverScrollableScrollPhysics
+3. Updated CollectionList to use a non-scrollable ListView with shrinkWrap and NeverScrollableScrollPhysics
+4. Simplified CollectionContent to properly handle the view type without passing scrollController to child widgets
+5. Removed unused _scrollToTop method from CollectionPage
+6. Replaced deprecated withOpacity with withAlpha for better performance
 
-### 5. Update Authentication Routes
-
-Location: lib/core/routing/app_router.dart
-
-- Added routes for new authentication pages
-- Updated imports to include new pages
-
-### 6. Update Main.dart
-
-Location: lib/main.dart
-
-- Added Firebase Authentication import
-- Ensured Firebase is properly initialized
-
-### 7. Fix Account Linking Issues
-
-- Modified login flow to check if the user is anonymous before signing in
-- If the user is anonymous, link the new credentials to the anonymous account instead of creating a new account
-- This ensures that user data from anonymous sessions is preserved when upgrading to a permanent account
-
-## Theme Customization Implementation Plan
+## Theme Customization Implementation Plan (Completed)
 
 ### 1. Create Theme System
 
@@ -133,59 +122,92 @@ Location: lib/core/routing/app_router.dart
 
 - Added route for theme settings page
 
-## Files Modified for Authentication
+## Collection Management Implementation Plan (Completed)
 
-1. lib/core/services/auth_service.dart (new)
-2. lib/core/providers/auth_provider.dart (new)
-3. lib/core/providers/auto_auth_provider.dart (new)
-4. lib/features/profile/presentation/pages/login_page.dart (new)
-5. lib/features/profile/presentation/pages/register_page.dart (new)
-6. lib/features/profile/presentation/pages/reset_password_page.dart (new)
-7. lib/features/profile/presentation/pages/account_page.dart (new)
-8. lib/features/profile/presentation/pages/profile_page.dart (updated)
-9. lib/core/routing/app_router.dart (updated)
-10. lib/main.dart (updated)
-11. lib/app/app.dart (updated)
+- Users can filter their collection by card type (regular, foil, graded)
+- Users can sort their collection by various criteria
+- Users can search within their collection
+- Collection data is synchronized with Firestore for access across devices
+- Collection UI is consistent with the app's design language
 
-## Files Modified for Theme Customization
+## Collection UI Improvement Implementation Plan (Completed)
 
-1. lib/app/theme/app_theme.dart (updated)
-2. lib/app/theme/contrast_extension.dart (new)
-3. lib/app/theme/theme_provider.dart (new)
-4. lib/app/theme/theme_extensions.dart (updated)
-5. lib/features/profile/presentation/pages/theme_settings_page.dart (new)
-6. lib/core/routing/app_router.dart (updated)
-7. lib/app/app.dart (updated)
+### 1. Update Collection Grid
 
-## Authentication Impact (Completed)
+Location: lib/features/collection/presentation/widgets/collection_grid.dart
 
-- Users are automatically signed in anonymously when they first open the app
-- Users can create accounts and sign in using multiple authentication methods
-- Anonymous users can upgrade to permanent accounts without losing their data
-- User data can be synchronized across devices
-- The Profile page shows different options based on authentication state
-- Account management features are now available
+- Updated grid implementation to match cards grid
+- Added scroll controller for scroll to top functionality
+- Improved grid layout with dynamic column count based on screen size
+- Enhanced card display with proper aspect ratio
 
-## Theme Customization Impact
+### 2. Update Collection Card
 
-- Users can select between light, dark, or system theme modes
-- Users can customize the app's primary color using a color picker
-- Users can select from predefined color schemes
-- Theme settings are persisted across app restarts
-- Text has guaranteed readability with sufficient contrast
-- The app respects system theme changes
-- The Profile page includes a link to theme settings
+Location: lib/features/collection/presentation/widgets/collection_card.dart
 
-## Authentication Status (Completed)
+- Added support for card labels toggle
+- Improved card display with quantity indicators
+- Enhanced card image display with proper border radius
+- Added graded badge for graded cards
 
-- Firebase Authentication has been implemented with Google Sign-In, Email/Password, and Anonymous authentication
-- Automatic anonymous authentication has been implemented
-- UI for authentication has been created
-- Router has been updated to include new authentication routes
-- Main.dart and app.dart have been updated to initialize Firebase Authentication and auto-auth
-- Account linking has been fixed to preserve user data when upgrading from anonymous to permanent accounts
+### 3. Update Collection Page
 
-## Theme Customization Status
+Location: lib/features/collection/presentation/pages/collection_page.dart
+
+- Added card labels toggle button
+- Improved sort options with animation and visual feedback
+- Added price sorting options
+- Added scroll to top functionality
+- Enhanced search functionality
+
+### 4. Update Collection Providers
+
+Location: lib/features/collection/domain/providers/collection_providers.dart
+
+- Enhanced search functionality to search by card name
+- Improved sort functionality with more options
+- Fixed search provider to properly handle card cache
+
+### 5. Update View Preferences
+
+Location: lib/features/collection/domain/providers/view_preferences_provider.dart
+
+- Added showLabels property for card labels toggle
+- Implemented toggleLabels method for card labels toggle
+- Ensured persistence of view preferences
+
+## Collection UI Layout Fix Implementation Plan (Completed)
+
+### 1. Fix Collection Grid
+
+Location: lib/features/collection/presentation/widgets/collection_grid.dart
+
+- Changed CustomScrollView to a simple GridView
+- Added shrinkWrap=true to make the grid take up only as much space as it needs
+- Added physics=NeverScrollableScrollPhysics() to disable scrolling in the grid view
+
+### 2. Fix Collection List
+
+Location: lib/features/collection/presentation/widgets/collection_list.dart
+
+- Changed CustomScrollView to a simple ListView
+- Added shrinkWrap=true to make the list take up only as much space as it needs
+- Added physics=NeverScrollableScrollPhysics() to disable scrolling in the list view
+
+### 3. Fix Collection Content
+
+Location: lib/features/collection/presentation/widgets/collection_content.dart
+
+- Simplified widget to properly handle the view type
+- Removed passing scrollController to child widgets
+
+### 4. Fix Collection Card
+
+Location: lib/features/collection/presentation/widgets/collection_card.dart
+
+- Replaced deprecated withOpacity with withAlpha for better performance
+
+## Theme Customization Status (Completed)
 
 - Theme customization has been implemented with light, dark, and system modes
 - Fixed null check error in ThemeSettingsPage when accessing FlexColor.schemes
@@ -198,25 +220,46 @@ Location: lib/core/routing/app_router.dart
 - The router has been updated to include the theme settings route
 - The Profile page has been updated to include a link to theme settings
 
-## Authentication Testing Strategy (Completed)
+## Collection Management Status (Completed)
 
-1. Authentication Flow Test
-   - Test each authentication provider (Google, Email/Password)
-   - Verify that automatic anonymous authentication works
-   - Verify user state persistence
-   - Test upgrading from anonymous to permanent accounts
+- Collection management has been implemented with support for regular and foil cards
+- Card condition tracking has been implemented with standardized condition codes
+- Purchase information tracking has been implemented with price and date
+- Professional grading support has been implemented for PSA, BGS, and CGC
+- Collection statistics have been implemented
+- Grid and list views have been implemented with customizable sizes
+- Filtering by card type has been implemented
+- Sorting by various criteria has been implemented
+- Search functionality has been implemented
+- Collection data is synchronized with Firestore
+- Collection UI is consistent with the app's design language
+- The router has been updated to include collection routes
 
-2. UI Test
-   - Verify that the Profile page shows different options based on authentication state
-   - Test login, registration, and password reset forms
-   - Verify form validation works correctly
+## Collection UI Improvement Status (Completed)
 
-3. Error Handling Test
-   - Test error handling for invalid credentials
-   - Test error handling for network issues
-   - Verify user feedback for errors
+- Collection grid has been updated to match cards grid implementation
+- Card labels toggle has been added to collection page
+- Collection card display has been improved with quantity indicators
+- Collection search functionality has been enhanced to search by card name
+- Scrolling issues in collection content have been fixed
+- Scroll to top functionality has been added
+- Sort options have been improved with animation and visual feedback
+- Price sorting options have been added
+- Search functionality in collection edit page has been fixed
+- UI consistency between cards and collection features has been ensured
 
-## Theme Customization Testing Strategy
+## Collection UI Layout Fix Status (Completed)
+
+- Nested scrollable widgets issue has been fixed
+- Collection grid now uses a non-scrollable GridView with shrinkWrap and NeverScrollableScrollPhysics
+- Collection list now uses a non-scrollable ListView with shrinkWrap and NeverScrollableScrollPhysics
+- Collection content has been simplified to properly handle the view type
+- Unused _scrollToTop method has been removed from CollectionPage
+- Deprecated withOpacity has been replaced with withAlpha for better performance
+- Cards now display correctly in the collection UI
+- Layout errors have been resolved
+
+## Theme Customization Testing Strategy (Completed)
 
 1. Theme Mode Test
    - Verify that light, dark, and system modes work correctly
@@ -234,11 +277,74 @@ Location: lib/core/routing/app_router.dart
    - Test theme changes in different parts of the app
    - Verify that text remains readable in all themes
 
+## Collection Management Testing Strategy (Completed)
+
+1. Collection CRUD Test
+   - Test adding cards to the collection
+   - Test updating card quantities, conditions, purchase info, and grading
+   - Test removing cards from the collection
+   - Verify that changes are persisted to Firestore
+
+2. Collection UI Test
+   - Test grid and list views
+   - Test view size changes
+   - Test filtering by card type
+   - Test sorting by various criteria
+   - Test search functionality
+   - Verify that collection statistics are accurate
+
+3. Offline Support Test
+   - Test adding cards while offline
+   - Test updating cards while offline
+   - Test removing cards while offline
+   - Verify that changes are synchronized when back online
+
+## Collection UI Improvement Testing Strategy (Completed)
+
+1. UI Consistency Test
+   - Verify that collection grid matches cards grid
+   - Test card labels toggle functionality
+   - Verify that card labels are displayed correctly
+   - Test quantity indicators display
+
+2. Search Functionality Test
+   - Test search by card name
+   - Test search by card number
+   - Verify that search results are accurate
+   - Test search in collection edit page
+
+3. Sorting and Navigation Test
+   - Test all sorting options
+   - Verify that price sorting options work correctly
+   - Test scroll to top functionality
+   - Verify that sort animation works correctly
+
+## Collection UI Layout Fix Testing Strategy (Completed)
+
+1. Layout Test
+   - Verify that cards display correctly in the collection UI
+   - Test that no layout errors occur when scrolling
+   - Verify that the collection grid and list display correctly
+   - Test that the collection content handles view type changes correctly
+
+2. Performance Test
+   - Verify that scrolling is smooth
+   - Test that the app doesn't lag when displaying many cards
+   - Verify that the app doesn't crash when loading the collection
+
+3. Visual Test
+   - Verify that cards are displayed with the correct size and spacing
+   - Test that card labels are displayed correctly
+   - Verify that quantity indicators are displayed correctly
+   - Test that graded badges are displayed correctly
+
 ## Next Steps
 
-1. Implement Firestore security rules to protect user data
-2. Update collection and deck features to associate data with user accounts
-3. Implement data migration when converting from anonymous to permanent accounts
-4. Implement email verification
-5. Implement collection management feature
-6. Implement deck builder feature
+1. Implement deck builder feature
+2. Implement card scanner feature
+3. Implement price tracking feature
+4. Add collection import/export functionality
+5. Add collection sharing functionality
+6. Implement favorites and wishlist features
+7. Add advanced filtering options for collection
+8. Implement batch operations for collection management
