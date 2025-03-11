@@ -36,12 +36,14 @@
   - [x] Account management
     - [x] Profile settings
     - [x] Email change with verification
+    - [x] Fixed text contrast issues in authentication pages
 - [x] Theme customization
   - [x] Light/dark mode support
   - [x] System theme integration
   - [x] Custom theme color selection
   - [x] Predefined color schemes
   - [x] Contrast guarantees for accessibility
+  - [x] Fixed text contrast issues in authentication pages
 - [x] Collection tracking
   - [x] Card collection management
   - [x] Regular and foil tracking
@@ -242,6 +244,11 @@
   - Reduced the space between the Collection Stats card and card images using Transform.translate with negative offset
   - Fixed the filter functionality in the Collection page to properly apply both collection-specific filters and card filters
   - Improved the overall user experience with more consistent UI elements and behavior
+- Fixed authentication UI text contrast issues:
+  - Updated text styling in login page, account page, and register page to ensure proper contrast in dark mode
+  - Replaced ContrastExtension with direct brightness check for critical text elements
+  - Implemented explicit white text color for dark mode to ensure maximum readability
+  - Maintained proper text styling for light mode
 
 ### In Progress
 

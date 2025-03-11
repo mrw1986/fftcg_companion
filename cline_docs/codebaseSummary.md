@@ -301,6 +301,14 @@
     - Improved the password reset flow with automatic logout for security
     - Made all authentication notifications more user-friendly with longer durations
     - Used theme-consistent colors for all notifications
+    - Fixed text contrast issues in authentication-related pages for better readability in dark mode
+
+13. **Authentication UI Contrast Fix**
+    - Fixed text contrast issues in login page, account page, and register page
+    - Replaced ContrastExtension usage with direct brightness checks for critical text elements
+    - Implemented explicit white text color for dark mode to ensure maximum readability
+    - Maintained proper text styling for light mode
+    - Improved user experience in dark mode by ensuring all text is readable
 
 ## User Feedback Integration
 
@@ -380,12 +388,14 @@
    - Users reported issues with Google Sign-In on emulators
    - Users wanted better feedback during authentication operations
    - Users needed clearer verification instructions for email accounts
+   - Users reported text readability issues in dark mode on authentication pages
    - Enhanced Google Sign-In with detailed logging and emulator detection
    - Redesigned GoogleSignInButton with loading state and error handling
    - Added email verification tracking with isVerified field
    - Made SnackBar notifications interactive with OK buttons
    - Improved error messages for authentication operations
    - Enhanced the overall authentication experience with better feedback
+   - Fixed text contrast issues in authentication-related pages by implementing direct brightness checks
 
 ## Upcoming Development Focus
 

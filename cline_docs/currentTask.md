@@ -580,6 +580,56 @@ Location: lib/features/profile/domain/models/user_model.dart, lib/core/services/
 - Logging has been added throughout the authentication process
 - The overall authentication experience has been improved with better feedback
 
+## Current Objective 5 (Completed)
+
+Fix text contrast issues in authentication-related pages to ensure readability in dark mode
+
+## Authentication UI Contrast Fix Context
+
+The app had issues with text readability in authentication-related pages in dark mode, where dark text was being displayed on dark backgrounds. We implemented the following fixes:
+
+1. Updated text styling in login page, account page, and register page to ensure proper contrast in dark mode
+2. Replaced ContrastExtension usage with direct brightness checks for critical text elements
+3. Implemented explicit white text color for dark mode to ensure maximum readability
+4. Maintained proper text styling for light mode
+
+## Authentication UI Contrast Fix Implementation Plan
+
+### 1. Fix Login Page Text Contrast
+
+Location: lib/features/profile/presentation/pages/login_page.dart
+
+- Updated text styling in the anonymous account options container
+- Replaced ContrastExtension with direct brightness check
+- Implemented explicit white text color for dark mode
+- Maintained proper text styling for light mode
+
+### 2. Fix Account Page Text Contrast
+
+Location: lib/features/profile/presentation/pages/account_page.dart
+
+- Updated text styling in the anonymous account information section
+- Replaced const Text widgets with Text widgets that check brightness
+- Implemented explicit white text color for dark mode
+- Maintained proper text styling for light mode
+
+### 3. Fix Register Page Text Contrast
+
+Location: lib/features/profile/presentation/pages/register_page.dart
+
+- Updated text styling in the account information container
+- Replaced ContrastExtension with direct brightness check
+- Implemented explicit white text color for dark mode
+- Maintained proper text styling for light mode
+
+## Authentication UI Contrast Fix Status
+
+- Text contrast issues in the login page have been fixed
+- Text contrast issues in the account page have been fixed
+- Text contrast issues in the register page have been fixed
+- All text in authentication-related pages is now readable in both light and dark modes
+- The fix uses a direct brightness check approach for maximum reliability
+
 ## Next Steps
 
 1. Implement deck builder feature
