@@ -45,7 +45,6 @@ Future<void> initializeApp() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-
     // Initialize CachePersistence
     await CachePersistence.initialize();
 

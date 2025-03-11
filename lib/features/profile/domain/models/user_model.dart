@@ -8,7 +8,9 @@ class UserModel {
   final String? photoURL;
   final Map<String, dynamic> settings;
   final Timestamp createdAt;
+  final bool isVerified;
   final Timestamp lastLogin;
+  final Timestamp? lastAccessed;
 
   UserModel({
     required this.id,
@@ -18,6 +20,8 @@ class UserModel {
     Map<String, dynamic>? settings,
     Timestamp? createdAt,
     Timestamp? lastLogin,
+    this.lastAccessed,
+    this.isVerified = false,
   })  : settings = settings ?? {},
         createdAt = createdAt ?? Timestamp.now(),
         lastLogin = lastLogin ?? Timestamp.now();
@@ -32,6 +36,8 @@ class UserModel {
       settings: Map<String, dynamic>.from(map['settings'] ?? {}),
       createdAt: map['createdAt'] ?? Timestamp.now(),
       lastLogin: map['lastLogin'] ?? Timestamp.now(),
+      lastAccessed: map['lastAccessed'],
+      isVerified: map['isVerified'] ?? false,
     );
   }
 
@@ -44,6 +50,8 @@ class UserModel {
       'settings': settings,
       'createdAt': createdAt,
       'lastLogin': lastLogin,
+      'lastAccessed': lastAccessed,
+      'isVerified': isVerified,
     };
   }
 
@@ -54,6 +62,8 @@ class UserModel {
     String? photoURL,
     Map<String, dynamic>? settings,
     Timestamp? lastLogin,
+    Timestamp? lastAccessed,
+    bool? isVerified,
   }) {
     return UserModel(
       id: id,
@@ -63,6 +73,8 @@ class UserModel {
       settings: settings ?? this.settings,
       createdAt: createdAt,
       lastLogin: lastLogin ?? this.lastLogin,
+      lastAccessed: lastAccessed ?? this.lastAccessed,
+      isVerified: isVerified ?? this.isVerified,
     );
   }
 }

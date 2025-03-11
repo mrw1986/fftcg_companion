@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/app/theme/contrast_extension.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/shared/widgets/google_sign_in_button.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 import 'package:fftcg_companion/shared/widgets/styled_button.dart';
@@ -21,7 +23,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
-  String? _errorMessage;
 
   @override
   void dispose() {
@@ -36,7 +37,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
@@ -58,42 +58,155 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       }
 
       if (mounted) {
+        // Show success message with action button
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Account created successfully. Please check your email for verification.'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            duration: const Duration(seconds: 10), // Longer duration
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Theme.of(context).colorScheme.onPrimary,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+
+        // Navigate to profile page
         context.go('/profile');
       }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
         _isLoading = false;
       });
+
+      // Show user-friendly error message as SnackBar
+      if (mounted) {
+        String errorMessage = 'Failed to create account';
+
+        if (e is FirebaseAuthException) {
+          switch (e.code) {
+            case 'email-already-in-use':
+              errorMessage =
+                  'An account already exists with this email address';
+              break;
+            case 'invalid-email':
+              errorMessage = 'Please enter a valid email address';
+              break;
+            case 'weak-password':
+              errorMessage =
+                  'Password is too weak. Please use a stronger password';
+              break;
+            case 'operation-not-allowed':
+              errorMessage = 'Email/password accounts are not enabled';
+              break;
+            default:
+              errorMessage = 'Registration failed: ${e.message}';
+          }
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
   Future<void> _signInWithGoogle() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
+      talker.debug('Register page: Starting Google Sign-In');
       final authService = ref.read(authServiceProvider);
       final authState = ref.read(authStateProvider);
 
       // If user is anonymous, link the account
       if (authState.isAnonymous) {
+        talker.debug('Register page: Linking anonymous account with Google');
         await authService.linkWithGoogle();
+        talker.debug('Register page: Google linking successful');
       } else {
         // Otherwise sign in with Google
+        talker.debug('Register page: Creating new account with Google');
         await authService.signInWithGoogle();
+        talker.debug('Register page: Google Sign-In successful');
       }
 
       if (mounted) {
+        // Show success message with action button
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Account created successfully with Google'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Theme.of(context).colorScheme.onPrimary,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+
+        // Navigate to profile page
         context.go('/profile');
       }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
         _isLoading = false;
       });
+
+      // Show user-friendly error message as SnackBar
+      if (mounted) {
+        String errorMessage = 'Failed to sign in with Google';
+
+        if (e is FirebaseAuthException) {
+          switch (e.code) {
+            case 'account-exists-with-different-credential':
+              errorMessage =
+                  'An account already exists with the same email address but different sign-in credentials';
+              break;
+            case 'invalid-credential':
+              errorMessage = 'The sign-in credential is invalid';
+              break;
+            case 'operation-not-allowed':
+              errorMessage = 'Google sign-in is not enabled for this project';
+              break;
+            case 'user-disabled':
+              errorMessage = 'This account has been disabled';
+              break;
+            default:
+              errorMessage = 'Google sign-in failed: ${e.message}';
+          }
+        } else if (e.toString().contains('sign in was cancelled')) {
+          errorMessage = 'Google sign-in was cancelled';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -146,25 +259,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                   .extension<ContrastExtension>()
                                   ?.onSurfaceWithContrast ??
                               Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                  if (_errorMessage != null)
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withAlpha(25),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context)
-                                  .extension<ContrastExtension>()
-                                  ?.onSurfaceWithContrast ??
-                              Theme.of(context).colorScheme.error,
-                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
@@ -262,7 +356,29 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   const Divider(thickness: 1),
                   const SizedBox(height: 16),
                   GoogleSignInButton(
-                    onPressed: _signInWithGoogle,
+                    onPressed: () async {
+                      await _signInWithGoogle();
+                    },
+                    onError: (e) {
+                      talker.error('Google Sign-In error in register page: $e');
+                      // Show a more detailed error message
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content:
+                              Text('Google Sign-In failed: ${e.toString()}'),
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                          duration: const Duration(seconds: 10),
+                          action: SnackBarAction(
+                            label: 'OK',
+                            textColor: Colors.white,
+                            onPressed: () {
+                              ScaffoldMessenger.of(context)
+                                  .hideCurrentSnackBar();
+                            },
+                          ),
+                        ),
+                      );
+                    },
                     text: isAnonymous
                         ? 'Link with Google'
                         : 'Register with Google',

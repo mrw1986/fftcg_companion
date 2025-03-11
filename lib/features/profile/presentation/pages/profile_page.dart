@@ -23,16 +23,6 @@ class ProfilePage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
-        actions: [
-          if (authState.isAuthenticated || authState.isAnonymous)
-            IconButton(
-              icon: const Icon(Icons.logout),
-              tooltip: 'Sign Out',
-              onPressed: () async {
-                await ref.read(authServiceProvider).signOut();
-              },
-            ),
-        ],
       ),
       body: ListView(
         children: [
@@ -153,67 +143,42 @@ class ProfilePage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'You\'re using the app without an account',
+                'You\'re using an anonymous account',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  // Ensure text is visible by using onSurface color
                   color:
                       contrast?.onSurfaceWithContrast ?? colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Create an account to save your collection, decks, and settings across devices.',
+                'Your anonymous account data will be automatically deleted after 30 days of inactivity.',
                 style: TextStyle(
                   fontSize: 16,
-                  // Ensure text is visible by using onSurface color
                   color:
                       contrast?.onSurfaceWithContrast ?? colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => context.go('/profile/register'),
-                      style: TextButton.styleFrom(
-                        // Use primary color with high contrast
-                        foregroundColor: contrast?.primaryWithContrast ??
-                            colorScheme.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: Text(
-                        'Create Account',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w500,
-                          // Ensure text is visible
-                          color: contrast?.primaryWithContrast ??
-                              colorScheme.primary,
-                        ),
-                      ),
+              Center(
+                child: ElevatedButton(
+                  onPressed: () => context.go('/profile/login'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        contrast?.primaryWithContrast ?? colorScheme.primary,
+                    foregroundColor: contrast?.onPrimaryWithContrast ??
+                        colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 24,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => context.go('/profile/login'),
-                      style: ElevatedButton.styleFrom(
-                        // Use primary color with high contrast
-                        backgroundColor: contrast?.primaryWithContrast ??
-                            colorScheme.primary,
-                        foregroundColor: contrast?.onPrimaryWithContrast ??
-                            colorScheme.onPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text('Sign In'),
-                    ),
-                  ),
-                ],
+                  child: const Text('Sign In / Link Account'),
+                ),
               ),
             ],
           ),

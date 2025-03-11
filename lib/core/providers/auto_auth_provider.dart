@@ -1,21 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
-import 'package:fftcg_companion/core/services/anonymous_auth_persistence.dart';
-import 'package:fftcg_companion/core/services/device_id_service.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
-
-/// Provider for the DeviceIdService
-final deviceIdServiceProvider = Provider<DeviceIdService>((ref) {
-  return DeviceIdService();
-});
-
-/// Provider for the AnonymousAuthPersistence service
-final anonymousAuthPersistenceProvider =
-    Provider<AnonymousAuthPersistence>((ref) {
-  final deviceIdService = ref.watch(deviceIdServiceProvider);
-  return AnonymousAuthPersistence(deviceIdService: deviceIdService);
-});
 
 /// State provider to track if we should skip auto-auth
 /// This is used to prevent creating a new anonymous user after explicit sign-out
@@ -26,9 +12,6 @@ final autoAuthProvider = Provider.autoDispose<void>((ref) {
   // Track if we're coming from a sign-out operation
   bool isInitialLoad = true;
   Timer? debounceTimer;
-
-  // Watch the persistence service provider to keep it alive
-  ref.watch(anonymousAuthPersistenceProvider);
 
   // Listen to auth state changes
   ref.listen(authStateProvider, (previous, next) async {

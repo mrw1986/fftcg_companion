@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/app/theme/contrast_extension.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/shared/widgets/google_sign_in_button.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 import 'package:fftcg_companion/shared/widgets/styled_button.dart';
@@ -20,7 +22,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  String? _errorMessage;
 
   @override
   void dispose() {
@@ -34,63 +35,210 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
       final authState = ref.read(authStateProvider);
       final authService = ref.read(authServiceProvider);
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
 
-      // If user is anonymous, we can't directly link with email/password
-      // We need to create a credential and link it
+      // If user is anonymous, we need to handle linking differently
       if (authState.isAnonymous) {
-        await authService.linkWithEmailAndPassword(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
-      } else {
-        await authService.signInWithEmailAndPassword(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
-      }
+        // First check if the account exists by trying to sign in
+        try {
+          // Create a secondary auth instance to check if the account exists
+          // without affecting the current user
+          final secondaryAuth = FirebaseAuth.instance;
+          await secondaryAuth.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
 
-      if (mounted) {
-        context.go('/profile');
+          // If we get here, the account exists, so we can link it
+          await authService.linkWithEmailAndPassword(email, password);
+
+          if (mounted) {
+            context.go('/profile');
+          }
+        } catch (signInError) {
+          // Check if the error is because the user doesn't exist
+          if (signInError is FirebaseAuthException &&
+              (signInError.code == 'user-not-found' ||
+                  signInError.code == 'wrong-password')) {
+            // Show a specific error message for this case
+            setState(() {
+              _isLoading = false;
+            });
+          } else {
+            // For other errors, rethrow to be caught by the outer catch
+            rethrow;
+          }
+        }
+      } else {
+        // Normal sign in for non-anonymous users
+        await authService.signInWithEmailAndPassword(email, password);
+
+        if (mounted) {
+          context.go('/profile');
+        }
       }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
         _isLoading = false;
       });
+
+      // Show user-friendly error message as SnackBar
+      if (mounted) {
+        String errorMessage = 'Failed to sign in';
+
+        if (e is FirebaseAuthException) {
+          switch (e.code) {
+            case 'user-not-found':
+              errorMessage = 'No account found with this email address';
+              break;
+            case 'wrong-password':
+              errorMessage = 'Incorrect password. Please try again';
+              break;
+            case 'invalid-email':
+              errorMessage = 'Please enter a valid email address';
+              break;
+            case 'user-disabled':
+              errorMessage = 'This account has been disabled';
+              break;
+            case 'too-many-requests':
+              errorMessage =
+                  'Too many failed login attempts. Please try again later';
+              break;
+            default:
+              errorMessage = 'Sign in failed: ${e.message}';
+          }
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+      }
     }
   }
 
   Future<void> _signInWithGoogle() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
+      talker.debug('Login page: Starting Google Sign-In');
       final authState = ref.read(authStateProvider);
       final authService = ref.read(authServiceProvider);
 
       // If user is anonymous, link the account instead of creating a new one
       if (authState.isAnonymous) {
-        await authService.linkWithGoogle();
-      } else {
-        await authService.signInWithGoogle();
-      }
+        try {
+          talker.debug('Login page: Calling authService.linkWithGoogle()');
+          await authService.linkWithGoogle();
+          talker.debug('Login page: Google linking successful');
 
-      if (mounted) {
-        context.go('/profile');
+          if (mounted) {
+            context.go('/profile');
+          }
+        } catch (linkError) {
+          // Handle specific errors for Google linking
+          if (linkError is FirebaseAuthException) {
+            if (linkError.code == 'credential-already-in-use') {
+              setState(() {
+                _isLoading = false;
+              });
+            } else {
+              // For other Firebase errors, show the error message
+              setState(() {
+                _isLoading = false;
+              });
+            }
+          } else {
+            // For non-Firebase errors, rethrow
+            rethrow;
+          }
+        }
+      } else {
+        // Normal Google sign in for non-anonymous users
+        talker.debug('Login page: Calling authService.signInWithGoogle()');
+        await authService.signInWithGoogle();
+        talker.debug('Login page: Google Sign-In successful');
+
+        if (mounted) {
+          context.go('/profile');
+        }
       }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
         _isLoading = false;
       });
+
+      // Show user-friendly error message as SnackBar
+      if (mounted) {
+        String errorMessage = 'Failed to sign in with Google';
+
+        if (e is FirebaseAuthException) {
+          switch (e.code) {
+            case 'account-exists-with-different-credential':
+              errorMessage =
+                  'An account already exists with the same email address but different sign-in credentials';
+              break;
+            case 'invalid-credential':
+              errorMessage = 'The sign-in credential is invalid';
+              break;
+            case 'operation-not-allowed':
+              errorMessage = 'Google sign-in is not enabled for this project';
+              break;
+            case 'user-disabled':
+              errorMessage = 'This account has been disabled';
+              break;
+            case 'user-not-found':
+              errorMessage = 'No account found with this email address';
+              break;
+            case 'wrong-password':
+              errorMessage = 'Incorrect password. Please try again';
+              break;
+            case 'invalid-verification-code':
+              errorMessage = 'The verification code is invalid';
+              break;
+            case 'invalid-verification-id':
+              errorMessage = 'The verification ID is invalid';
+              break;
+            default:
+              errorMessage = 'Google sign-in failed: ${e.message}';
+          }
+        } else if (e.toString().contains('sign in was cancelled')) {
+          errorMessage = 'Google sign-in was cancelled';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -100,7 +248,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Login'),
+        title: Text(
+            ref.watch(authStateProvider).isAnonymous ? 'Account' : 'Login'),
       ),
       body: _isLoading
           ? const Center(child: LoadingIndicator())
@@ -112,25 +261,113 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   const SizedBox(height: 24),
                   const ThemedLogo(height: 150),
                   const SizedBox(height: 24),
-                  if (_errorMessage != null)
+                  if (ref.watch(authStateProvider).isAnonymous)
                     Container(
-                      padding: const EdgeInsets.all(8),
-                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 24),
                       decoration: BoxDecoration(
-                        color: Colors.red.withAlpha(25),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withAlpha(51), // 0.2 * 255 = 51
                         borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _errorMessage!,
-                        style: TextStyle(
+                        border: Border.all(
                           color: Theme.of(context)
                                   .extension<ContrastExtension>()
-                                  ?.onSurfaceWithContrast ??
-                              Theme.of(context).colorScheme.error,
-                          fontWeight: FontWeight.bold,
+                                  ?.primaryWithContrast ??
+                              Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withAlpha(128),
+                          width: 1,
                         ),
                       ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'You have two options:',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context)
+                                      .extension<ContrastExtension>()
+                                      ?.onSurfaceWithContrast ??
+                                  Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '1. Link this anonymous account to preserve your current data',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Theme.of(context)
+                                      .extension<ContrastExtension>()
+                                      ?.onSurfaceWithContrast ??
+                                  Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '2. Sign in with an existing account (will replace anonymous data)',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Theme.of(context)
+                                      .extension<ContrastExtension>()
+                                      ?.onSurfaceWithContrast ??
+                                  Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Note: Anonymous accounts are deleted after 30 days of inactivity.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                              color: Theme.of(context)
+                                      .extension<ContrastExtension>()
+                                      ?.onSurfaceWithContrast ??
+                                  Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+
+                  // Move Google sign-in button up for better visibility
+                  if (ref.watch(authStateProvider).isAnonymous)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: GoogleSignInButton(
+                        onPressed: () async {
+                          await _signInWithGoogle();
+                        },
+                        onError: (e) {
+                          talker
+                              .error('Google Sign-In error in login page: $e');
+                          // Show a more detailed error message
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  'Google Sign-In failed: ${e.toString()}'),
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.error,
+                              duration: const Duration(seconds: 10),
+                              action: SnackBarAction(
+                                label: 'OK',
+                                textColor: Colors.white,
+                                onPressed: () {
+                                  ScaffoldMessenger.of(context)
+                                      .hideCurrentSnackBar();
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                        text: 'Sign In / Link with Google',
+                      ),
+                    ),
+
                   Form(
                     key: _formKey,
                     child: Column(
@@ -175,7 +412,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         Center(
                           child: StyledButton(
                             onPressed: _signInWithEmailAndPassword,
-                            text: 'Login',
+                            text: ref.watch(authStateProvider).isAnonymous
+                                ? 'Sign In / Link Account'
+                                : 'Login',
                           ),
                         ),
                       ],
@@ -195,7 +434,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   ?.primaryWithContrast ??
                               Theme.of(context).colorScheme.primary,
                         ),
-                        child: const Text('Don\'t have an account? Register'),
+                        child: Text(ref.watch(authStateProvider).isAnonymous
+                            ? 'Create a new account'
+                            : 'Don\'t have an account? Register'),
                       ),
                     ],
                   ),
@@ -216,13 +457,39 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                  const Divider(thickness: 1),
-                  const SizedBox(height: 16),
-                  GoogleSignInButton(
-                    onPressed: _signInWithGoogle,
-                    text: 'Sign in with Google',
-                  ),
+                  // Only show the Google button here for non-anonymous users
+                  if (!ref.watch(authStateProvider).isAnonymous) ...[
+                    const SizedBox(height: 24),
+                    const Divider(thickness: 1),
+                    const SizedBox(height: 16),
+                    GoogleSignInButton(
+                      onPressed: () async {
+                        await _signInWithGoogle();
+                      },
+                      onError: (e) {
+                        talker.error('Google Sign-In error in login page: $e');
+                        // Show a more detailed error message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content:
+                                Text('Google Sign-In failed: ${e.toString()}'),
+                            backgroundColor:
+                                Theme.of(context).colorScheme.error,
+                            duration: const Duration(seconds: 10),
+                            action: SnackBarAction(
+                              label: 'OK',
+                              textColor: Colors.white,
+                              onPressed: () {
+                                ScaffoldMessenger.of(context)
+                                    .hideCurrentSnackBar();
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      text: 'Sign in with Google',
+                    ),
+                  ]
                   // No longer needed as we automatically sign in anonymously
                 ],
               ),

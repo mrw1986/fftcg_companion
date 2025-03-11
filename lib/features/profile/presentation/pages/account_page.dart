@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 
 class AccountPage extends ConsumerStatefulWidget {
@@ -14,34 +15,38 @@ class AccountPage extends ConsumerStatefulWidget {
 
 class _AccountPageState extends ConsumerState<AccountPage> {
   final _displayNameController = TextEditingController();
+  final _emailController = TextEditingController();
   bool _isLoading = false;
-  String? _errorMessage;
-  String? _successMessage;
+  bool _showChangeEmail = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeDisplayName();
+    _initializeUserData();
   }
 
-  void _initializeDisplayName() {
+  void _initializeUserData() {
     final user = ref.read(authStateProvider).user;
-    if (user != null && user.displayName != null) {
-      _displayNameController.text = user.displayName!;
+    if (user != null) {
+      if (user.displayName != null) {
+        _displayNameController.text = user.displayName!;
+      }
+      if (user.email != null) {
+        _emailController.text = user.email!;
+      }
     }
   }
 
   @override
   void dispose() {
     _displayNameController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
   Future<void> _updateProfile() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
-      _successMessage = null;
     });
 
     try {
@@ -49,21 +54,129 @@ class _AccountPageState extends ConsumerState<AccountPage> {
             displayName: _displayNameController.text.trim(),
           );
       setState(() {
-        _successMessage = 'Profile updated successfully';
         _isLoading = false;
       });
+
+      // Show success message as SnackBar with action button
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Profile updated successfully'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Theme.of(context).colorScheme.onPrimary,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+      }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
         _isLoading = false;
       });
+
+      // Show error message as SnackBar with action button
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating profile: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateEmail() async {
+    if (_emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please enter a valid email address'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 10),
+          action: SnackBarAction(
+            label: 'OK',
+            textColor: Colors.white,
+            onPressed: () {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await ref.read(authServiceProvider).verifyBeforeUpdateEmail(
+            _emailController.text.trim(),
+          );
+      setState(() {
+        _isLoading = false;
+        _showChangeEmail = false;
+      });
+
+      // Show success message as SnackBar with action button
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Verification email sent. Please check your email to complete the process.'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            duration: const Duration(seconds: 10), // Longer duration
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Theme.of(context).colorScheme.onPrimary,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      // Show error message as SnackBar with action button
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating email: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+      }
     }
   }
 
   Future<void> _signOut() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
@@ -73,9 +186,26 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
         _isLoading = false;
       });
+
+      // Show error message as SnackBar with action button
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error signing out: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -112,36 +242,6 @@ class _AccountPageState extends ConsumerState<AccountPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_errorMessage != null)
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withAlpha(25),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ),
-                  if (_successMessage != null)
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withAlpha(25),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _successMessage!,
-                        style: const TextStyle(
-                          color: Colors.green,
-                        ),
-                      ),
-                    ),
                   Card(
                     margin: const EdgeInsets.only(bottom: 16),
                     child: Padding(
@@ -161,7 +261,43 @@ class _AccountPageState extends ConsumerState<AccountPage> {
                             title: const Text('Email'),
                             subtitle: Text(user.email ?? 'No email'),
                             leading: const Icon(Icons.email_outlined),
+                            trailing: user.providerData.any((element) =>
+                                    element.providerId == 'password')
+                                ? TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _showChangeEmail = !_showChangeEmail;
+                                      });
+                                    },
+                                    child: Text(
+                                        _showChangeEmail ? 'Cancel' : 'Change'),
+                                  )
+                                : null,
                           ),
+                          if (_showChangeEmail) ...[
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _emailController,
+                              decoration: const InputDecoration(
+                                labelText: 'New Email',
+                                border: OutlineInputBorder(),
+                              ),
+                              keyboardType: TextInputType.emailAddress,
+                            ),
+                            const SizedBox(height: 8),
+                            ElevatedButton(
+                              onPressed: _updateEmail,
+                              child: const Text('Update Email'),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Note: You will receive a verification email to confirm this change.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
                           ListTile(
                             title: const Text('Account Type'),
                             subtitle: Text(_getProviderName(user)),

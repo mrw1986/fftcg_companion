@@ -15,8 +15,17 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   bool _isLoading = false;
-  String? _errorMessage;
   bool _resetEmailSent = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill email if user is logged in
+    final user = ref.read(authStateProvider).user;
+    if (user != null && user.email != null && user.email!.isNotEmpty) {
+      _emailController.text = user.email!;
+    }
+  }
 
   @override
   void dispose() {
@@ -29,22 +38,68 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
       await ref.read(authServiceProvider).sendPasswordResetEmail(
             _emailController.text.trim(),
           );
+
+      // Sign the user out after sending the reset email
+      await ref.read(authServiceProvider).signOut();
+
       setState(() {
         _resetEmailSent = true;
         _isLoading = false;
       });
+
+      // Show success message as SnackBar with action button
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Password reset email sent successfully. You have been logged out for security reasons.'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Theme.of(context).colorScheme.onPrimary,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+      }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
         _isLoading = false;
       });
+
+      // Show error message as SnackBar with user-friendly message
+      if (mounted) {
+        String errorMessage = 'Failed to send password reset email';
+        if (e.toString().contains('user-not-found')) {
+          errorMessage = 'No account found with this email address';
+        } else if (e.toString().contains('invalid-email')) {
+          errorMessage = 'Please enter a valid email address';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -72,7 +127,8 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
                       padding: const EdgeInsets.all(16),
                       margin: const EdgeInsets.only(bottom: 24),
                       decoration: BoxDecoration(
-                        color: Colors.green.withAlpha(25),
+                        color:
+                            Theme.of(context).colorScheme.primary.withAlpha(25),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
@@ -103,21 +159,6 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
                       style: TextStyle(fontSize: 16),
                     ),
                     const SizedBox(height: 24),
-                    if (_errorMessage != null)
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withAlpha(25),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ),
                     Form(
                       key: _formKey,
                       child: Column(
