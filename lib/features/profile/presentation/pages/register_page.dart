@@ -255,10 +255,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: Theme.of(context)
-                                  .extension<ContrastExtension>()
-                                  ?.onSurfaceWithContrast ??
-                              Theme.of(context).colorScheme.onSurface,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),

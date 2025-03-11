@@ -321,15 +321,27 @@ class _AccountPageState extends ConsumerState<AccountPage> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        const Text(
+                                        Text(
                                           'Anonymous Account',
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
+                                            color:
+                                                Theme.of(context).brightness ==
+                                                        Brightness.dark
+                                                    ? Colors.white
+                                                    : null,
                                           ),
                                         ),
                                         const SizedBox(height: 4),
-                                        const Text(
+                                        Text(
                                           'Your data is only stored on this device. To save your data across devices, upgrade to a permanent account.',
+                                          style: TextStyle(
+                                            color:
+                                                Theme.of(context).brightness ==
+                                                        Brightness.dark
+                                                    ? Colors.white
+                                                    : null,
+                                          ),
                                         ),
                                         const SizedBox(height: 8),
                                         ElevatedButton(

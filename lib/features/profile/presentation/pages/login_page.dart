@@ -290,10 +290,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Theme.of(context)
-                                      .extension<ContrastExtension>()
-                                      ?.onSurfaceWithContrast ??
-                                  Theme.of(context).colorScheme.onSurface,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -301,10 +301,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             '1. Link this anonymous account to preserve your current data',
                             style: TextStyle(
                               fontSize: 16,
-                              color: Theme.of(context)
-                                      .extension<ContrastExtension>()
-                                      ?.onSurfaceWithContrast ??
-                                  Theme.of(context).colorScheme.onSurface,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -312,10 +312,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             '2. Sign in with an existing account (will replace anonymous data)',
                             style: TextStyle(
                               fontSize: 16,
-                              color: Theme.of(context)
-                                      .extension<ContrastExtension>()
-                                      ?.onSurfaceWithContrast ??
-                                  Theme.of(context).colorScheme.onSurface,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -324,10 +324,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             style: TextStyle(
                               fontSize: 14,
                               fontStyle: FontStyle.italic,
-                              color: Theme.of(context)
-                                      .extension<ContrastExtension>()
-                                      ?.onSurfaceWithContrast ??
-                                  Theme.of(context).colorScheme.onSurface,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                         ],
