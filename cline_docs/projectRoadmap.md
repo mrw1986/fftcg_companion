@@ -26,10 +26,16 @@
   - [x] Error handling and recovery
 - [x] User authentication
   - [x] Google Sign-In integration
+    - [x] Enhanced error handling with detailed logging
+    - [x] Emulator detection for better debugging
+    - [x] Improved GoogleSignInButton with loading state
   - [x] Email/Password authentication
+    - [x] Email verification tracking
+    - [x] Interactive verification notifications
   - [x] Anonymous authentication
   - [x] Account management
-  - [x] Profile settings
+    - [x] Profile settings
+    - [x] Email change with verification
 - [x] Theme customization
   - [x] Light/dark mode support
   - [x] System theme integration
