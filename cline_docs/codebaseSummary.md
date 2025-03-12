@@ -37,6 +37,9 @@
    - Account linking for anonymous to permanent account conversion
    - Authentication state management with Riverpod
    - Interactive notifications for authentication operations
+   - Re-authentication for security-sensitive operations
+   - Provider unlinking for managing authentication methods
+   - Account deletion with proper data cleanup
 
 ### Feature Modules
 
@@ -312,6 +315,19 @@
 
 ## User Feedback Integration
 
+1. **Firebase Authentication Enhancements**
+    - Added explicit method for deleting non-anonymous users with proper error handling
+    - Added re-authentication methods for security-sensitive operations
+    - Added method for unlinking authentication providers
+    - Updated UI to support these new features
+    - Improved error handling with user-friendly messages
+    - Enhanced logging throughout the authentication flow
+    - Added UI for deleting user accounts with confirmation dialog
+    - Added re-authentication dialog for security-sensitive operations
+    - Added UI for managing linked authentication providers
+    - Added ability to unlink providers while ensuring at least one remains
+    - Enhanced error handling with themed SnackBars
+
 1. **Card Details Navigation**
    - Users wanted to browse through cards without returning to the list
    - Users needed to navigate between filtered or search results easily
@@ -321,7 +337,7 @@
    - Made navigation controls visually appealing and non-intrusive
    - Implemented smooth transitions between cards
 
-2. **Collection Management Workflow**
+1. **Collection Management Workflow**
    - Users wanted a more streamlined way to add cards to their collection
    - Users needed to search for cards when adding to collection
    - Users wanted to add cards directly from the card details page
@@ -333,7 +349,7 @@
    - Added card labels toggle for better visibility
    - Enhanced collection search functionality
 
-3. **Search Experience**
+1. **Search Experience**
    - Users wanted a more intuitive search interface
    - Users requested ability to search within filtered cards
    - Users needed to sort search results
@@ -344,7 +360,7 @@
    - Added smooth transitions for all search-related UI elements
    - Ensured cards remain visible during search operations
 
-4. **Collection Management**
+1. **Collection Management**
    - Users wanted to track their card collection
    - Users needed to track card condition and purchase information
    - Users requested professional grading support
@@ -356,7 +372,7 @@
    - Created intuitive UI for managing collection
    - Added statistics to track collection progress
 
-5. **Card Details Page**
+1. **Card Details Page**
    - Users reported white corners on card images in dark mode
    - Users reported inconsistent styling for "T:" in card descriptions
    - Implemented fix using CornerMaskWidget to handle white corners
@@ -364,19 +380,19 @@
    - Improved layout with navigation buttons and FAB
    - Increased card image size for better visibility
 
-6. **Card Description Text**
+1. **Card Description Text**
    - Users reported inconsistent styling for special abilities
    - Updated regex pattern to handle different spacing scenarios
    - Improved text processing for consistent formatting
 
-7. **Splash Screen and Loading Experience**
+1. **Splash Screen and Loading Experience**
    - Users reported splash screen not respecting dark mode
    - Users wanted a cleaner loading indicator without the logo
    - Updated native splash screen configuration to use appropriate images for each theme
    - Modified custom splash screen to properly detect system brightness
    - Simplified loading indicator to show only a progress spinner
 
-8. **UI Consistency**
+1. **UI Consistency**
    - Users reported inconsistent UI between Cards and Collection pages
    - Users wanted the same features available in both sections
    - Replicated the card label toggle from the Collection page to the Card Database page
@@ -384,7 +400,7 @@
    - Adjusted padding between UI elements for a more compact layout
    - Improved the overall user experience with more consistent UI elements and behavior
 
-9. **Authentication Experience**
+1. **Authentication Experience**
    - Users reported issues with Google Sign-In on emulators
    - Users wanted better feedback during authentication operations
    - Users needed clearer verification instructions for email accounts

@@ -36,6 +36,9 @@
   - [x] Account management
     - [x] Profile settings
     - [x] Email change with verification
+    - [x] Enhanced security with re-authentication for sensitive operations
+    - [x] Account deletion functionality
+    - [x] Provider unlinking capabilities
     - [x] Fixed text contrast issues in authentication pages
 - [x] Theme customization
   - [x] Light/dark mode support
@@ -249,6 +252,11 @@
   - Replaced ContrastExtension with direct brightness check for critical text elements
   - Implemented explicit white text color for dark mode to ensure maximum readability
   - Maintained proper text styling for light mode
+- Enhanced Firebase Authentication with security features:
+  - Added re-authentication for security-sensitive operations
+  - Implemented account deletion with proper data cleanup
+  - Added provider unlinking for managing authentication methods
+  - Improved error handling with user-friendly messages
 
 ### In Progress
 

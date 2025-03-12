@@ -74,11 +74,21 @@ class AuthService {
           credential.user!.providerData
               .any((element) => element.providerId == 'password')) {
         // Send a new verification email if not verified
-        await credential.user!.sendEmailVerification();
+        try {
+          await credential.user!.sendEmailVerification();
+          talker.info('Verification email sent to ${credential.user!.email}');
+          talker.debug('User ID: ${credential.user!.uid}');
+        } catch (verificationError) {
+          talker.error('Error sending verification email: $verificationError');
+          // Continue with the error handling below
+        }
 
         // Throw an exception to prevent login
-        throw Exception(
-            'Email not verified. A new verification email has been sent. Please check your inbox and verify your email before logging in.');
+        throw FirebaseAuthException(
+          code: 'email-not-verified',
+          message:
+              'Email not verified. A new verification email has been sent. Please check your inbox and verify your email before logging in.',
+        );
       }
 
       // Update user in Firestore
@@ -98,6 +108,7 @@ class AuthService {
       String email, String password,
       {bool sendVerificationEmail = true}) async {
     try {
+      // Create the user account
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -105,8 +116,36 @@ class AuthService {
 
       // Send email verification
       if (sendVerificationEmail && credential.user != null) {
-        await credential.user!.sendEmailVerification();
-        talker.debug('Verification email sent to ${credential.user!.email}');
+        try {
+          // Configure ActionCodeSettings for better email verification experience
+          final actionCodeSettings = ActionCodeSettings(
+            url:
+                'https://fftcgcompanion.page.link/verify?email=${credential.user!.email}',
+            handleCodeInApp: true,
+            androidPackageName: 'com.mrw1986.fftcg_companion',
+            androidInstallApp: true,
+            androidMinimumVersion: '12',
+          );
+
+          // Send verification email with ActionCodeSettings
+          await credential.user!.sendEmailVerification(actionCodeSettings);
+          talker.info('Verification email sent to ${credential.user!.email}');
+          talker.debug('User created: ${credential.user!.uid}');
+        } catch (verificationError) {
+          // If ActionCodeSettings fails, try without it
+          talker.error(
+              'Error sending verification email with ActionCodeSettings: $verificationError');
+          try {
+            // Fallback to simple verification email
+            await credential.user!.sendEmailVerification();
+            talker.info(
+                'Simple verification email sent to ${credential.user!.email}');
+          } catch (simpleVerificationError) {
+            talker.error(
+                'Error sending simple verification email: $simpleVerificationError');
+            // Continue with account creation but log the error
+          }
+        }
       }
 
       // Create user in Firestore with isVerified = false
@@ -215,12 +254,59 @@ class AuthService {
         email: email,
         password: password,
       );
-      final userCredential =
-          await _auth.currentUser!.linkWithCredential(credential);
+
+      // Try to link the account
+      UserCredential userCredential;
+      try {
+        userCredential =
+            await _auth.currentUser!.linkWithCredential(credential);
+      } catch (e) {
+        talker.error('Error linking with email/password: $e');
+
+        // If the error is related to reCAPTCHA, try a different approach
+        if (e.toString().contains('reCAPTCHA') ||
+            e.toString().contains('App Check') ||
+            e.toString().contains('token')) {
+          talker.debug('Attempting alternative linking approach');
+
+          // Create a new user with the email/password
+          final tempAuth = FirebaseAuth.instance;
+          final tempUser = await tempAuth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+
+          // Send verification email to the new user
+          await tempUser.user!.sendEmailVerification();
+
+          // Sign out the temporary user
+          await tempAuth.signOut();
+
+          // Return to the original user and throw a custom exception
+          throw FirebaseAuthException(
+            code: 'manual-linking-required',
+            message:
+                'Please check your email for verification and then sign in with your new account.',
+          );
+        }
+
+        // If it's another error, rethrow it
+        rethrow;
+      }
 
       // If the user had a displayName before linking, preserve it
       if (currentDisplayName != null && currentDisplayName.isNotEmpty) {
         await userCredential.user!.updateDisplayName(currentDisplayName);
+      }
+
+      // Send verification email
+      try {
+        await userCredential.user!.sendEmailVerification();
+        talker.info('Verification email sent to ${userCredential.user!.email}');
+      } catch (verificationError) {
+        talker.error(
+            'Error sending verification email after linking: $verificationError');
+        // Continue with account linking but log the error
       }
 
       // Update user in Firestore
@@ -346,11 +432,176 @@ class AuthService {
     }
   }
 
+  /// Delete the current user account (non-anonymous)
+  ///
+  /// This method deletes the current user account and all associated data.
+  /// It requires recent authentication, so it may throw a requires-recent-login error.
+  /// In that case, you should call reauthenticateUser first.
+  Future<void> deleteUser() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('No user is signed in');
+
+      // Check if the user is anonymous
+      if (user.isAnonymous) {
+        // For anonymous users, we can just delete them directly
+        await user.delete();
+        talker.debug('Anonymous user deleted successfully');
+        return;
+      }
+
+      // For non-anonymous users, we need to delete their data from Firestore first
+      // and then delete the user account
+      try {
+        // Delete user data from Firestore
+        await _userRepository.deleteUser(user.uid);
+        talker.debug('User data deleted from Firestore');
+
+        // Delete the user account
+        await user.delete();
+        talker.debug('User account deleted successfully');
+      } catch (e) {
+        talker.error('Error deleting user: $e');
+        throw _handleAuthException(e);
+      }
+    } catch (e) {
+      talker.error('Error deleting user: $e');
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Re-authenticate a user for security-sensitive operations
+  ///
+  /// This method is required before performing security-sensitive operations
+  /// such as deleting an account, changing email, or changing password.
+  ///
+  /// The method accepts different credential types:
+  /// - For email/password: EmailAuthProvider.credential(email, password)
+  /// - For Google: GoogleAuthProvider.credential(idToken, accessToken)
+  ///
+  /// @param credential The AuthCredential to use for re-authentication
+  /// @return UserCredential if successful
+  Future<UserCredential> reauthenticateUser(AuthCredential credential) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('No user is signed in');
+
+      talker.debug('Re-authenticating user: ${user.email}');
+
+      // Re-authenticate the user
+      final userCredential =
+          await user.reauthenticateWithCredential(credential);
+      talker.debug('User re-authenticated successfully');
+
+      return userCredential;
+    } catch (e) {
+      talker.error('Error re-authenticating user: $e');
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Re-authenticate with email and password
+  ///
+  /// Convenience method for re-authenticating with email and password
+  Future<UserCredential> reauthenticateWithEmailAndPassword(
+      String email, String password) async {
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: email,
+        password: password,
+      );
+      return await reauthenticateUser(credential);
+    } catch (e) {
+      talker.error('Error re-authenticating with email/password: $e');
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Re-authenticate with Google
+  ///
+  /// Convenience method for re-authenticating with Google
+  Future<UserCredential> reauthenticateWithGoogle() async {
+    try {
+      // Check if running on an emulator
+      bool isEmulator = false;
+      try {
+        final androidId = await _getAndroidId();
+        isEmulator =
+            androidId == 'emulator' || androidId.startsWith('emulator');
+        talker.debug(
+            'Device check: isEmulator = $isEmulator, androidId = $androidId');
+      } catch (e) {
+        talker.debug('Failed to check if device is emulator: $e');
+      }
+
+      if (isEmulator) {
+        talker.warning(
+            'Running on emulator - Google Sign-In may not work properly');
+      }
+
+      // Trigger the authentication flow
+      talker.debug('Starting Google Sign-In flow for re-authentication');
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        talker.warning(
+            'Google Sign-In was cancelled or failed during re-authentication');
+        throw Exception('Google sign in was cancelled by the user');
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Re-authenticate with the credential
+      return await reauthenticateUser(credential);
+    } catch (e) {
+      talker.error('Error re-authenticating with Google: $e');
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Unlink an authentication provider from the current user
+  ///
+  /// @param providerId The provider ID to unlink (e.g., 'google.com', 'password')
+  Future<User> unlinkProvider(String providerId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('No user is signed in');
+
+      // Check if the user has more than one provider
+      if (user.providerData.length <= 1) {
+        throw Exception(
+            'Cannot unlink the last authentication provider. You must have at least one way to sign in.');
+      }
+
+      talker.debug('Unlinking provider: $providerId');
+      final updatedUser = await user.unlink(providerId);
+
+      // Update user in Firestore
+      await _userRepository.createUserFromAuth(updatedUser);
+
+      talker.debug('Provider unlinked successfully');
+      return updatedUser;
+    } catch (e) {
+      talker.error('Error unlinking provider: $e');
+      throw _handleAuthException(e);
+    }
+  }
+
   /// Send password reset email
   Future<void> sendPasswordResetEmail(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
+      talker.info('Password reset email sent to $email');
     } catch (e) {
+      talker.error('Error sending password reset email: $e');
       throw _handleAuthException(e);
     }
   }
@@ -422,7 +673,7 @@ class AuthService {
         await _userRepository.createOrUpdateUser(
           firestoreUser.copyWith(isVerified: isVerified),
         );
-        talker.debug(
+        talker.info(
             'Updated verification status to $isVerified for user ${user.uid}');
       }
 
@@ -440,7 +691,37 @@ class AuthService {
       if (user == null) throw Exception('No user is signed in');
 
       // Send verification email before updating email
-      await user.verifyBeforeUpdateEmail(newEmail);
+      try {
+        // Configure ActionCodeSettings for better email verification experience
+        final actionCodeSettings = ActionCodeSettings(
+          url: 'https://fftcgcompanion.page.link/verify?email=$newEmail',
+          handleCodeInApp: true,
+          androidPackageName: 'com.mrw1986.fftcg_companion',
+          androidInstallApp: true,
+          androidMinimumVersion: '12',
+        );
+
+        // Send verification email with ActionCodeSettings
+        await user.verifyBeforeUpdateEmail(newEmail, actionCodeSettings);
+        talker.info('Verification email sent to $newEmail');
+        talker.debug('Email update verification sent for user: ${user.uid}');
+      } catch (e) {
+        talker.error(
+            'Error sending verification email with ActionCodeSettings: $e');
+
+        // Try without ActionCodeSettings as fallback
+        try {
+          await user.verifyBeforeUpdateEmail(newEmail);
+          talker.info('Simple verification email sent to $newEmail');
+        } catch (simpleError) {
+          talker.error('Error sending simple verification email: $simpleError');
+          throw FirebaseAuthException(
+            code: 'verification-email-failed',
+            message:
+                'Failed to send verification email. Please try again later or contact support.',
+          );
+        }
+      }
 
       return;
     } catch (e) {
@@ -488,37 +769,108 @@ class AuthService {
   Exception _handleAuthException(dynamic e) {
     if (e is FirebaseAuthException) {
       switch (e.code) {
+        // Email/Password Authentication Errors
         case 'user-not-found':
-          return Exception('No user found with this email.');
+          return Exception(
+              'No account found with this email address. Please check your email or create a new account.');
         case 'wrong-password':
-          return Exception('Wrong password provided.');
+          return Exception(
+              'Incorrect password. Please try again or use the "Forgot Password" option.');
         case 'email-already-in-use':
-          return Exception('The email address is already in use.');
+          return Exception(
+              'An account already exists with this email address. Please sign in or use a different email.');
         case 'weak-password':
-          return Exception('The password is too weak.');
+          return Exception(
+              'The password is too weak. Please use a stronger password with at least 8 characters, including uppercase, lowercase, numeric, and special characters.');
         case 'operation-not-allowed':
-          return Exception('This authentication method is not enabled.');
+          return Exception(
+              'This authentication method is not enabled. Please contact support or try a different sign-in method.');
         case 'invalid-email':
-          return Exception('The email address is invalid.');
+          return Exception('Please enter a valid email address.');
+        case 'user-disabled':
+          return Exception(
+              'This account has been disabled. Please contact support for assistance.');
+        case 'too-many-requests':
+          return Exception(
+              'Too many sign-in attempts. Please try again later or reset your password.');
+        case 'user-token-expired':
+          return Exception('Your session has expired. Please sign in again.');
+        case 'network-request-failed':
+          return Exception(
+              'Network error. Please check your internet connection and try again.');
+        case 'INVALID_LOGIN_CREDENTIALS':
+          return Exception(
+              'Invalid login credentials. Please check your email and password.');
+        case 'invalid-credential':
+          return Exception(
+              'The authentication credentials are invalid. Please try again.');
+        case 'email-not-verified':
+          return Exception(
+              'Email not verified. A verification email has been sent. Please check your inbox and verify your email before logging in.');
+        case 'verification-email-failed':
+          return Exception(
+              'Failed to send verification email. Please try again later or contact support.');
+        case 'manual-linking-required':
+          return Exception(
+              'Please check your email for verification and then sign in with your new account.');
+
+        // Federated Identity Provider Errors
         case 'account-exists-with-different-credential':
           return Exception(
-              'An account already exists with the same email address but different sign-in credentials.');
-        case 'invalid-credential':
-          return Exception('The credential is invalid.');
-        case 'user-disabled':
-          return Exception('This user account has been disabled.');
+              'An account already exists with the same email address but different sign-in credentials. Please sign in using your original provider.');
+        case 'invalid-verification-code':
+          return Exception(
+              'The verification code is invalid. Please try again with a new code.');
+        case 'invalid-verification-id':
+          return Exception(
+              'The verification ID is invalid. Please restart the verification process.');
+
+        // Re-authentication Errors
         case 'requires-recent-login':
           return Exception(
-              'This operation requires recent authentication. Please log in again.');
+              'For security reasons, this operation requires recent authentication. Please sign in again before retrying.');
+        case 'user-mismatch':
+          return Exception(
+              'The provided credentials do not correspond to the current user. Please use the credentials for this account.');
+
+        // Provider Linking Errors
+
         case 'provider-already-linked':
-          return Exception('This provider is already linked to your account.');
+          return Exception(
+              'This authentication provider is already linked to your account.');
+        case 'no-such-provider':
+          return Exception(
+              'The specified authentication provider is not linked to this account.');
         case 'credential-already-in-use':
           return Exception(
-              'This credential is already associated with a different user account.');
+              'This credential is already associated with a different user account. Please use a different credential or sign in with the associated account.');
+
+        // Multi-factor Authentication Errors
+        case 'second-factor-required':
+          return Exception(
+              'Multi-factor authentication is required. Please complete the second authentication step.');
+        case 'tenant-id-mismatch':
+          return Exception(
+              'The provided tenant ID does not match the Auth instance\'s tenant ID.');
+
+        // Phone Authentication Errors
+        case 'quota-exceeded':
+          return Exception('SMS quota exceeded. Please try again later.');
+        case 'missing-phone-number':
+          return Exception('Please provide a phone number.');
+        case 'invalid-phone-number':
+          return Exception(
+              'The phone number format is incorrect. Please enter a valid phone number.');
+        case 'captcha-check-failed':
+          return Exception(
+              'The reCAPTCHA verification failed. Please try again.');
+
+        // General Errors
         default:
-          return Exception('An error occurred: ${e.message}');
+          return Exception('Authentication error: ${e.message}');
       }
     }
-    return Exception('An unexpected error occurred: $e');
+    return Exception(
+        'An unexpected error occurred. Please try again or contact support if the problem persists.');
   }
 }

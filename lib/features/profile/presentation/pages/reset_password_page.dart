@@ -55,20 +55,12 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
 
       // Show success message as SnackBar with action button
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-                'Password reset email sent successfully. You have been logged out for security reasons.'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            duration: const Duration(seconds: 10),
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Theme.of(context).colorScheme.onPrimary,
-              onPressed: () {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              },
-            ),
-          ),
+        showThemedSnackBar(
+          context: context,
+          message:
+              'Password reset email sent successfully. You have been logged out for security reasons.',
+          isError: false,
+          duration: const Duration(seconds: 10),
         );
       }
     } catch (e) {
@@ -85,19 +77,11 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
           errorMessage = 'Please enter a valid email address';
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            duration: const Duration(seconds: 10),
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              },
-            ),
-          ),
+        showThemedSnackBar(
+          context: context,
+          message: errorMessage,
+          isError: true,
+          duration: const Duration(seconds: 10),
         );
       }
     }

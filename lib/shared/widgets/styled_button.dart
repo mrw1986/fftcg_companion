@@ -56,12 +56,11 @@ class StyledButton extends StatelessWidget {
                         BorderRadius.circular(24), // Pill-shaped button
                   ),
                 ),
-                child: Text(
-                  text,
-                  style: TextStyle(
-                    color: bgColor,
-                    fontWeight: FontWeight.w500,
-                  ),
+                child: _BorderedText(
+                  text: text,
+                  fillColor: bgColor,
+                  strokeColor: Colors.black,
+                  strokeWidth: 1.5,
                 ),
               )
             : ElevatedButton(
@@ -75,14 +74,56 @@ class StyledButton extends StatelessWidget {
                         BorderRadius.circular(24), // Pill-shaped button
                   ),
                 ),
-                child: Text(
-                  text,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                  ),
+                child: _BorderedText(
+                  text: text,
+                  fillColor: Colors.white, // White text for better contrast
+                  strokeColor: Colors.black,
+                  strokeWidth: 1.5,
                 ),
               ),
       ),
+    );
+  }
+}
+
+/// A widget that displays text with a border using a Stack
+class _BorderedText extends StatelessWidget {
+  final String text;
+  final Color fillColor;
+  final Color strokeColor;
+  final double strokeWidth;
+
+  const _BorderedText({
+    required this.text,
+    required this.fillColor,
+    required this.strokeColor,
+    this.strokeWidth = 1.5,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Stroked text for border
+        Text(
+          text,
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = strokeWidth
+              ..color = strokeColor,
+          ),
+        ),
+        // Solid text as fill
+        Text(
+          text,
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            color: fillColor,
+          ),
+        ),
+      ],
     );
   }
 }

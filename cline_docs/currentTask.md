@@ -640,4 +640,66 @@ Location: lib/features/profile/presentation/pages/register_page.dart
 6. Implement favorites and wishlist features
 7. Add advanced filtering options for collection
 8. Implement batch operations for collection management
-9. Implement batch operations for collection management
+
+## Current Objective 6 (Completed)
+
+Enhance Firebase Authentication implementation with additional security features and user management capabilities
+
+## Firebase Authentication Enhancements Context
+
+The app needed additional Firebase Authentication features to improve security and user management. We implemented the following enhancements:
+
+1. Added explicit method for deleting non-anonymous users
+2. Added re-authentication methods for security-sensitive operations
+3. Added method for unlinking authentication providers
+4. Improved error handling with user-friendly messages
+5. Updated UI to support these new features
+
+## Firebase Authentication Enhancements Implementation Plan
+
+### 1. Enhance AuthService
+
+Location: lib/core/services/auth_service.dart
+
+- Added deleteUser method for deleting user accounts
+- Added reauthenticateUser method for security-sensitive operations
+- Added reauthenticateWithEmailAndPassword convenience method
+- Added reauthenticateWithGoogle convenience method
+- Added unlinkProvider method for removing authentication providers
+- Enhanced error handling for new methods
+- Added detailed logging throughout
+
+### 2. Update Auth Providers
+
+Location: lib/core/providers/auth_provider.dart
+
+- Added deleteUserProvider for account deletion
+- Added reauthWithEmailProvider for email/password re-authentication
+- Added reauthWithGoogleProvider for Google re-authentication
+- Added unlinkProviderProvider for unlinking authentication providers
+- Added showThemedSnackBar helper function for consistent UI feedback
+- Added EmailPasswordCredentials helper class for re-authentication
+
+### 3. Update Account Page UI
+
+Location: lib/features/profile/presentation/pages/account_page.dart
+
+- Added UI for deleting user accounts with confirmation dialog
+- Added re-authentication dialog for security-sensitive operations
+- Added UI for managing linked authentication providers
+- Added ability to unlink providers while ensuring at least one remains
+- Enhanced error handling with user-friendly messages
+- Improved UI feedback with themed SnackBars
+
+## Firebase Authentication Enhancements Status
+
+- Added explicit method for deleting non-anonymous users with proper error handling
+- Added re-authentication methods for security-sensitive operations
+- Added method for unlinking authentication providers
+- Updated UI to support these new features
+- Improved error handling with user-friendly messages
+- Enhanced logging throughout the authentication flow
+
+## Future Development Tasks
+
+The next steps for development are outlined in the "Next Steps" section above. These include implementing the deck builder feature, card scanner feature, and price tracking feature.

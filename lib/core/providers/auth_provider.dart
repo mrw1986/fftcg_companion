@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/material.dart';
 import 'package:fftcg_companion/core/services/auth_service.dart';
 
 /// Provider for the AuthService
@@ -80,4 +81,88 @@ enum AuthStatus {
   authenticated,
   loading,
   error,
+}
+
+/// Provider for handling user account deletion
+final deleteUserProvider = FutureProvider.autoDispose<void>((ref) async {
+  final authService = ref.watch(authServiceProvider);
+  await authService.deleteUser();
+});
+
+/// Provider for re-authenticating a user with email and password
+final reauthWithEmailProvider =
+    FutureProvider.autoDispose.family<UserCredential, EmailPasswordCredentials>(
+  (ref, credentials) async {
+    final authService = ref.watch(authServiceProvider);
+    return await authService.reauthenticateWithEmailAndPassword(
+      credentials.email,
+      credentials.password,
+    );
+  },
+);
+
+/// Provider for re-authenticating a user with Google
+final reauthWithGoogleProvider = FutureProvider.autoDispose<UserCredential>(
+  (ref) async {
+    final authService = ref.watch(authServiceProvider);
+    return await authService.reauthenticateWithGoogle();
+  },
+);
+
+/// Provider for unlinking an authentication provider
+final unlinkProviderProvider = FutureProvider.autoDispose.family<User, String>(
+  (ref, providerId) async {
+    final authService = ref.watch(authServiceProvider);
+    return await authService.unlinkProvider(providerId);
+  },
+);
+
+/// Helper class for email/password credentials
+class EmailPasswordCredentials {
+  final String email;
+  final String password;
+
+  EmailPasswordCredentials({required this.email, required this.password});
+}
+
+/// Helper function to show a themed SnackBar
+void showThemedSnackBar({
+  required BuildContext context,
+  required String message,
+  bool isError = false,
+  Duration duration = const Duration(seconds: 10),
+}) {
+  // Check if the context is still mounted before showing the SnackBar
+  if (!context.mounted) return;
+
+  // Get the ScaffoldMessenger safely
+  final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+  // Clear any existing SnackBars to prevent overlap
+  scaffoldMessenger.clearSnackBars();
+
+  // Show the new SnackBar
+  scaffoldMessenger.showSnackBar(
+    SnackBar(
+      content: Text(
+        message,
+        style: TextStyle(
+          color: isError
+              ? Theme.of(context).colorScheme.onError
+              : Theme.of(context).colorScheme.onPrimary,
+        ),
+      ),
+      backgroundColor: isError
+          ? Theme.of(context).colorScheme.error
+          : Theme.of(context).colorScheme.primary,
+      duration: duration,
+      action: SnackBarAction(
+        label: 'OK',
+        textColor: isError
+            ? Theme.of(context).colorScheme.onError
+            : Theme.of(context).colorScheme.onPrimary,
+        onPressed: () => scaffoldMessenger.hideCurrentSnackBar(),
+      ),
+    ),
+  );
 }

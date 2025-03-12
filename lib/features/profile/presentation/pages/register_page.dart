@@ -23,6 +23,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
+  bool _showPasswordRequirements = false;
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
 
   @override
   void dispose() {
@@ -59,20 +62,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
       if (mounted) {
         // Show success message with action button
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-                'Account created successfully. Please check your email for verification.'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            duration: const Duration(seconds: 10), // Longer duration
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Theme.of(context).colorScheme.onPrimary,
-              onPressed: () {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              },
-            ),
-          ),
+        showThemedSnackBar(
+          context: context,
+          message:
+              'Account created successfully. Please check your email for verification.',
+          isError: false,
+          duration: const Duration(seconds: 10),
         );
 
         // Navigate to profile page
@@ -98,7 +93,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               break;
             case 'weak-password':
               errorMessage =
-                  'Password is too weak. Please use a stronger password';
+                  'Password is too weak. Please use a password with at least 8 characters, '
+                  'including uppercase, lowercase, numeric, and special characters.';
               break;
             case 'operation-not-allowed':
               errorMessage = 'Email/password accounts are not enabled';
@@ -108,12 +104,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           }
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            duration: const Duration(seconds: 3),
-          ),
+        showThemedSnackBar(
+          context: context,
+          message: errorMessage,
+          isError: true,
+          duration: const Duration(seconds: 10),
         );
       }
     }
@@ -143,19 +138,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
       if (mounted) {
         // Show success message with action button
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Account created successfully with Google'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            duration: const Duration(seconds: 5),
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Theme.of(context).colorScheme.onPrimary,
-              onPressed: () {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              },
-            ),
-          ),
+        showThemedSnackBar(
+          context: context,
+          message: 'Account created successfully with Google',
+          isError: false,
+          duration: const Duration(seconds: 5),
         );
 
         // Navigate to profile page
@@ -192,19 +179,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           errorMessage = 'Google sign-in was cancelled';
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            duration: const Duration(seconds: 10),
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              },
-            ),
-          ),
+        showThemedSnackBar(
+          context: context,
+          message: errorMessage,
+          isError: true,
+          duration: const Duration(seconds: 10),
         );
       }
     }
@@ -221,168 +200,247 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       ),
       body: _isLoading
           ? const Center(child: LoadingIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 24),
-                  const ThemedLogo(height: 150),
-                  const SizedBox(height: 24),
-                  if (isAnonymous)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      margin: const EdgeInsets.only(bottom: 24),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withAlpha(51), // 0.2 * 255 = 51
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Theme.of(context)
-                                  .extension<ContrastExtension>()
-                                  ?.primaryWithContrast ??
-                              Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withAlpha(128),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        'You\'re currently using the app without an account. Complete your registration to save your collection, decks, and settings.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Colors.white
-                              : Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _emailController,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your email';
-                            }
-                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                .hasMatch(value)) {
-                              return 'Please enter a valid email';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                            border: OutlineInputBorder(),
-                          ),
-                          obscureText: true,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter a password';
-                            }
-                            if (value.length < 6) {
-                              return 'Password must be at least 6 characters';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _confirmPasswordController,
-                          decoration: const InputDecoration(
-                            labelText: 'Confirm Password',
-                            border: OutlineInputBorder(),
-                          ),
-                          obscureText: true,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please confirm your password';
-                            }
-                            if (value != _passwordController.text) {
-                              return 'Passwords do not match';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 24),
-                        Center(
-                          child: StyledButton(
-                            onPressed: _registerWithEmailAndPassword,
-                            text: isAnonymous
-                                ? 'Complete Registration'
-                                : 'Register',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (!isAnonymous) ...[
+          : Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        TextButton(
-                          onPressed: () => context.go('/profile/login'),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            foregroundColor: Theme.of(context)
+                    const ThemedLogo(height: 120), // Reduced height
+                    const SizedBox(height: 16), // Reduced spacing
+                    if (isAnonymous)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        margin:
+                            const EdgeInsets.only(bottom: 16), // Reduced margin
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withAlpha(51), // 0.2 * 255 = 51
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Theme.of(context)
                                     .extension<ContrastExtension>()
                                     ?.primaryWithContrast ??
-                                Theme.of(context).colorScheme.primary,
+                                Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withAlpha(128),
+                            width: 1,
                           ),
-                          child: const Text('Already have an account? Login'),
                         ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  const Divider(thickness: 1),
-                  const SizedBox(height: 16),
-                  GoogleSignInButton(
-                    onPressed: () async {
-                      await _signInWithGoogle();
-                    },
-                    onError: (e) {
-                      talker.error('Google Sign-In error in register page: $e');
-                      // Show a more detailed error message
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content:
-                              Text('Google Sign-In failed: ${e.toString()}'),
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                          duration: const Duration(seconds: 10),
-                          action: SnackBarAction(
-                            label: 'OK',
-                            textColor: Colors.white,
-                            onPressed: () {
-                              ScaffoldMessenger.of(context)
-                                  .hideCurrentSnackBar();
+                        child: Text(
+                          'You\'re currently using the app without an account. Complete your registration to save your collection, decks, and settings.',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _emailController,
+                            decoration: const InputDecoration(
+                              labelText: 'Email',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.emailAddress,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your email';
+                              }
+                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                  .hasMatch(value)) {
+                                return 'Please enter a valid email';
+                              }
+                              return null;
                             },
                           ),
-                        ),
-                      );
-                    },
-                    text: isAnonymous
-                        ? 'Link with Google'
-                        : 'Register with Google',
-                  ),
-                ],
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _passwordController,
+                            decoration: InputDecoration(
+                              labelText: 'Password (8+ characters)',
+                              border: const OutlineInputBorder(),
+                              helperText:
+                                  'Must include uppercase, lowercase, number, and special character',
+                              helperMaxLines: 2,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _showPassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                onPressed: () => setState(
+                                    () => _showPassword = !_showPassword),
+                              ),
+                            ),
+                            obscureText: !_showPassword,
+                            onTap: () {
+                              setState(() {
+                                _showPasswordRequirements = true;
+                              });
+                            },
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter a password';
+                              }
+                              if (value.length < 8) {
+                                return 'Password must be at least 8 characters';
+                              }
+                              // Check for uppercase
+                              if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                                return 'Password must include an uppercase letter';
+                              }
+                              // Check for lowercase
+                              if (!RegExp(r'[a-z]').hasMatch(value)) {
+                                return 'Password must include a lowercase letter';
+                              }
+                              // Check for number
+                              if (!RegExp(r'[0-9]').hasMatch(value)) {
+                                return 'Password must include a number';
+                              }
+                              // Check for special character
+                              if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]')
+                                  .hasMatch(value)) {
+                                return 'Password must include a special character';
+                              }
+                              return null;
+                            },
+                          ),
+                          if (_showPasswordRequirements) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .outline
+                                      .withAlpha(128), // 0.5 * 255 = 128
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Password Requirements:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text('• At least 8 characters long'),
+                                  Text('• At least one uppercase letter (A-Z)'),
+                                  Text('• At least one lowercase letter (a-z)'),
+                                  Text('• At least one number (0-9)'),
+                                  Text(
+                                      '• At least one special character (!@#\$%^&*(),.?":{}|<>)'),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _confirmPasswordController,
+                            decoration: InputDecoration(
+                              labelText: 'Confirm Password',
+                              border: const OutlineInputBorder(),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _showConfirmPassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                onPressed: () => setState(() =>
+                                    _showConfirmPassword =
+                                        !_showConfirmPassword),
+                              ),
+                            ),
+                            obscureText: !_showConfirmPassword,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please confirm your password';
+                              }
+                              if (value != _passwordController.text) {
+                                return 'Passwords do not match';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          Center(
+                            child: StyledButton(
+                              onPressed: _registerWithEmailAndPassword,
+                              text: isAnonymous
+                                  ? 'Complete Registration'
+                                  : 'Register',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Add Google Sign-In button below the Complete Registration button (no divider)
+                    const SizedBox(height: 16),
+                    GoogleSignInButton(
+                      onPressed: () async {
+                        await _signInWithGoogle();
+                      },
+                      onError: (e) {
+                        talker
+                            .error('Google Sign-In error in register page: $e');
+                        // Show a more detailed error message
+                        showThemedSnackBar(
+                          context: context,
+                          message: 'Google Sign-In failed: ${e.toString()}',
+                          isError: true,
+                          duration: const Duration(seconds: 10),
+                        );
+                      },
+                      text: isAnonymous
+                          ? 'Continue with Google'
+                          : 'Register with Google',
+                    ),
+
+                    if (!isAnonymous) ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          TextButton(
+                            onPressed: () => context.go('/profile/login'),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              foregroundColor: Theme.of(context)
+                                      .extension<ContrastExtension>()
+                                      ?.primaryWithContrast ??
+                                  Theme.of(context).colorScheme.primary,
+                            ),
+                            child: const Text('Already have an account? Login'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
     );
