@@ -249,10 +249,10 @@ class ThemeSettingsPage extends ConsumerWidget {
       currentColor,
       title: Text('Select Theme Color',
           style: Theme.of(context).textTheme.titleLarge),
-      width: 40,
-      height: 40,
-      spacing: 0,
-      runSpacing: 0,
+      width: 30, // Further reduce item size
+      height: 30, // Further reduce item size
+      spacing: 4, // Increase spacing
+      runSpacing: 4, // Increase spacing between rows
       borderRadius: 4,
       wheelDiameter: 165,
       enableOpacity: false,
@@ -260,14 +260,14 @@ class ThemeSettingsPage extends ConsumerWidget {
       colorCodeHasColor: true,
       pickersEnabled: const <ColorPickerType, bool>{
         ColorPickerType.primary: true,
-        ColorPickerType.accent: true,
+        ColorPickerType.accent: false, // Disable accent picker to save space
         ColorPickerType.custom: true,
-        ColorPickerType.wheel: true,
+        ColorPickerType.wheel: false, // Disable wheel picker to save space
       },
       customColorSwatchesAndNames: customSwatches,
       copyPasteBehavior: const ColorPickerCopyPasteBehavior(
         copyButton: true,
-        pasteButton: true,
+        pasteButton: false, // Disable paste button to save space
         longPressMenu: true,
       ),
       actionButtons: const ColorPickerActionButtons(
@@ -275,10 +275,11 @@ class ThemeSettingsPage extends ConsumerWidget {
         closeButton: true,
         dialogActionButtons: true,
       ),
+      columnSpacing: 8, // Add spacing between elements
       constraints: const BoxConstraints(
         minHeight: 480,
         minWidth: 320,
-        maxWidth: 320,
+        maxWidth: 400, // Further increase max width to prevent overflow
       ),
     );
 

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:fftcg_companion/app/theme/contrast_extension.dart';
-import 'package:fftcg_companion/shared/widgets/bordered_text.dart';
 
 /// A styled button that matches the app's design language
 /// This button has a consistent style with the Google Sign-In button
@@ -57,11 +56,9 @@ class StyledButton extends StatelessWidget {
                         BorderRadius.circular(24), // Pill-shaped button
                   ),
                 ),
-                child: BorderedText(
-                  text: text,
-                  fillColor: bgColor,
-                  strokeColor: Colors.black,
-                  strokeWidth: 2.0,
+                child: Text(
+                  text,
+                  style: TextStyle(color: txtColor),
                 ),
               )
             : ElevatedButton(
@@ -69,17 +66,16 @@ class StyledButton extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: bgColor,
                   foregroundColor: txtColor,
-                  elevation: 1, // Slight elevation for depth
+                  elevation: 2, // Slightly more elevation for better visibility
                   shape: RoundedRectangleBorder(
                     borderRadius:
                         BorderRadius.circular(24), // Pill-shaped button
                   ),
                 ),
-                child: BorderedText(
-                  text: text,
-                  fillColor: Colors.white, // White text for better contrast
-                  strokeColor: Colors.black,
-                  strokeWidth: 2.0,
+                child: Text(
+                  text,
+                  style:
+                      null, // Let the button's foregroundColor handle the text color
                 ),
               ),
       ),

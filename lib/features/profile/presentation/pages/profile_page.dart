@@ -5,6 +5,7 @@ import 'package:fftcg_companion/app/theme/contrast_extension.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/features/profile/presentation/providers/splash_screen_provider.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
+import 'package:fftcg_companion/shared/widgets/styled_button.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -120,6 +121,36 @@ class ProfilePage extends ConsumerWidget {
                   Text(
                     'Please check your email and verify your account. A verification email has been sent to ${user.email}. You will be signed out until you verify your email.',
                     style: TextStyle(color: colorScheme.onErrorContainer),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: StyledButton(
+                      onPressed: () async {
+                        try {
+                          await ref
+                              .read(authServiceProvider)
+                              .sendEmailVerification();
+                          if (context.mounted) {
+                            showThemedSnackBar(
+                              context: context,
+                              message:
+                                  'Verification email resent. Please check your inbox.',
+                              isError: false,
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            showThemedSnackBar(
+                              context: context,
+                              message:
+                                  'Failed to resend verification email. Please try again later.',
+                              isError: true,
+                            );
+                          }
+                        }
+                      },
+                      text: 'Resend Verification Email',
+                    ),
                   ),
                 ],
               ),

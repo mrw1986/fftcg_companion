@@ -208,8 +208,14 @@ class AppTheme {
         ),
       ).copyWith(
         foregroundColor: WidgetStateProperty.resolveWith<Color>((states) {
-          // Use white text with black outline for better visibility
-          return Colors.white;
+          // Use appropriate text color based on brightness for better visibility
+          if (brightness == Brightness.dark) {
+            // In dark mode, use white text for better contrast
+            return Colors.white;
+          } else {
+            // In light mode, use dark text for better contrast
+            return Colors.black87;
+          }
         }),
         overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
           // Customize overlay color for pressed state
