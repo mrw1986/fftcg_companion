@@ -38,7 +38,7 @@ final autoAuthProvider = Provider.autoDispose<void>((ref) {
     }
 
     // If the user is authenticated, reset the skip auto-auth flag
-    if (next.isAuthenticated || next.isAnonymous) {
+    if (next.isAuthenticated || next.isAnonymous || next.isEmailNotVerified) {
       ref.read(skipAutoAuthProvider.notifier).state = false;
     }
   });

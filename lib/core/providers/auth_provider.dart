@@ -15,7 +15,7 @@ final currentUserProvider = StreamProvider<User?>((ref) {
 });
 
 /// Provider for the authentication state
-final authStateProvider = Provider<AuthState>((ref) {
+final authStateProvider = Provider.autoDispose<AuthState>((ref) {
   final userAsync = ref.watch(currentUserProvider);
 
   return userAsync.when(
@@ -29,13 +29,9 @@ final authStateProvider = Provider<AuthState>((ref) {
         if (user.providerData
                 .any((element) => element.providerId == 'password') &&
             !user.emailVerified) {
-          // If email is not verified, sign the user out and return unauthenticated state
-          final authService = ref.read(authServiceProvider);
-          // Send a verification email and sign out
-          authService
-              .sendEmailVerification()
-              .then((_) => authService.signOut());
+          // If email is not verified, return emailNotVerified state
           return AuthState.emailNotVerified(user);
+          // We no longer sign the user out immediately, allowing the UI to show the verification warning
         } else {
           return AuthState.authenticated(user);
         }

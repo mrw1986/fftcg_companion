@@ -204,7 +204,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         ),
                         const SizedBox(height: 24),
                         StyledButton(
-                          onPressed: () => context.go('/profile'),
+                          onPressed: () {
+                            // Force a complete refresh of the auth state
+                            // First invalidate the currentUserProvider which authStateProvider depends on
+                            ref.invalidate(currentUserProvider);
+
+                            // Then refresh the authStateProvider itself
+                            ref.invalidate(authStateProvider);
+
+                            context.go('/profile');
+                          },
                           text: 'Return to Profile',
                         ),
                       ],

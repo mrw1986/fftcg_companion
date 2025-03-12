@@ -601,7 +601,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
                           ),
                         ),
 
-                        // Add Google Sign-In button here for anonymous users
+                        // Add Google Sign-In button below for anonymous users
                         if (user.isAnonymous)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 16.0),

@@ -133,38 +133,41 @@ class ProfilePage extends ConsumerWidget {
               child: user.photoURL == null ? const Icon(Icons.person) : null,
             ),
             title: Text(
-              user.displayName ?? 'User',
+              user.displayName ?? 'Not logged in',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: contrast?.onSurfaceWithContrast ?? colorScheme.onSurface,
               ),
             ),
-            subtitle: Text(
-              user.email ?? 'No email',
-              style: TextStyle(
+            subtitle: authState.isEmailNotVerified
+                ? null
+                : Text(
+                    user.email ?? 'No email',
+                    style: TextStyle(
+                      color: contrast?.onSurfaceWithContrast ??
+                          colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+          ),
+          if (!authState.isEmailNotVerified)
+            ListTile(
+              leading: Icon(
+                Icons.person_outline,
+                color: contrast?.primaryWithContrast ?? colorScheme.primary,
+              ),
+              title: Text(
+                'Account Settings',
+                style: TextStyle(
+                    color: contrast?.onSurfaceWithContrast ??
+                        colorScheme.onSurface),
+              ),
+              trailing: Icon(
+                Icons.chevron_right,
                 color: contrast?.onSurfaceWithContrast ??
                     colorScheme.onSurfaceVariant,
               ),
+              onTap: () => context.go('/profile/account'),
             ),
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.person_outline,
-              color: contrast?.primaryWithContrast ?? colorScheme.primary,
-            ),
-            title: Text(
-              'Account Settings',
-              style: TextStyle(
-                  color:
-                      contrast?.onSurfaceWithContrast ?? colorScheme.onSurface),
-            ),
-            trailing: Icon(
-              Icons.chevron_right,
-              color: contrast?.onSurfaceWithContrast ??
-                  colorScheme.onSurfaceVariant,
-            ),
-            onTap: () => context.go('/profile/account'),
-          ),
         ],
       );
     } else if (authState.isAnonymous) {
