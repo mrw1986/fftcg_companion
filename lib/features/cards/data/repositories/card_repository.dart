@@ -122,7 +122,8 @@ class CardRepository extends _$CardRepository {
     // Check connectivity before syncing
     try {
       final connectivity = await Connectivity().checkConnectivity();
-      if (connectivity == ConnectivityResult.none) {
+      if (connectivity.isEmpty ||
+          connectivity.contains(ConnectivityResult.none)) {
         talker.debug('Skipping background sync due to no connectivity');
         return;
       }
@@ -164,7 +165,8 @@ class CardRepository extends _$CardRepository {
     try {
       // Check connectivity
       final connectivity = await Connectivity().checkConnectivity();
-      if (connectivity == ConnectivityResult.none) {
+      if (connectivity.isEmpty ||
+          connectivity.contains(ConnectivityResult.none)) {
         talker.info('Skipping sync due to no connectivity');
         _isSyncing = false;
         return;

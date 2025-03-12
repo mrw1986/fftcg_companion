@@ -95,42 +95,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             'Failed to sign in. Please check your email and password.';
 
         if (e is FirebaseAuthException) {
-          switch (e.code) {
-            case 'user-not-found':
-              errorMessage =
-                  'No account found with this email address. Please check your email or create a new account.';
-              break;
-            case 'wrong-password':
-              errorMessage =
-                  'Incorrect password. Please try again or use the "Forgot Password" option below.';
-              break;
-            case 'invalid-email':
-              errorMessage = 'Please enter a valid email address.';
-              break;
-            case 'user-disabled':
-              errorMessage =
-                  'This account has been disabled. Please contact support for assistance.';
-              break;
-            case 'too-many-requests':
-              errorMessage =
-                  'Too many failed login attempts. Please try again later or reset your password.';
-              break;
-            case 'INVALID_LOGIN_CREDENTIALS':
-              errorMessage =
-                  'Invalid login credentials. Please check your email and password.';
-              break;
-            case 'invalid-credential':
-              errorMessage =
-                  'The authentication credentials are invalid. Please check your email and password.';
-              break;
-            default:
-              if (e.message?.contains('not verified') ?? false) {
-                errorMessage =
-                    'Your email address has not been verified. A new verification email has been sent. Please check your inbox and spam folder, then try again.';
-              } else {
-                errorMessage = 'Sign in failed: ${e.message}';
-              }
-          }
+          final authService = ref.read(authServiceProvider);
+          errorMessage = authService.getReadableAuthError(e);
+        } else {
+          errorMessage = e.toString();
         }
 
         showThemedSnackBar(
@@ -201,44 +169,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         String errorMessage = 'Failed to sign in with Google';
 
         if (e is FirebaseAuthException) {
-          switch (e.code) {
-            case 'account-exists-with-different-credential':
-              errorMessage =
-                  'An account already exists with the same email address but different sign-in credentials. Please sign in using your original provider.';
-              break;
-            case 'invalid-credential':
-              errorMessage =
-                  'The sign-in credential is invalid. Please try again.';
-              break;
-            case 'operation-not-allowed':
-              errorMessage =
-                  'Google sign-in is not enabled for this project. Please contact support.';
-              break;
-            case 'user-disabled':
-              errorMessage =
-                  'This account has been disabled. Please contact support for assistance.';
-              break;
-            case 'user-not-found':
-              errorMessage =
-                  'No account found with this email address. Please check your email or create a new account.';
-              break;
-            case 'wrong-password':
-              errorMessage =
-                  'Incorrect password. Please try again or use the "Forgot Password" option.';
-              break;
-            case 'invalid-verification-code':
-              errorMessage =
-                  'The verification code is invalid. Please try again with a new code.';
-              break;
-            case 'invalid-verification-id':
-              errorMessage =
-                  'The verification ID is invalid. Please restart the verification process.';
-              break;
-            default:
-              errorMessage = 'Google sign-in failed: ${e.message}';
-          }
+          final authService = ref.read(authServiceProvider);
+          errorMessage = authService.getReadableAuthError(e);
         } else if (e.toString().contains('sign in was cancelled')) {
           errorMessage = 'Google sign-in was cancelled';
+        } else {
+          errorMessage = e.toString();
         }
 
         showThemedSnackBar(

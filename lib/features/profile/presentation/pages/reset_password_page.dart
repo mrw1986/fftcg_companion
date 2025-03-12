@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 
@@ -71,10 +72,10 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
       // Show error message as SnackBar with user-friendly message
       if (mounted) {
         String errorMessage = 'Failed to send password reset email';
-        if (e.toString().contains('user-not-found')) {
-          errorMessage = 'No account found with this email address';
-        } else if (e.toString().contains('invalid-email')) {
-          errorMessage = 'Please enter a valid email address';
+
+        if (e is FirebaseAuthException) {
+          final authService = ref.read(authServiceProvider);
+          errorMessage = authService.getReadableAuthError(e);
         }
 
         showThemedSnackBar(

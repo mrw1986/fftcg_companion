@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fftcg_companion/app/theme/contrast_extension.dart';
+import 'package:fftcg_companion/shared/widgets/bordered_text.dart';
 
 /// A styled button that matches the app's design language
 /// This button has a consistent style with the Google Sign-In button
@@ -56,11 +57,11 @@ class StyledButton extends StatelessWidget {
                         BorderRadius.circular(24), // Pill-shaped button
                   ),
                 ),
-                child: _BorderedText(
+                child: BorderedText(
                   text: text,
                   fillColor: bgColor,
                   strokeColor: Colors.black,
-                  strokeWidth: 1.5,
+                  strokeWidth: 2.0,
                 ),
               )
             : ElevatedButton(
@@ -74,56 +75,14 @@ class StyledButton extends StatelessWidget {
                         BorderRadius.circular(24), // Pill-shaped button
                   ),
                 ),
-                child: _BorderedText(
+                child: BorderedText(
                   text: text,
                   fillColor: Colors.white, // White text for better contrast
                   strokeColor: Colors.black,
-                  strokeWidth: 1.5,
+                  strokeWidth: 2.0,
                 ),
               ),
       ),
-    );
-  }
-}
-
-/// A widget that displays text with a border using a Stack
-class _BorderedText extends StatelessWidget {
-  final String text;
-  final Color fillColor;
-  final Color strokeColor;
-  final double strokeWidth;
-
-  const _BorderedText({
-    required this.text,
-    required this.fillColor,
-    required this.strokeColor,
-    this.strokeWidth = 1.5,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Stroked text for border
-        Text(
-          text,
-          style: TextStyle(
-            fontWeight: FontWeight.w500,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = strokeWidth
-              ..color = strokeColor,
-          ),
-        ),
-        // Solid text as fill
-        Text(
-          text,
-          style: TextStyle(
-            fontWeight: FontWeight.w500,
-            color: fillColor,
-          ),
-        ),
-      ],
     );
   }
 }

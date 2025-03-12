@@ -36,6 +36,7 @@ class FFTCGCompanionApp extends ConsumerWidget {
                 child: CustomErrorWidget(details: details),
               );
             };
+
             return Material(child: child!);
           },
         );

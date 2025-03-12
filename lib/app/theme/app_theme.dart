@@ -38,6 +38,9 @@ class AppTheme {
       useMaterial3: true,
       swapLegacyOnMaterial3: true,
       fontFamily: GoogleFonts.roboto().fontFamily,
+    ).copyWith(
+      // Add custom button theme with bordered text
+      elevatedButtonTheme: _createElevatedButtonTheme(Brightness.light),
     );
   }
 
@@ -71,6 +74,9 @@ class AppTheme {
       useMaterial3: true,
       swapLegacyOnMaterial3: true,
       fontFamily: GoogleFonts.roboto().fontFamily,
+    ).copyWith(
+      // Add custom button theme with bordered text
+      elevatedButtonTheme: _createElevatedButtonTheme(Brightness.dark),
     );
   }
 
@@ -125,6 +131,9 @@ class AppTheme {
         displayColor: contrastExtension.onBackgroundWithContrast,
       ),
       extensions: [contrastExtension],
+
+      // Add custom button theme with bordered text
+      elevatedButtonTheme: _createElevatedButtonTheme(Brightness.light),
     );
   }
 
@@ -178,6 +187,40 @@ class AppTheme {
         displayColor: contrastExtension.onBackgroundWithContrast,
       ),
       extensions: [contrastExtension],
+
+      // Add custom button theme with bordered text
+      elevatedButtonTheme: _createElevatedButtonTheme(Brightness.dark),
+    );
+  }
+
+  /// Creates a custom ElevatedButtonThemeData with bordered text
+  static ElevatedButtonThemeData _createElevatedButtonTheme(
+      Brightness brightness) {
+    return ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        elevation: 1,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24), // Pill-shaped button
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w500,
+        ),
+      ).copyWith(
+        foregroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+          // Use white text with black outline for better visibility
+          return Colors.white;
+        }),
+        overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
+          // Customize overlay color for pressed state
+          if (states.contains(WidgetState.pressed)) {
+            return Colors.white.withAlpha(25); // 0.1 * 255 = 25
+          }
+          return null;
+        }),
+        // Note: The actual bordered text effect is applied in the ButtonStyleButton.defaultStyleOf
+        // override in the MaterialApp theme, as it requires a BuildContext to create the Text widget
+      ),
     );
   }
 

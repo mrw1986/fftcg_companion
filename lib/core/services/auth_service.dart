@@ -16,6 +16,9 @@ class AuthService {
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
   final Ref? _ref;
 
+  // Define a timeout duration for auth operations
+  static const Duration _timeout = Duration(seconds: 30);
+
   /// Creates an AuthService
   AuthService([this._ref]);
 
@@ -62,10 +65,12 @@ class AuthService {
       String email, String password,
       {bool requireVerification = true}) async {
     try {
-      final credential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final credential = await _auth
+          .signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          )
+          .timeout(_timeout);
 
       // Check if email is verified if required
       if (requireVerification &&
@@ -75,7 +80,7 @@ class AuthService {
               .any((element) => element.providerId == 'password')) {
         // Send a new verification email if not verified
         try {
-          await credential.user!.sendEmailVerification();
+          await credential.user!.sendEmailVerification().timeout(_timeout);
           talker.info('Verification email sent to ${credential.user!.email}');
           talker.debug('User ID: ${credential.user!.uid}');
         } catch (verificationError) {
@@ -109,42 +114,24 @@ class AuthService {
       {bool sendVerificationEmail = true}) async {
     try {
       // Create the user account
-      final credential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final credential = await _auth
+          .createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          )
+          .timeout(_timeout);
 
       // Send email verification
       if (sendVerificationEmail && credential.user != null) {
         try {
-          // Configure ActionCodeSettings for better email verification experience
-          final actionCodeSettings = ActionCodeSettings(
-            url:
-                'https://fftcgcompanion.page.link/verify?email=${credential.user!.email}',
-            handleCodeInApp: true,
-            androidPackageName: 'com.mrw1986.fftcg_companion',
-            androidInstallApp: true,
-            androidMinimumVersion: '12',
-          );
-
-          // Send verification email with ActionCodeSettings
-          await credential.user!.sendEmailVerification(actionCodeSettings);
+          // Send verification email
+          await credential.user!.sendEmailVerification().timeout(_timeout);
           talker.info('Verification email sent to ${credential.user!.email}');
           talker.debug('User created: ${credential.user!.uid}');
         } catch (verificationError) {
-          // If ActionCodeSettings fails, try without it
           talker.error(
-              'Error sending verification email with ActionCodeSettings: $verificationError');
-          try {
-            // Fallback to simple verification email
-            await credential.user!.sendEmailVerification();
-            talker.info(
-                'Simple verification email sent to ${credential.user!.email}');
-          } catch (simpleVerificationError) {
-            talker.error(
-                'Error sending simple verification email: $simpleVerificationError');
-            // Continue with account creation but log the error
-          }
+              'Error sending verification email (createUser): $verificationError');
+          // Continue with account creation but log the error
         }
       }
 
@@ -277,7 +264,7 @@ class AuthService {
           );
 
           // Send verification email to the new user
-          await tempUser.user!.sendEmailVerification();
+          await tempUser.user!.sendEmailVerification().timeout(_timeout);
 
           // Sign out the temporary user
           await tempAuth.signOut();
@@ -301,7 +288,7 @@ class AuthService {
 
       // Send verification email
       try {
-        await userCredential.user!.sendEmailVerification();
+        await userCredential.user!.sendEmailVerification().timeout(_timeout);
         talker.info('Verification email sent to ${userCredential.user!.email}');
       } catch (verificationError) {
         talker.error(
@@ -490,7 +477,7 @@ class AuthService {
 
       // Re-authenticate the user
       final userCredential =
-          await user.reauthenticateWithCredential(credential);
+          await user.reauthenticateWithCredential(credential).timeout(_timeout);
       talker.debug('User re-authenticated successfully');
 
       return userCredential;
@@ -598,7 +585,7 @@ class AuthService {
   /// Send password reset email
   Future<void> sendPasswordResetEmail(String email) async {
     try {
-      await _auth.sendPasswordResetEmail(email: email);
+      await _auth.sendPasswordResetEmail(email: email).timeout(_timeout);
       talker.info('Password reset email sent to $email');
     } catch (e) {
       talker.error('Error sending password reset email: $e');
@@ -684,6 +671,20 @@ class AuthService {
     }
   }
 
+  /// Send verification email
+  Future<void> sendEmailVerification() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null && !user.emailVerified) {
+        await user.sendEmailVerification().timeout(_timeout);
+        talker.info('Verification email sent to ${user.email}');
+      }
+    } catch (e) {
+      talker.error('Error sending email verification', e);
+      rethrow;
+    }
+  }
+
   /// Send verification email before updating email
   Future<void> verifyBeforeUpdateEmail(String newEmail) async {
     try {
@@ -692,35 +693,17 @@ class AuthService {
 
       // Send verification email before updating email
       try {
-        // Configure ActionCodeSettings for better email verification experience
-        final actionCodeSettings = ActionCodeSettings(
-          url: 'https://fftcgcompanion.page.link/verify?email=$newEmail',
-          handleCodeInApp: true,
-          androidPackageName: 'com.mrw1986.fftcg_companion',
-          androidInstallApp: true,
-          androidMinimumVersion: '12',
-        );
-
-        // Send verification email with ActionCodeSettings
-        await user.verifyBeforeUpdateEmail(newEmail, actionCodeSettings);
+        // Send a simple verification email
+        await user.verifyBeforeUpdateEmail(newEmail).timeout(_timeout);
         talker.info('Verification email sent to $newEmail');
         talker.debug('Email update verification sent for user: ${user.uid}');
       } catch (e) {
-        talker.error(
-            'Error sending verification email with ActionCodeSettings: $e');
-
-        // Try without ActionCodeSettings as fallback
-        try {
-          await user.verifyBeforeUpdateEmail(newEmail);
-          talker.info('Simple verification email sent to $newEmail');
-        } catch (simpleError) {
-          talker.error('Error sending simple verification email: $simpleError');
-          throw FirebaseAuthException(
-            code: 'verification-email-failed',
-            message:
-                'Failed to send verification email. Please try again later or contact support.',
-          );
-        }
+        talker.error('Error sending verification email (updateEmail): $e');
+        throw FirebaseAuthException(
+          code: 'verification-email-failed',
+          message:
+              'Failed to send verification email. Please try again later or contact support.',
+        );
       }
 
       return;
@@ -762,6 +745,42 @@ class AuthService {
     } catch (e) {
       talker.error('Error getting Android ID: $e');
       return 'unknown';
+    }
+  }
+
+  /// Get a user-friendly error message for Firebase authentication errors
+  String getReadableAuthError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'too-many-requests':
+        return e.message ?? 'Too many attempts. Please try again later.';
+      case 'email-already-in-use':
+        return 'An account already exists with this email. Please sign in or use a different email.';
+      case 'invalid-email':
+        return 'Please enter a valid email address.';
+      case 'operation-not-allowed':
+        return 'This sign-in method is not enabled. Please contact support.';
+      case 'weak-password':
+        return 'Please choose a stronger password (at least 6 characters).';
+      case 'wrong-password':
+        return 'Incorrect password. Please try again or reset your password.';
+      case 'user-not-found':
+        return 'No account found with this email. Please check the email or create an account.';
+      case 'invalid-credential':
+        return 'Invalid login credentials. Please check your email and password.';
+      case 'network-request-failed':
+        return 'Network error. Please check your connection and try again.';
+      case 'user-disabled':
+        return 'This account has been disabled. Please contact support.';
+      case 'email-not-verified':
+        return 'Please verify your email address. A verification email has been sent.';
+      case 'app-check-failed':
+        return 'App verification failed. Please try again or reinstall the app.';
+      case 'no-connection':
+        return 'No internet connection. Please check your connection and try again.';
+      case 'google-sign-in-cancelled':
+        return 'Google sign in was cancelled. Please try again.';
+      default:
+        return e.message ?? 'An error occurred. Please try again.';
     }
   }
 

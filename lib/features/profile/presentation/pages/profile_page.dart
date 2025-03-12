@@ -78,7 +78,7 @@ class ProfilePage extends ConsumerWidget {
 
   Widget _buildAuthSection(
       BuildContext context, WidgetRef ref, AuthState authState) {
-    if (authState.isAuthenticated) {
+    if (authState.isAuthenticated || authState.isEmailNotVerified) {
       final user = authState.user!;
       final theme = Theme.of(context);
       final colorScheme = theme.colorScheme;
@@ -86,6 +86,44 @@ class ProfilePage extends ConsumerWidget {
 
       return Column(
         children: [
+          // Show email verification warning if needed
+          if (authState.isEmailNotVerified)
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: colorScheme.error,
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          color: colorScheme.error),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Email Not Verified',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Please check your email and verify your account. A verification email has been sent to ${user.email}. You will be signed out until you verify your email.',
+                    style: TextStyle(color: colorScheme.onErrorContainer),
+                  ),
+                ],
+              ),
+            ),
           ListTile(
             leading: CircleAvatar(
               backgroundImage:

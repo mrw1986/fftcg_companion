@@ -82,7 +82,11 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       // Show error message as SnackBar with action button
       if (mounted) {
         showThemedSnackBar(
-            context: context, message: e.toString(), isError: true);
+            context: context,
+            message: e is FirebaseAuthException
+                ? ref.read(authServiceProvider).getReadableAuthError(e)
+                : e.toString(),
+            isError: true);
       }
     }
   }
@@ -126,7 +130,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       // Check if the error is related to requiring recent authentication
       if (e.toString().contains('requires-recent-login') ||
           e.toString().contains('recent authentication')) {
-        // Show re-authentication dialog
+        // Show re-authentication dialog for security-sensitive operations
         setState(() {
           _showReauthDialog = true;
         });
@@ -134,7 +138,11 @@ class _AccountPageState extends ConsumerState<AccountPage> {
         // Show error message as SnackBar with action button
         if (mounted) {
           showThemedSnackBar(
-              context: context, message: e.toString(), isError: true);
+              context: context,
+              message: e is FirebaseAuthException
+                  ? ref.read(authServiceProvider).getReadableAuthError(e)
+                  : e.toString(),
+              isError: true);
         }
       }
     }
@@ -199,7 +207,11 @@ class _AccountPageState extends ConsumerState<AccountPage> {
         // Show error message
         if (mounted) {
           showThemedSnackBar(
-              context: context, message: e.toString(), isError: true);
+              context: context,
+              message: e is FirebaseAuthException
+                  ? ref.read(authServiceProvider).getReadableAuthError(e)
+                  : e.toString(),
+              isError: true);
         }
       }
     }
@@ -247,7 +259,11 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       // Show error message
       if (mounted) {
         showThemedSnackBar(
-            context: context, message: e.toString(), isError: true);
+            context: context,
+            message: e is FirebaseAuthException
+                ? ref.read(authServiceProvider).getReadableAuthError(e)
+                : e.toString(),
+            isError: true);
       }
     }
   }
@@ -302,7 +318,11 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       // Show error message
       if (mounted) {
         showThemedSnackBar(
-            context: context, message: e.toString(), isError: true);
+            context: context,
+            message: e is FirebaseAuthException
+                ? ref.read(authServiceProvider).getReadableAuthError(e)
+                : e.toString(),
+            isError: true);
       }
     }
   }
@@ -335,7 +355,11 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       // Show error message
       if (mounted) {
         showThemedSnackBar(
-            context: context, message: e.toString(), isError: true);
+            context: context,
+            message: e is FirebaseAuthException
+                ? ref.read(authServiceProvider).getReadableAuthError(e)
+                : e.toString(),
+            isError: true);
       }
     }
   }

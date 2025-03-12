@@ -25,7 +25,20 @@ final authStateProvider = Provider<AuthState>((ref) {
       } else if (user.isAnonymous) {
         return AuthState.anonymous(user);
       } else {
-        return AuthState.authenticated(user);
+        // Check if the user's email is verified if they're using email/password auth
+        if (user.providerData
+                .any((element) => element.providerId == 'password') &&
+            !user.emailVerified) {
+          // If email is not verified, sign the user out and return unauthenticated state
+          final authService = ref.read(authServiceProvider);
+          // Send a verification email and sign out
+          authService
+              .sendEmailVerification()
+              .then((_) => authService.signOut());
+          return AuthState.emailNotVerified(user);
+        } else {
+          return AuthState.authenticated(user);
+        }
       }
     },
     loading: () => const AuthState.loading(),
@@ -38,36 +51,49 @@ class AuthState {
   final AuthStatus status;
   final User? user;
   final String? errorMessage;
+  final bool emailNotVerified;
 
   const AuthState({
     required this.status,
     this.user,
+    this.emailNotVerified = false,
     this.errorMessage,
   });
 
   const AuthState.unauthenticated()
       : status = AuthStatus.unauthenticated,
+        emailNotVerified = false,
         user = null,
         errorMessage = null;
 
   const AuthState.anonymous([this.user])
       : status = AuthStatus.anonymous,
+        emailNotVerified = false,
         errorMessage = null;
 
   const AuthState.authenticated(this.user)
       : status = AuthStatus.authenticated,
+        emailNotVerified = false,
+        errorMessage = null;
+
+  const AuthState.emailNotVerified(this.user)
+      : status = AuthStatus.emailNotVerified,
+        emailNotVerified = true,
         errorMessage = null;
 
   const AuthState.loading()
       : status = AuthStatus.loading,
         user = null,
+        emailNotVerified = false,
         errorMessage = null;
 
   const AuthState.error(this.errorMessage)
       : status = AuthStatus.error,
-        user = null;
+        user = null,
+        emailNotVerified = false;
 
   bool get isAuthenticated => status == AuthStatus.authenticated;
+  bool get isEmailNotVerified => status == AuthStatus.emailNotVerified;
   bool get isAnonymous => status == AuthStatus.anonymous;
   bool get isUnauthenticated => status == AuthStatus.unauthenticated;
   bool get isLoading => status == AuthStatus.loading;
@@ -78,6 +104,7 @@ class AuthState {
 enum AuthStatus {
   unauthenticated,
   anonymous,
+  emailNotVerified,
   authenticated,
   loading,
   error,
