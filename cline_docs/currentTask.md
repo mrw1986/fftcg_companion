@@ -700,6 +700,100 @@ Location: lib/features/profile/presentation/pages/account_page.dart
 - Improved error handling with user-friendly messages
 - Enhanced logging throughout the authentication flow
 
+## Current Objective 7 (Completed)
+
+Simplify the Theme Settings page UI and improve text contrast in color selection
+
+## Theme Settings UI Simplification Context
+
+The Theme Settings page had unnecessary UI elements and some text contrast issues in the color selection grid. We implemented the following improvements:
+
+1. Removed the custom color selector circle at the top right
+2. Removed the "Predefined Schemes" text to simplify the UI
+3. Kept only the color grid for theme color selection
+4. Improved text contrast in the color grid by using withAlpha instead of withOpacity
+5. Added proper contrast calculation for palette icons based on background color
+
+## Theme Settings UI Simplification Implementation Plan
+
+### 1. Simplify Theme Settings Page
+
+Location: lib/features/profile/presentation/pages/theme_settings_page.dart
+
+- Removed the custom color selector circle
+- Removed the "Predefined Schemes" text
+- Kept only the color grid for theme color selection
+- Simplified the UI to focus on the essential functionality
+
+### 2. Improve Text Contrast
+
+Location: lib/features/profile/presentation/pages/theme_settings_page.dart
+
+- Improved text contrast in the color grid
+- Used withAlpha instead of withOpacity for better performance
+- Added proper contrast calculation for palette icons based on background color
+- Ensured icons are visible on all background colors
+
+## Theme Settings UI Simplification Status
+
+- The Theme Settings page has been simplified with unnecessary UI elements removed
+- The custom color selector circle has been removed
+- The "Predefined Schemes" text has been removed
+- Only the color grid remains for theme color selection
+- Text contrast has been improved in the color grid
+- Palette icons now have proper contrast against their background colors
+- The overall UI is more focused and user-friendly
+
 ## Future Development Tasks
 
 The next steps for development are outlined in the "Next Steps" section above. These include implementing the deck builder feature, card scanner feature, and price tracking feature.
+
+## Current Objective 8
+
+Enhance the theme picker with advanced features using flex_color_scheme and flex_color_picker
+
+## Theme Picker Enhancement Context
+
+The theme picker needed to be enhanced with more advanced features to provide a better user experience. We implemented the following improvements:
+
+1. Added Material 3 tonal palette generation
+2. Enabled color shades selection
+3. Added color name display
+4. Added recently used colors tracking with persistence
+5. Implemented multiple color picker types (Primary, Accent, Black & White, and Wheel)
+6. Improved the UI organization with clear section headings
+7. Enhanced the predefined schemes section with visual indicators for the selected scheme
+
+## Theme Picker Enhancement Implementation Plan
+
+### 1. Enhance Theme Settings Page
+
+Location: lib/features/profile/presentation/pages/theme_settings_page.dart
+
+- Converted to a StatefulWidget to manage state for recent colors
+- Implemented enhanced ColorPicker with requested features
+- Added tonal palette support
+- Enabled color names display
+- Added recently used colors section
+- Configured multiple picker types (Primary, Accent, B&W, Wheel)
+- Improved the predefined schemes section with selection indicators
+
+### 2. Update Theme Provider
+
+Location: lib/app/theme/theme_provider.dart
+
+- Added methods to persist and retrieve recently used colors
+- Implemented JSON serialization for color storage
+- Added utility methods for color conversion
+
+## Theme Picker Enhancement Status
+
+- Enhanced ColorPicker has been implemented with all requested features
+- Material 3 tonal palette generation is now available
+- Color shades selection is enabled
+- Color names are displayed for better user understanding
+- Recently used colors are tracked and persisted between sessions
+- Multiple color picker types are available (Primary, Accent, B&W, Wheel)
+- The UI is better organized with clear section headings
+- The predefined schemes section now shows visual indicators for the selected scheme
+- The overall theme picker experience is more comprehensive and user-friendly

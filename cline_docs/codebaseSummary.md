@@ -144,7 +144,27 @@
 
 ## Recent Significant Changes
 
-1. **UI Consistency Improvements**
+1. **Theme Picker Enhancement**
+   - Enhanced the theme picker with advanced features using flex_color_scheme and flex_color_picker
+   - Added Material 3 tonal palette generation for selected colors
+   - Enabled color shades selection for more precise color choices
+   - Added color name display for better user understanding
+   - Implemented recently used colors tracking with persistence between sessions
+   - Added multiple color picker types (Primary, Accent, Black & White, and Wheel)
+   - Improved the UI organization with clear section headings
+   - Enhanced the predefined schemes section with visual indicators for the selected scheme
+   - Added persistence for recently used colors in the theme provider
+
+2. **Theme Settings UI Simplification**
+   - Removed the custom color selector circle at the top right
+   - Removed the "Predefined Schemes" text to simplify the UI
+   - Kept only the color grid for theme color selection
+   - Improved text contrast in the color grid by using withAlpha instead of withOpacity
+   - Added proper contrast calculation for palette icons based on background color
+   - Simplified the UI to focus on the essential functionality
+   - Enhanced overall user experience with a more focused and user-friendly interface
+
+3. **UI Consistency Improvements**
    - Replicated the card label toggle from the Collection page to the Card Database page with independent state for each
    - Fixed the Collection sorting query to properly handle ascending/descending sorting
    - Removed the extra divider lines between sections in both the Collection filter dialog and Card filter dialog
@@ -155,7 +175,7 @@
    - Fixed the filter functionality in the Collection page to properly apply both collection-specific filters and card filters
    - Improved the overall user experience with more consistent UI elements and behavior
 
-2. **Card Details Page UI Improvements**
+4. **Card Details Page UI Improvements**
    - Fixed "T:" styling in card descriptions to show the dull.png image
    - Improved layout with navigation buttons and FAB
      - Moved navigation buttons outside the card image
@@ -168,7 +188,7 @@
      - Used BoxFit.cover to ensure the image fills the entire container
      - Preserved Hero animation for smooth transitions
 
-3. **Collection UI Improvements**
+5. **Collection UI Improvements**
    - Updated collection grid to match cards grid implementation
    - Added card labels toggle in collection page
    - Improved collection card display with quantity indicators
@@ -180,7 +200,7 @@
    - Fixed search functionality in collection edit page
    - Ensured consistent UI between cards and collection features
 
-4. **Card Details Page Enhancement**
+6. **Card Details Page Enhancement**
    - Added action buttons below the card image
    - Implemented "Add to Collection" button that navigates to the Collection Edit page with the selected card
    - Added placeholder "Favorite" button with star icon and toggle functionality
@@ -188,7 +208,7 @@
    - Ensured buttons are visually consistent with the app's design language
    - Improved layout to accommodate the new action buttons
 
-5. **Collection Edit Page Enhancement**
+7. **Collection Edit Page Enhancement**
    - Added integrated card search functionality
    - Implemented search bar in the app bar when in search mode
    - Created search results list with card images and details
@@ -197,7 +217,7 @@
    - Ensured seamless integration with existing collection management features
    - Added support for direct navigation from Card Details page
 
-6. **Collection Feature Implementation**
+8. **Collection Feature Implementation**
    - Created collection data models with support for regular and foil cards
    - Added card condition tracking with standardized condition codes
    - Implemented purchase information tracking with price and date
@@ -214,215 +234,13 @@
    - Fixed nested scrollable widgets issue in collection content
    - Fixed layout issues by converting sliver widgets to regular widgets in collection grid and list
 
-7. **Theme System Enhancement**
+9. **Theme System Enhancement**
    - Added ThemeSettingsPage for customizing app appearance
    - Implemented color picker for selecting custom theme colors
    - Added predefined color schemes from FlexColorScheme
    - Created contrast extension to ensure text readability
    - Implemented theme mode selection (light, dark, system)
    - Added persistent theme settings using Hive storage
-   - Updated router to include theme settings route
-   - Ensured colors have appropriate contrast in both light and dark modes
-
-8. **Authentication Implementation**
-   - Added Firebase Authentication integration with Google Sign-In, Email/Password, and Anonymous authentication
-   - Created authentication service and Riverpod providers for state management
-   - Implemented login, registration, and account management UI
-   - Added password reset functionality
-   - Implemented anonymous to permanent account conversion
-   - Updated Profile page to show different options based on authentication state
-   - Added account management features
-   - Integrated authentication state with the app's navigation system
-   - Enhanced Google Sign-In with detailed logging and emulator detection
-   - Redesigned GoogleSignInButton with loading state and error handling
-   - Added email verification tracking with isVerified field in UserModel
-   - Made SnackBar notifications interactive with OK buttons
-   - Improved error messages for authentication operations
-   - Enhanced the overall authentication experience with better feedback
-
-9. **UI Improvements**
-   - Implemented swipe navigation in card details page with intuitive controls
-   - Added navigation buttons on sides of card image for easy browsing
-   - Implemented PageView for smooth transitions between cards
-   - Ensured navigation respects current filtered card list
-   - Implemented animated search bar in app bar
-   - Fixed special ability styling in card descriptions
-   - Improved card corner rounding in dark mode
-   - Enhanced card image display with proper border radius
-   - Added smooth animations for search transitions
-   - Fixed splash screen to properly respect dark/light mode
-   - Simplified loading indicator for a cleaner look
-   - Fixed card list item corner rounding with dynamic border radius based on view size
-   - Implemented element-colored cost crystals with dynamic rendering based on number of elements
-   - Standardized element color palette across the application
-   - Improved metadata chip organization with logical ordering
-   - Made set categories (Promotional Sets, Collections & Decks, and Opus Sets) collapsed by default unless sets are selected
-   - Changed sorting to make sealed products appear at the bottom of results instead of the top
-   - Added Category filter using the filters.category document values
-   - Updated Card model to use fullCardNumber for display and sorting
-   - Modified sorting logic to ensure non-cards always appear at the bottom regardless of sort type
-   - Replaced custom splash screen with properly configured native splash screen
-   - Fixed Android 12+ splash screen to show the full logo with "COMPANION" text
-
-10. **Performance Optimizations**
-    - Improved image caching
-    - Reduced unnecessary rebuilds
-    - Optimized search functionality
-    - Enhanced animation performance
-    - Added memory cache layer to reduce Hive access
-    - Implemented resilient storage operations with fallback mechanisms
-    - Replaced deprecated withOpacity with withAlpha for better performance
-    - Fixed nested scrollable widgets to prevent layout issues
-    - Improved scrolling performance by using NeverScrollableScrollPhysics for nested scrollable widgets
-
-11. **Bug Fixes**
-    - Fixed card description text styling issues
-    - Resolved card corner rounding problems in dark mode
-    - Fixed null check error in ThemeSettingsPage when accessing FlexColor.schemes
-      - Added null safety check when accessing predefined color schemes
-      - Provided fallback to Material scheme when a scheme is not available
-    - Improved error handling for image loading
-    - Fixed search visibility issues
-    - Resolved Hive box type mismatch errors
-    - Fixed non-card items sorting to the top when filtering by set
-    - Enhanced error recovery for storage operations
-    - Fixed search visibility issues
-    - Replaced deprecated withOpacity with withAlpha for better performance
-    - Fixed nested scrollable widgets in collection content to prevent "Vertical viewport was given unbounded height" errors
-    - Fixed "A RenderPadding expected a child of type RenderBox but received a child of type RenderSliverFillRemainingWithScrollable" error by converting sliver widgets to regular widgets
-
-12. **Authentication Improvements**
-    - Enhanced Google Sign-In error handling with detailed logging
-    - Added emulator detection to provide specific warnings when running on emulators
-    - Improved the GoogleSignInButton widget to show loading state and handle errors
-    - Added email verification tracking with isVerified field in UserModel
-    - Enhanced SnackBar notifications to be interactive with OK buttons
-    - Improved error messages for authentication operations
-    - Added better logging throughout the authentication process
-    - Fixed issues with Google Sign-In on emulators
-    - Enhanced the email verification process with better user feedback
-    - Improved the password reset flow with automatic logout for security
-    - Made all authentication notifications more user-friendly with longer durations
-    - Used theme-consistent colors for all notifications
-    - Fixed text contrast issues in authentication-related pages for better readability in dark mode
-
-13. **Authentication UI Contrast Fix**
-    - Fixed text contrast issues in login page, account page, and register page
-    - Replaced ContrastExtension usage with direct brightness checks for critical text elements
-    - Implemented explicit white text color for dark mode to ensure maximum readability
-    - Maintained proper text styling for light mode
-    - Improved user experience in dark mode by ensuring all text is readable
-
-## User Feedback Integration
-
-1. **Firebase Authentication Enhancements**
-    - Added explicit method for deleting non-anonymous users with proper error handling
-    - Added re-authentication methods for security-sensitive operations
-    - Added method for unlinking authentication providers
-    - Updated UI to support these new features
-    - Improved error handling with user-friendly messages
-    - Enhanced logging throughout the authentication flow
-    - Added UI for deleting user accounts with confirmation dialog
-    - Added re-authentication dialog for security-sensitive operations
-    - Added UI for managing linked authentication providers
-    - Added ability to unlink providers while ensuring at least one remains
-    - Enhanced error handling with themed SnackBars
-
-1. **Card Details Navigation**
-   - Users wanted to browse through cards without returning to the list
-   - Users needed to navigate between filtered or search results easily
-   - Implemented swipe navigation with PageView for intuitive browsing
-   - Added navigation buttons on sides of card image
-   - Ensured navigation respects current filtered card list
-   - Made navigation controls visually appealing and non-intrusive
-   - Implemented smooth transitions between cards
-
-1. **Collection Management Workflow**
-   - Users wanted a more streamlined way to add cards to their collection
-   - Users needed to search for cards when adding to collection
-   - Users wanted to add cards directly from the card details page
-   - Added "Add to Collection" button on card details page
-   - Implemented integrated search in the collection edit page
-   - Created seamless flow between card browsing and collection management
-   - Added placeholder favorites and wishlist functionality for future implementation
-   - Improved collection grid to match cards grid implementation
-   - Added card labels toggle for better visibility
-   - Enhanced collection search functionality
-
-1. **Search Experience**
-   - Users wanted a more intuitive search interface
-   - Users requested ability to search within filtered cards
-   - Users needed to sort search results
-   - Users wanted access to all app bar actions during search
-   - Implemented animated search bar that expands from right to left
-   - Created FilteredSearchProvider for integrated search, filter, and sort
-   - Made all app bar actions visible and functional during search
-   - Added smooth transitions for all search-related UI elements
-   - Ensured cards remain visible during search operations
-
-1. **Collection Management**
-   - Users wanted to track their card collection
-   - Users needed to track card condition and purchase information
-   - Users requested professional grading support
-   - Implemented comprehensive collection tracking system
-   - Added support for regular and foil cards
-   - Created condition tracking with standardized codes
-   - Added purchase information tracking with price and date
-   - Implemented professional grading support for PSA, BGS, and CGC
-   - Created intuitive UI for managing collection
-   - Added statistics to track collection progress
-
-1. **Card Details Page**
-   - Users reported white corners on card images in dark mode
-   - Users reported inconsistent styling for "T:" in card descriptions
-   - Implemented fix using CornerMaskWidget to handle white corners
-   - Fixed "T:" styling to show the dull.png image
-   - Improved layout with navigation buttons and FAB
-   - Increased card image size for better visibility
-
-1. **Card Description Text**
-   - Users reported inconsistent styling for special abilities
-   - Updated regex pattern to handle different spacing scenarios
-   - Improved text processing for consistent formatting
-
-1. **Splash Screen and Loading Experience**
-   - Users reported splash screen not respecting dark mode
-   - Users wanted a cleaner loading indicator without the logo
-   - Updated native splash screen configuration to use appropriate images for each theme
-   - Modified custom splash screen to properly detect system brightness
-   - Simplified loading indicator to show only a progress spinner
-
-1. **UI Consistency**
-   - Users reported inconsistent UI between Cards and Collection pages
-   - Users wanted the same features available in both sections
-   - Replicated the card label toggle from the Collection page to the Card Database page
-   - Fixed the Collection sorting query to properly handle all sort methods
-   - Adjusted padding between UI elements for a more compact layout
-   - Improved the overall user experience with more consistent UI elements and behavior
-
-1. **Authentication Experience**
-   - Users reported issues with Google Sign-In on emulators
-   - Users wanted better feedback during authentication operations
-   - Users needed clearer verification instructions for email accounts
-   - Users reported text readability issues in dark mode on authentication pages
-   - Enhanced Google Sign-In with detailed logging and emulator detection
-   - Redesigned GoogleSignInButton with loading state and error handling
-   - Added email verification tracking with isVerified field
-   - Made SnackBar notifications interactive with OK buttons
-   - Improved error messages for authentication operations
-   - Enhanced the overall authentication experience with better feedback
-   - Fixed text contrast issues in authentication-related pages by implementing direct brightness checks
-
-## Upcoming Development Focus
-
-1. **Favorites and Wishlist Implementation**
-   - Implement full functionality for favorites feature
-   - Create wishlist data models and repositories
-   - Add wishlist management UI
-   - Implement wishlist statistics and tracking
-   - Enable sharing wishlists with other users
-
-2. **Deck Builder Implementation**
    - Create deck building interface
    - Implement deck validation rules
    - Add deck statistics and analysis

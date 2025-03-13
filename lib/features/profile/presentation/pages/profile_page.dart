@@ -126,6 +126,8 @@ class ProfilePage extends ConsumerWidget {
                   Center(
                     child: StyledButton(
                       onPressed: () async {
+                        // Resend verification email
+
                         try {
                           await ref
                               .read(authServiceProvider)
@@ -150,6 +152,9 @@ class ProfilePage extends ConsumerWidget {
                         }
                       },
                       text: 'Resend Verification Email',
+                      // Use a fixed color that works well with the red background
+                      backgroundColor: Colors.white,
+                      textColor: Colors.red.shade900,
                     ),
                   ),
                 ],

@@ -1,6 +1,7 @@
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'dart:convert';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 part 'theme_provider.g.dart';
@@ -61,6 +62,7 @@ class ThemeModeController extends _$ThemeModeController {
 class ThemeColorController extends _$ThemeColorController {
   static const _boxName = 'settings';
   static const _themeColorKey = 'theme_color';
+  static const _recentColorsKey = 'recent_colors';
 
   Box? _getBox() {
     if (!Hive.isBoxOpen(_boxName)) {
@@ -95,10 +97,52 @@ class ThemeColorController extends _$ThemeColorController {
 
     return (a << 24) | (r << 16) | (g << 8) | b;
   }
+
+  /// Get the list of recently used colors
+  List<Color> getRecentColors() {
+    try {
+      final box = _getBox();
+      if (box == null) return [];
+
+      final recentColorsJson = box.get(_recentColorsKey);
+      if (recentColorsJson == null) return [];
+
+      final List<dynamic> colorsList = jsonDecode(recentColorsJson);
+      return colorsList.map((colorInt) => Color(colorInt)).toList();
+    } catch (e, stack) {
+      talker.error('Error getting recent colors', e, stack);
+      return [];
+    }
+  }
+
+  /// Save the list of recently used colors
+  Future<void> saveRecentColors(List<Color> colors) async {
+    try {
+      if (!Hive.isBoxOpen(_boxName)) {
+        await Hive.openBox(_boxName);
+      }
+      final box = Hive.box(_boxName);
+
+      // Convert colors to a list of integers for storage
+      final colorInts = colors.map((color) => _colorToInt(color)).toList();
+
+      // Store as JSON string
+      await box.put(_recentColorsKey, jsonEncode(colorInts));
+      talker.debug('Saved ${colors.length} recent colors');
+    } catch (e, stack) {
+      talker.error('Error saving recent colors', e, stack);
+    }
+  }
 }
 
 extension ColorUtils on Color {
+  /// Convert a Color to an integer representation
   int toHexArgb() {
     return (a.toInt() << 24) | (r.toInt() << 16) | (g.toInt() << 8) | b.toInt();
+  }
+
+  /// Get a string representation of the color
+  String toHexString() {
+    return '#${(toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
   }
 }

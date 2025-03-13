@@ -47,6 +47,8 @@
   - [x] Predefined color schemes
   - [x] Contrast guarantees for accessibility
   - [x] Fixed text contrast issues in authentication pages
+  - [x] Simplified theme settings UI
+  - [x] Improved text contrast in color selection grid
 - [x] Collection tracking
   - [x] Card collection management
   - [x] Regular and foil tracking
@@ -257,6 +259,13 @@
   - Implemented account deletion with proper data cleanup
   - Added provider unlinking for managing authentication methods
   - Improved error handling with user-friendly messages
+- Simplified Theme Settings UI:
+  - Removed the custom color selector circle at the top right
+  - Removed the "Predefined Schemes" text to simplify the UI
+  - Kept only the color grid for theme color selection
+  - Improved text contrast in the color grid by using withAlpha instead of withOpacity
+  - Added proper contrast calculation for palette icons based on background color
+  - Enhanced overall user experience with a more focused and user-friendly interface
 
 ### In Progress
 
