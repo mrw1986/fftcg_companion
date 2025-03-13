@@ -699,13 +699,23 @@ class AuthService {
         await user.verifyBeforeUpdateEmail(newEmail).timeout(_timeout);
         talker.info('Verification email sent to $newEmail');
         talker.debug('Email update verification sent for user: ${user.uid}');
-      } catch (e) {
+
+        // Update the user's email in Firestore after successful verification
+        await _userRepository.updateUserEmail(user.uid, newEmail);
+        talker.info('Updated user email in Firestore to $newEmail');
+      } on FirebaseAuthException catch (e) {
         talker.error('Error sending verification email (updateEmail): $e');
-        throw FirebaseAuthException(
-          code: 'verification-email-failed',
-          message:
-              'Failed to send verification email. Please try again later or contact support.',
-        );
+        if (e.code == 'requires-recent-login') {
+          // Rethrow the requires-recent-login exception so it can be handled upstream
+          rethrow;
+        } else {
+          // For other errors, throw a generic verification-email-failed exception
+          throw FirebaseAuthException(
+            code: 'verification-email-failed',
+            message:
+                'Failed to send verification email. Please try again later or contact support.',
+          );
+        }
       }
 
       return;

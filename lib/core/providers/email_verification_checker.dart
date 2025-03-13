@@ -79,42 +79,21 @@ Future<void> _checkEmailVerification(Ref ref) async {
       // This will update Firestore and refresh the auth state
       await authService.handleEmailVerificationComplete();
 
-      // Force a refresh of the auth state provider
+      // Force a refresh of the auth state provider and currentUserProvider
       ref.invalidate(authStateProvider);
-
-      // Also invalidate the currentUserProvider to ensure it gets the latest user
       ref.invalidate(currentUserProvider);
 
-      // Wait for the auth state to be updated
+      // Wait for the auth state to be updated.  A short delay helps ensure
+      // that the providers have time to update before the router refresh.
       await Future.delayed(const Duration(milliseconds: 300));
 
-      // Refresh the router to update the UI
+      // Refresh the router to update the UI.
       final router = ref.read(routerProvider);
       router.refresh();
-
-      // // If we're on the profile page, navigate to it again to force a rebuild
-      // final currentLocation =
-      //     router.routeInformationProvider.value.uri.toString();
-      // if (currentLocation.contains('/profile')) {
-      //   talker.debug('Refreshing profile page after email verification');
-      //   // Use a slightly longer delay to ensure the auth state has fully propagated
-      //   Timer(const Duration(milliseconds: 800), () {
-      //     // Force a full refresh by going to a different page first
-      //     router.go('/');
-      //     // Then go back to profile after a short delay
-      //     Timer(const Duration(milliseconds: 100), () {
-      //       router.go('/profile');
-      //     });
-      //   });
-      // }
-    } else {
-      // If the user is still not verified, log the current state
-      if (refreshedUser != null) {
-        talker.debug(
-            'User email verification status: ${refreshedUser.emailVerified}');
-      }
     }
   } catch (e) {
     talker.error('Error checking email verification status', e);
   }
 }
+
+// TODO: Remove this once we confirm the email verification is working as expected

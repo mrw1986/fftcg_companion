@@ -122,29 +122,56 @@ class _AccountPageState extends ConsumerState<AccountPage> {
             isError: false,
             duration: const Duration(seconds: 10));
       }
-    } catch (e) {
+    } on FirebaseAuthException catch (e) {
       setState(() {
         _isLoading = false;
       });
 
-      // Check if the error is related to requiring recent authentication
-      if (e.toString().contains('requires-recent-login') ||
-          e.toString().contains('recent authentication')) {
+      talker.debug('Caught FirebaseAuthException with code: ${e.code}');
+      if (e.code == 'requires-recent-login') {
         talker.debug('Email update requires re-authentication');
         if (mounted) {
           _showReauthRequiredDialog(isForDeletion: false);
         }
         return;
       } else {
+        talker.error('Error updating email: $e');
+
         // Show error message as SnackBar with action button
         if (mounted) {
           showThemedSnackBar(
-              context: context,
-              message: e is FirebaseAuthException
-                  ? ref.read(authServiceProvider).getReadableAuthError(e)
-                  : e.toString(),
-              isError: true);
+            context: context,
+            message: ref.read(authServiceProvider).getReadableAuthError(e),
+            isError: true,
+          );
         }
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      talker.error('Unexpected error during email update: $e');
+
+      // Check if the error message contains "requires-recent-login" or "recent authentication"
+      // This handles cases where the FirebaseAuthException is wrapped in another exception
+      if (e.toString().contains('requires-recent-login') ||
+          e.toString().contains('recent authentication')) {
+        talker.debug(
+            'Detected re-authentication requirement from generic exception');
+        if (mounted) {
+          _showReauthRequiredDialog(isForDeletion: false);
+        }
+        return;
+      }
+
+      // Show error message as SnackBar with action button
+      if (mounted) {
+        showThemedSnackBar(
+          context: context,
+          message: e.toString(),
+          isError: true,
+        );
       }
     }
   }

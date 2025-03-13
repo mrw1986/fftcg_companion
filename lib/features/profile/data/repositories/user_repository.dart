@@ -131,4 +131,20 @@ class UserRepository {
       rethrow;
     }
   }
+
+  /// Update user email
+  Future<void> updateUserEmail(
+    String userId,
+    String email,
+  ) async {
+    try {
+      final user = await getUserById(userId);
+      if (user == null) throw Exception('User not found');
+      final updatedUser = user.copyWith(email: email);
+      await createOrUpdateUser(updatedUser);
+    } catch (e) {
+      // Log error
+      rethrow;
+    }
+  }
 }

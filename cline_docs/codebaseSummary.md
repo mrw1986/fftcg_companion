@@ -78,11 +78,15 @@
      - Added dedicated re-authentication dialog with clear explanations
      - Made re-auth dialog context-aware (deletion vs. email update)
      - Added automatic continuation of operation after successful re-auth
+     - Fixed issue where `requires-recent-login` error was not correctly handled for email updates
    - Enhanced error handling:
      - User-friendly error messages
      - Improved detection of re-authentication requirements
      - Better state management during re-authentication
      - Proper error recovery with clear guidance
+   - Fixed issue where updated email address was not reflected in Firestore:
+     - Added `updateUserEmail` method to `UserRepository`.
+     - Called `updateUserEmail` in `AuthService.verifyBeforeUpdateEmail` after successful verification.
 
 3. UI Improvements
    - Consistent dialog styling

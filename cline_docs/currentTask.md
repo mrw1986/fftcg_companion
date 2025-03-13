@@ -4,7 +4,7 @@
 
 [Previous objectives remain unchanged...]
 
-## Current Objective 10 (In Progress)
+## Current Objective 11 (In Progress)
 
 Fix email verification and account deletion UX issues
 
@@ -44,7 +44,7 @@ The app had several UX issues with email verification and account deletion:
 #### Completed
 
 - Email verification checker now properly updates UI:
-  - Enhanced token refresh mechanism
+  - Enhanced token refresh mechanism and ensured it's called after email updates
   - Improved UI update after verification
   - Added more robust error handling and logging
 - Account deletion improvements:
@@ -54,13 +54,17 @@ The app had several UX issues with email verification and account deletion:
   - Improved detection of re-authentication requirements from generic exceptions
   - Added dedicated re-authentication dialog with clear explanation
 - Re-authentication flow improvements:
-  - Fixed re-authentication prompt for account deletion
+  - Fixed re-authentication prompt for account deletion and email updates
   - Added proper state management for re-auth dialog
   - Improved error handling with clear messages
   - Added proper cleanup after operations
   - Enhanced re-authentication dialog to be context-aware (deletion vs. email update)
   - Added automatic continuation of operation after successful re-authentication
+  - Fixed issue where `requires-recent-login` error was not correctly handled for email updates
 - Auth service properly handles token refreshes
+- Fixed issue where updated email address was not reflected in the UI after verification:
+  - Added `updateUserEmail` method to `UserRepository` to update the email in Firestore.
+  - Called `updateUserEmail` in `AuthService.verifyBeforeUpdateEmail` after successful verification.
 
 - Fixed multiple UI refreshes after email verification by removing redundant navigation calls in `email_verification_checker.dart`.
 
