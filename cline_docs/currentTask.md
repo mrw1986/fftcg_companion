@@ -62,6 +62,8 @@ The app had several UX issues with email verification and account deletion:
   - Added automatic continuation of operation after successful re-authentication
 - Auth service properly handles token refreshes
 
+- Fixed multiple UI refreshes after email verification by removing redundant navigation calls in `email_verification_checker.dart`.
+
 #### Testing Strategy
 
 1. Email Verification Test

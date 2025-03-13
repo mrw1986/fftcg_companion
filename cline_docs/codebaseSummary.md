@@ -90,6 +90,9 @@
    - Improved loading states
    - Enhanced user feedback throughout sensitive operations
 
+4. Fixed Multiple UI Refreshes
+   - Removed redundant navigation calls in `email_verification_checker.dart` to prevent multiple UI refreshes after email verification.
+
 ### User Feedback Integration
 
 1. Authentication Feedback
