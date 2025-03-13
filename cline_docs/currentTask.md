@@ -748,7 +748,7 @@ Location: lib/features/profile/presentation/pages/theme_settings_page.dart
 
 The next steps for development are outlined in the "Next Steps" section above. These include implementing the deck builder feature, card scanner feature, and price tracking feature.
 
-## Current Objective 8
+## Current Objective 8 (Completed)
 
 Enhance the theme picker with advanced features using flex_color_scheme and flex_color_picker
 
@@ -766,7 +766,7 @@ The theme picker needed to be enhanced with more advanced features to provide a 
 
 ## Theme Picker Enhancement Implementation Plan
 
-### 1. Enhance Theme Settings Page
+### 1. Enhance Theme Settings Page (Contrast Fix)
 
 Location: lib/features/profile/presentation/pages/theme_settings_page.dart
 
@@ -797,3 +797,47 @@ Location: lib/app/theme/theme_provider.dart
 - The UI is better organized with clear section headings
 - The predefined schemes section now shows visual indicators for the selected scheme
 - The overall theme picker experience is more comprehensive and user-friendly
+
+## Current Objective 9 (Completed)
+
+Fix contrast issues in the theme picker and improve text readability
+
+## Theme Picker Contrast Fix Context
+
+The theme picker had issues with text contrast, particularly when selecting dark colors. We implemented the following improvements:
+
+1. Enhanced text styling in the color picker with high-contrast white text and shadows
+2. Fixed the opacityTrackHeight parameter to comply with the required range (8-50dp)
+3. Improved the SwitchListTile in the profile page for better visibility in dark mode
+4. Added adaptive text colors based on the current theme brightness
+5. Increased font sizes for better readability
+
+## Theme Picker Contrast Fix Implementation Plan
+
+### 1. Enhance Theme Settings Page
+
+Location: lib/features/profile/presentation/pages/theme_settings_page.dart
+
+- Updated text styling with high-contrast white text and shadows
+- Fixed the opacityTrackHeight parameter to comply with the required range
+- Added adaptive text colors based on the current theme brightness
+- Increased font sizes for better readability
+- Enhanced the theme mode buttons with larger icons and text
+
+### 2. Update Profile Page
+
+Location: lib/features/profile/presentation/pages/profile_page.dart
+
+- Improved the SwitchListTile styling for better visibility in dark mode
+- Added explicit colors for the switch thumb and track
+- Enhanced subtitle text with adaptive colors based on theme brightness
+
+## Theme Picker Contrast Fix Status
+
+- Text styling in the color picker has been enhanced with high-contrast white text and shadows
+- The opacityTrackHeight parameter has been fixed to comply with the required range
+- The SwitchListTile in the profile page has been improved for better visibility in dark mode
+- Adaptive text colors have been added based on the current theme brightness
+- Font sizes have been increased for better readability
+- The theme mode buttons have been enhanced with larger icons and text
+- The overall theme picker experience is now more accessible and user-friendly

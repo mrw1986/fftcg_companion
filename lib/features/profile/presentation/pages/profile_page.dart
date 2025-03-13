@@ -42,13 +42,25 @@ class ProfilePage extends ConsumerWidget {
           SwitchListTile(
             secondary: const Icon(Icons.image_outlined),
             title: const Text('Show Splash Screen'),
-            subtitle: const Text('Display splash screen when app starts'),
+            subtitle: Text(
+              'Display splash screen when app starts',
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white70
+                    : Colors.black87,
+              ),
+            ),
             value: splashPrefs.enabled,
             onChanged: (_) {
               ref
                   .read(splashScreenPreferencesProvider.notifier)
                   .toggleEnabled();
             },
+            activeColor: Theme.of(context).colorScheme.primary,
+            activeTrackColor: Theme.of(context).colorScheme.primaryContainer,
+            inactiveThumbColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey.shade400
+                : Colors.grey.shade600,
           ),
           ListTile(
             leading: const Icon(Icons.notifications_outlined),

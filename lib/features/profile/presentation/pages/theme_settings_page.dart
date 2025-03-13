@@ -35,6 +35,17 @@ class _ThemeSettingsPageState extends ConsumerState<ThemeSettingsPage> {
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeControllerProvider);
     final themeColor = ref.watch(themeColorControllerProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+
+    // Define high contrast text styles
+    final TextStyle highContrastStyle = TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+      color: Colors.white,
+      shadows: [Shadow(color: Colors.black, blurRadius: 3)],
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -129,6 +140,7 @@ class _ThemeSettingsPageState extends ConsumerState<ThemeSettingsPage> {
 
                     // Enable requested features
                     enableShadesSelection: true,
+                    enableOpacity: false,
                     enableTonalPalette: true,
                     showMaterialName: true,
                     showColorName: true,
@@ -154,29 +166,53 @@ class _ThemeSettingsPageState extends ConsumerState<ThemeSettingsPage> {
                     // Configure headings
                     heading: Text(
                       'Select color',
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
                     ),
                     subheading: Text(
                       'Select color shade',
-                      style: Theme.of(context).textTheme.titleSmall,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
                     ),
                     tonalSubheading: Text(
                       'Material 3 tonal palette',
-                      style: Theme.of(context).textTheme.titleSmall,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
                     ),
                     wheelSubheading: Text(
                       'Color wheel',
-                      style: Theme.of(context).textTheme.titleSmall,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
                     ),
                     recentColorsSubheading: Text(
                       'Recent colors',
-                      style: Theme.of(context).textTheme.titleSmall,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
                     ),
 
-                    // Configure text styles
-                    materialNameTextStyle:
-                        Theme.of(context).textTheme.bodySmall,
-                    colorNameTextStyle: Theme.of(context).textTheme.bodySmall,
+                    // Configure text styles with high contrast
+                    materialNameTextStyle: highContrastStyle,
+                    colorNameTextStyle: highContrastStyle,
+                    colorCodeTextStyle: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                    colorCodePrefixStyle: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.normal,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
 
                     // Configure wheel
                     wheelDiameter: 190,
@@ -212,6 +248,15 @@ class _ThemeSettingsPageState extends ConsumerState<ThemeSettingsPage> {
   ) {
     final isSelected = currentMode == mode;
     final colorScheme = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+
+    // Use higher contrast colors for text and icons
+    final Color textColor = isSelected
+        ? colorScheme.primary
+        : isDark
+            ? Colors.white
+            : Colors.black87;
 
     return InkWell(
       onTap: () {
@@ -234,18 +279,16 @@ class _ThemeSettingsPageState extends ConsumerState<ThemeSettingsPage> {
           children: [
             Icon(
               icon,
-              color: isSelected
-                  ? colorScheme.primary
-                  : colorScheme.onSurface.withAlpha(179), // 0.7 * 255 ≈ 179
+              color: textColor,
+              size: 28, // Slightly larger for better visibility
             ),
             const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
-                color: isSelected
-                    ? colorScheme.primary
-                    : colorScheme.onSurface.withAlpha(179), // 0.7 * 255 ≈ 179
+                color: textColor,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 16, // Slightly larger for better visibility
               ),
             ),
           ],

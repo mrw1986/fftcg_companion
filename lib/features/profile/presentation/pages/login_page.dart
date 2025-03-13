@@ -93,10 +93,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (mounted) {
         String errorMessage =
             'Failed to sign in. Please check your email and password.';
+        bool isError = true;
 
         if (e is FirebaseAuthException) {
           final authService = ref.read(authServiceProvider);
           errorMessage = authService.getReadableAuthError(e);
+
+          // Don't show cancellation as an error
+          if (e.code == 'cancelled-by-user') {
+            isError = false;
+          }
         } else {
           errorMessage = e.toString();
         }
@@ -104,8 +110,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         showThemedSnackBar(
           context: context,
           message: errorMessage,
-          isError: true,
-          duration: const Duration(seconds: 10),
+          isError: isError,
+          duration: isError
+              ? const Duration(seconds: 10)
+              : const Duration(seconds: 3),
         );
       }
     }
@@ -132,21 +140,44 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             context.go('/profile');
           }
         } catch (linkError) {
-          // Handle specific errors for Google linking
-          if (linkError is FirebaseAuthException) {
-            if (linkError.code == 'credential-already-in-use') {
-              setState(() {
-                _isLoading = false;
-              });
+          setState(() {
+            _isLoading = false;
+          });
+
+          // Show user-friendly error message
+          if (mounted) {
+            String errorMessage = 'Failed to sign in with Google';
+            bool isError = true;
+
+            if (linkError is FirebaseAuthException) {
+              errorMessage = authService.getReadableAuthError(linkError);
+
+              // Don't show cancellation as an error
+              if (linkError.code == 'cancelled-by-user') {
+                isError = false;
+                talker.debug('Showing cancellation message');
+              } else {
+                talker.debug('Showing error message: $errorMessage');
+              }
+            } else if (linkError.toString().contains('sign in was cancelled')) {
+              errorMessage =
+                  'Sign-in was cancelled. You can try again when you\'re ready.';
+              isError = false;
+              talker
+                  .debug('Showing cancellation message for non-Firebase error');
             } else {
-              // For other Firebase errors, show the error message
-              setState(() {
-                _isLoading = false;
-              });
+              errorMessage = linkError.toString();
+              talker.debug('Showing non-Firebase error: $errorMessage');
             }
-          } else {
-            // For non-Firebase errors, rethrow
-            rethrow;
+
+            showThemedSnackBar(
+              context: context,
+              message: errorMessage,
+              isError: isError,
+              duration: isError
+                  ? const Duration(seconds: 10)
+                  : const Duration(seconds: 3),
+            );
           }
         }
       } else {
@@ -167,12 +198,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       // Show user-friendly error message as SnackBar
       if (mounted) {
         String errorMessage = 'Failed to sign in with Google';
+        bool isError = true;
 
         if (e is FirebaseAuthException) {
           final authService = ref.read(authServiceProvider);
           errorMessage = authService.getReadableAuthError(e);
+
+          // Don't show cancellation as an error
+          if (e.code == 'cancelled-by-user') {
+            isError = false;
+          }
         } else if (e.toString().contains('sign in was cancelled')) {
-          errorMessage = 'Google sign-in was cancelled';
+          errorMessage =
+              'Sign-in was cancelled. You can try again when you\'re ready.';
+          isError = false;
         } else {
           errorMessage = e.toString();
         }
@@ -180,8 +219,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         showThemedSnackBar(
           context: context,
           message: errorMessage,
-          isError: true,
-          duration: const Duration(seconds: 10),
+          isError: isError,
+          duration: isError
+              ? const Duration(seconds: 10)
+              : const Duration(seconds: 3),
         );
       }
     }

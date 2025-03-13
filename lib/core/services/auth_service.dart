@@ -751,6 +751,8 @@ class AuthService {
   /// Get a user-friendly error message for Firebase authentication errors
   String getReadableAuthError(FirebaseAuthException e) {
     switch (e.code) {
+      case 'cancelled-by-user':
+        return 'Sign-in was cancelled. You can try again when you\'re ready.';
       case 'too-many-requests':
         return e.message ?? 'Too many attempts. Please try again later.';
       case 'email-already-in-use':
@@ -786,6 +788,15 @@ class AuthService {
 
   /// Handle authentication exceptions
   Exception _handleAuthException(dynamic e) {
+    // Handle Google Sign-In cancellation
+    if (e is Exception &&
+        e.toString().contains('sign in was cancelled by the user')) {
+      return FirebaseAuthException(
+        code: 'cancelled-by-user',
+        message: 'Sign-in was cancelled. You can try again when you\'re ready.',
+      );
+    }
+
     if (e is FirebaseAuthException) {
       switch (e.code) {
         // Email/Password Authentication Errors

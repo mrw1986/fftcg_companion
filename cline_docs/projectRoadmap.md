@@ -49,6 +49,13 @@
   - [x] Fixed text contrast issues in authentication pages
   - [x] Simplified theme settings UI
   - [x] Improved text contrast in color selection grid
+  - [x] Enhanced theme picker with advanced features
+    - [x] Material 3 tonal palette generation
+    - [x] Color shades selection
+    - [x] Color name display
+    - [x] Recently used colors tracking
+    - [x] Multiple color picker types (Primary, Accent, B&W, Wheel)
+  - [x] Fixed contrast issues in theme picker for better readability
 - [x] Collection tracking
   - [x] Card collection management
   - [x] Regular and foil tracking
@@ -266,6 +273,20 @@
   - Improved text contrast in the color grid by using withAlpha instead of withOpacity
   - Added proper contrast calculation for palette icons based on background color
   - Enhanced overall user experience with a more focused and user-friendly interface
+- Enhanced theme picker with advanced features:
+  - Implemented Material 3 tonal palette generation for selected colors
+  - Enabled color shades selection for more precise color choices
+  - Added color name display for better user understanding
+  - Implemented recently used colors tracking with persistence between sessions
+  - Added multiple color picker types (Primary, Accent, Black & White, and Wheel)
+  - Improved the UI organization with clear section headings
+- Fixed contrast issues in theme picker:
+  - Enhanced text styling with high-contrast white text and shadows
+  - Fixed the opacityTrackHeight parameter to comply with the required range
+  - Improved the SwitchListTile in the profile page for better visibility in dark mode
+  - Added adaptive text colors based on the current theme brightness
+  - Increased font sizes for better readability
+  - Enhanced the theme mode buttons with larger icons and text
 
 ### In Progress
 

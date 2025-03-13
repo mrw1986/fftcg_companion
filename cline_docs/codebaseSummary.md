@@ -144,6 +144,17 @@
 
 ## Recent Significant Changes
 
+1. **Theme Picker Contrast Improvements**
+   - Fixed contrast issues in the theme picker for better text readability
+   - Enhanced text styling in the color picker with high-contrast white text and shadows
+   - Fixed the opacityTrackHeight parameter to comply with the required range (8-50dp)
+   - Improved the SwitchListTile in the profile page for better visibility in dark mode
+   - Added adaptive text colors based on the current theme brightness
+   - Increased font sizes for better readability
+   - Enhanced the theme mode buttons with larger icons and text
+   - Improved overall accessibility of the theme picker
+   - Made text elements more readable on all background colors
+
 1. **Theme Picker Enhancement**
    - Enhanced the theme picker with advanced features using flex_color_scheme and flex_color_picker
    - Added Material 3 tonal palette generation for selected colors
@@ -155,7 +166,7 @@
    - Enhanced the predefined schemes section with visual indicators for the selected scheme
    - Added persistence for recently used colors in the theme provider
 
-2. **Theme Settings UI Simplification**
+1. **Theme Settings UI Simplification**
    - Removed the custom color selector circle at the top right
    - Removed the "Predefined Schemes" text to simplify the UI
    - Kept only the color grid for theme color selection
@@ -164,7 +175,7 @@
    - Simplified the UI to focus on the essential functionality
    - Enhanced overall user experience with a more focused and user-friendly interface
 
-3. **UI Consistency Improvements**
+1. **UI Consistency Improvements**
    - Replicated the card label toggle from the Collection page to the Card Database page with independent state for each
    - Fixed the Collection sorting query to properly handle ascending/descending sorting
    - Removed the extra divider lines between sections in both the Collection filter dialog and Card filter dialog
@@ -175,7 +186,7 @@
    - Fixed the filter functionality in the Collection page to properly apply both collection-specific filters and card filters
    - Improved the overall user experience with more consistent UI elements and behavior
 
-4. **Card Details Page UI Improvements**
+1. **Card Details Page UI Improvements**
    - Fixed "T:" styling in card descriptions to show the dull.png image
    - Improved layout with navigation buttons and FAB
      - Moved navigation buttons outside the card image
@@ -188,7 +199,7 @@
      - Used BoxFit.cover to ensure the image fills the entire container
      - Preserved Hero animation for smooth transitions
 
-5. **Collection UI Improvements**
+1. **Collection UI Improvements**
    - Updated collection grid to match cards grid implementation
    - Added card labels toggle in collection page
    - Improved collection card display with quantity indicators
@@ -200,7 +211,7 @@
    - Fixed search functionality in collection edit page
    - Ensured consistent UI between cards and collection features
 
-6. **Card Details Page Enhancement**
+1. **Card Details Page Enhancement**
    - Added action buttons below the card image
    - Implemented "Add to Collection" button that navigates to the Collection Edit page with the selected card
    - Added placeholder "Favorite" button with star icon and toggle functionality
@@ -208,7 +219,7 @@
    - Ensured buttons are visually consistent with the app's design language
    - Improved layout to accommodate the new action buttons
 
-7. **Collection Edit Page Enhancement**
+1. **Collection Edit Page Enhancement**
    - Added integrated card search functionality
    - Implemented search bar in the app bar when in search mode
    - Created search results list with card images and details
@@ -217,7 +228,7 @@
    - Ensured seamless integration with existing collection management features
    - Added support for direct navigation from Card Details page
 
-8. **Collection Feature Implementation**
+1. **Collection Feature Implementation**
    - Created collection data models with support for regular and foil cards
    - Added card condition tracking with standardized condition codes
    - Implemented purchase information tracking with price and date
@@ -234,7 +245,7 @@
    - Fixed nested scrollable widgets issue in collection content
    - Fixed layout issues by converting sliver widgets to regular widgets in collection grid and list
 
-9. **Theme System Enhancement**
+1. **Theme System Enhancement**
    - Added ThemeSettingsPage for customizing app appearance
    - Implemented color picker for selecting custom theme colors
    - Added predefined color schemes from FlexColorScheme
@@ -247,25 +258,25 @@
    - Support different deck formats
    - Enable deck sharing functionality
 
-3. **Card Scanner Implementation**
+1. **Card Scanner Implementation**
    - Develop camera integration for card scanning
    - Implement image recognition for cards
    - Create quick add to collection from scan
    - Add batch scanning for multiple cards
 
-4. **Price Tracking Implementation**
+1. **Price Tracking Implementation**
    - Integrate with price APIs
    - Add price history charts
    - Implement price alerts
    - Calculate collection value
 
-5. **Performance Improvements**
+1. **Performance Improvements**
    - Further optimize image loading
    - Reduce animation overhead
    - Implement progressive image loading techniques
    - Improve overall app responsiveness
 
-6. **Error Handling**
+1. **Error Handling**
    - Enhance error reporting
    - Improve recovery mechanisms
    - Add retry functionality for failed image loads
