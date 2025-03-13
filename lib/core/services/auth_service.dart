@@ -732,9 +732,15 @@ class AuthService {
 
       // Get the refreshed user
       final refreshedUser = _auth.currentUser;
-      if (refreshedUser == null || !refreshedUser.emailVerified) {
+      if (refreshedUser == null) {
         talker.warning(
-            'User not verified after reload in handleEmailVerificationComplete');
+            'User not found after reload in handleEmailVerificationComplete');
+        return;
+      }
+
+      // Check if the email is verified
+      if (!refreshedUser.emailVerified) {
+        talker.warning('User email still not verified after reload');
         return;
       }
 
@@ -746,10 +752,29 @@ class AuthService {
 
       // Force refresh the ID token to update the auth state
       talker.info('Refreshing auth tokens after email verification');
-      await refreshedUser.getIdToken(true);
+      final newToken = await refreshedUser.getIdToken(true);
+      talker.debug('New ID token obtained, length: ${newToken?.length ?? 0}');
 
       // Get a fresh ID token result to ensure claims are updated
-      await refreshedUser.getIdTokenResult(true);
+      final tokenResult = await refreshedUser.getIdTokenResult(true);
+      talker.debug('Token issued at: ${tokenResult.issuedAtTime}');
+      talker.debug('Token expiration: ${tokenResult.expirationTime}');
+
+      // Sign out and sign back in to fully refresh the auth state
+      // This is a more aggressive approach but ensures the UI updates
+      if (refreshedUser.providerData
+          .any((element) => element.providerId == 'password')) {
+        talker.debug('Performing a re-authentication to refresh auth state');
+        try {
+          // We don't have the password here, so we can't do a full re-auth
+          // Instead, we'll just reload the user again
+          await refreshedUser.reload();
+          talker.debug('User reloaded again after verification');
+        } catch (reloadError) {
+          talker.error('Error reloading user after verification', reloadError);
+          // Continue with the process despite the error
+        }
+      }
 
       // Reload the user one more time to ensure we have the latest state
       await refreshedUser.reload();

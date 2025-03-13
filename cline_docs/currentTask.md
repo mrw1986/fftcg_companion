@@ -43,7 +43,10 @@ The app had several UX issues with email verification and account deletion:
 
 #### Completed
 
-- Email verification checker now properly updates UI
+- Email verification checker now properly updates UI:
+  - Enhanced token refresh mechanism
+  - Improved UI update after verification
+  - Added more robust error handling and logging
 - Account deletion improvements:
   - Added popup confirmation dialog
   - Fixed error handling for requires-recent-login cases

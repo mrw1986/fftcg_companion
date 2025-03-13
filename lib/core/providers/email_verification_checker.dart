@@ -50,10 +50,24 @@ Future<void> _checkEmailVerification(Ref ref) async {
       return;
     }
 
+    talker.debug('Checking email verification status for: ${user.email}');
+
+    // Get the ID token before reload to compare later
+    final beforeToken = await user.getIdToken();
+
     // Force refresh the user to get the latest verification status
     await user.reload();
 
-    // Get the refreshed user object
+    // Get a fresh ID token after reload
+    final afterToken = await user.getIdToken(true);
+
+    // Check if the token has changed, which indicates a state change
+    final tokenChanged = beforeToken != afterToken;
+    if (tokenChanged) {
+      talker.debug('ID token changed, state may have updated');
+    }
+
+    // Get the refreshed user through the auth service
     final refreshedUser = FirebaseAuth.instance.currentUser;
 
     // Check if the email is now verified
@@ -65,26 +79,39 @@ Future<void> _checkEmailVerification(Ref ref) async {
       // This will update Firestore and refresh the auth state
       await authService.handleEmailVerificationComplete();
 
-      // Force a reload of the current user to ensure we have the latest state
-      await FirebaseAuth.instance.currentUser?.reload();
-
       // Force a refresh of the auth state provider
       ref.invalidate(authStateProvider);
+
+      // Also invalidate the currentUserProvider to ensure it gets the latest user
+      ref.invalidate(currentUserProvider);
+
+      // Wait for the auth state to be updated
+      await Future.delayed(const Duration(milliseconds: 300));
 
       // Refresh the router to update the UI
       final router = ref.read(routerProvider);
       router.refresh();
 
-      // If we're on the profile page, navigate to it again to force a rebuild
-      final currentLocation =
-          router.routeInformationProvider.value.uri.toString();
-      if (currentLocation.contains('/profile') &&
-          !currentLocation.contains('/profile/')) {
-        talker.debug('Refreshing profile page after email verification');
-        // Use a slight delay to ensure the auth state has fully propagated
-        Timer(const Duration(milliseconds: 300), () {
-          router.go('/profile');
-        });
+      // // If we're on the profile page, navigate to it again to force a rebuild
+      // final currentLocation =
+      //     router.routeInformationProvider.value.uri.toString();
+      // if (currentLocation.contains('/profile')) {
+      //   talker.debug('Refreshing profile page after email verification');
+      //   // Use a slightly longer delay to ensure the auth state has fully propagated
+      //   Timer(const Duration(milliseconds: 800), () {
+      //     // Force a full refresh by going to a different page first
+      //     router.go('/');
+      //     // Then go back to profile after a short delay
+      //     Timer(const Duration(milliseconds: 100), () {
+      //       router.go('/profile');
+      //     });
+      //   });
+      // }
+    } else {
+      // If the user is still not verified, log the current state
+      if (refreshedUser != null) {
+        talker.debug(
+            'User email verification status: ${refreshedUser.emailVerified}');
       }
     }
   } catch (e) {
