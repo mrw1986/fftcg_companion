@@ -31,7 +31,6 @@ final authStateProvider = Provider.autoDispose<AuthState>((ref) {
             !user.emailVerified) {
           // If email is not verified, return emailNotVerified state
           return AuthState.emailNotVerified(user);
-          // We no longer sign the user out immediately, allowing the UI to show the verification warning
         } else {
           return AuthState.authenticated(user);
         }

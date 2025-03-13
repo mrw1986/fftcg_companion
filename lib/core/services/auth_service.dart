@@ -447,12 +447,14 @@ class AuthService {
         // Delete the user account
         await user.delete();
         talker.debug('User account deleted successfully');
+      } on FirebaseAuthException catch (e) {
+        talker.error('FirebaseAuthException in deleteUser: ${e.code}');
+        rethrow;
       } catch (e) {
-        talker.error('Error deleting user: $e');
-        throw _handleAuthException(e);
+        talker.error('Unexpected error in deleteUser: $e');
+        rethrow;
       }
     } catch (e) {
-      talker.error('Error deleting user: $e');
       throw _handleAuthException(e);
     }
   }
@@ -644,15 +646,15 @@ class AuthService {
   /// Update the user's verification status in Firestore
   Future<void> updateVerificationStatus() async {
     try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception('No user is signed in');
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw Exception('No user is signed in');
 
       // Force refresh to get the latest user data
-      await user.reload();
-      final isVerified = user.emailVerified;
+      await currentUser.reload();
+      final isVerified = currentUser.emailVerified;
 
       // Get the current user from Firestore
-      final firestoreUser = await _userRepository.getUserById(user.uid);
+      final firestoreUser = await _userRepository.getUserById(currentUser.uid);
       if (firestoreUser == null) throw Exception('User not found in Firestore');
 
       // Update the verification status if it has changed
@@ -661,7 +663,7 @@ class AuthService {
           firestoreUser.copyWith(isVerified: isVerified),
         );
         talker.info(
-            'Updated verification status to $isVerified for user ${user.uid}');
+            'Updated verification status to $isVerified for user ${currentUser.uid}');
       }
 
       return;
@@ -708,6 +710,54 @@ class AuthService {
 
       return;
     } catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Handle email verification completion
+  /// This method is called when a user's email is verified
+  Future<void> handleEmailVerificationComplete() async {
+    talker.info('Handling email verification completion');
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        talker.warning(
+            'No user found when handling email verification completion');
+        return;
+      }
+
+      // Force refresh the user to get the latest verification status
+      talker.info('Reloading user to get latest verification status');
+      await user.reload();
+
+      // Get the refreshed user
+      final refreshedUser = _auth.currentUser;
+      if (refreshedUser == null || !refreshedUser.emailVerified) {
+        talker.warning(
+            'User not verified after reload in handleEmailVerificationComplete');
+        return;
+      }
+
+      talker.info(
+          'Email verification confirmed for user: ${refreshedUser.email}');
+
+      // Update the verification status in Firestore
+      await updateVerificationStatus();
+
+      // Force refresh the ID token to update the auth state
+      talker.info('Refreshing auth tokens after email verification');
+      await refreshedUser.getIdToken(true);
+
+      // Get a fresh ID token result to ensure claims are updated
+      await refreshedUser.getIdTokenResult(true);
+
+      // Reload the user one more time to ensure we have the latest state
+      await refreshedUser.reload();
+
+      talker.info(
+          'Email verification completed for user: ${refreshedUser.email}');
+    } catch (e) {
+      talker.error('Error handling email verification completion', e);
       throw _handleAuthException(e);
     }
   }

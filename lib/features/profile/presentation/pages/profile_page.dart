@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/app/theme/contrast_extension.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/profile/presentation/providers/splash_screen_provider.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 import 'package:fftcg_companion/shared/widgets/styled_button.dart';
@@ -140,11 +142,22 @@ class ProfilePage extends ConsumerWidget {
                       onPressed: () async {
                         // Resend verification email
 
+                        // Show loading indicator
+                        final scaffoldMessenger = ScaffoldMessenger.of(context);
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Sending verification email...'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+
                         try {
                           await ref
                               .read(authServiceProvider)
                               .sendEmailVerification();
                           if (context.mounted) {
+                            // Clear any existing SnackBars
+                            scaffoldMessenger.clearSnackBars();
                             showThemedSnackBar(
                               context: context,
                               message:
@@ -152,12 +165,28 @@ class ProfilePage extends ConsumerWidget {
                               isError: false,
                             );
                           }
-                        } catch (e) {
+                        } catch (error) {
+                          talker.error(
+                              'Error sending verification email', error);
+
                           if (context.mounted) {
+                            // Clear any existing SnackBars
+                            scaffoldMessenger.clearSnackBars();
+
+                            String errorMessage =
+                                'Failed to resend verification email. Please try again later.';
+
+                            // Handle specific Firebase errors
+                            if (error is FirebaseAuthException) {
+                              if (error.code == 'too-many-requests') {
+                                errorMessage =
+                                    'Too many requests. We have temporarily blocked email sending due to unusual activity. Please try again later.';
+                              }
+                            }
+
                             showThemedSnackBar(
                               context: context,
-                              message:
-                                  'Failed to resend verification email. Please try again later.',
+                              message: errorMessage,
                               isError: true,
                             );
                           }
@@ -181,7 +210,7 @@ class ProfilePage extends ConsumerWidget {
               child: user.photoURL == null ? const Icon(Icons.person) : null,
             ),
             title: Text(
-              user.displayName ?? 'Not logged in',
+              user.displayName ?? (user.email?.split('@')[0] ?? 'User'),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: contrast?.onSurfaceWithContrast ?? colorScheme.onSurface,

@@ -18,8 +18,8 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   final _displayNameController = TextEditingController();
   final _emailController = TextEditingController();
   bool _isLoading = false;
+  bool _isAccountDeletion = false;
   bool _showChangeEmail = false;
-  bool _showDeleteConfirmation = false;
   bool _showReauthDialog = false;
   final _reauthEmailController = TextEditingController();
   bool _showReauthPassword = false;
@@ -130,10 +130,11 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       // Check if the error is related to requiring recent authentication
       if (e.toString().contains('requires-recent-login') ||
           e.toString().contains('recent authentication')) {
-        // Show re-authentication dialog for security-sensitive operations
-        setState(() {
-          _showReauthDialog = true;
-        });
+        talker.debug('Email update requires re-authentication');
+        if (mounted) {
+          _showReauthRequiredDialog(isForDeletion: false);
+        }
+        return;
       } else {
         // Show error message as SnackBar with action button
         if (mounted) {
@@ -176,6 +177,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   Future<void> _deleteAccount() async {
     try {
       setState(() {
+        talker.debug('Starting account deletion');
         _isLoading = true;
       });
 
@@ -184,42 +186,194 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       setState(() {
         _isLoading = false;
       });
+      talker.info('Account deleted successfully');
 
       if (mounted) {
         // Navigate back to profile page after successful deletion
         context.go('/profile');
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      talker.debug('Caught FirebaseAuthException with code: ${e.code}');
+      if (e.code == 'requires-recent-login') {
+        talker.debug('Account deletion requires re-authentication');
+        if (mounted) {
+          _showReauthRequiredDialog();
+        }
+        return;
+      } else {
+        talker.error('Error deleting account: $e');
+
+        // Show a themed dialog instead of a snackbar
+        if (mounted) {
+          showDialog<void>(
+            barrierDismissible: false,
+            context: context,
+            builder: (BuildContext context) {
+              String errorMessage =
+                  ref.read(authServiceProvider).getReadableAuthError(e);
+
+              // Make the error message more user-friendly
+              if (errorMessage.contains('An unexpected error occurred')) {
+                errorMessage =
+                    'An error occurred while deleting your account. Please try again or contact support if the problem persists.';
+              }
+
+              return AlertDialog(
+                title: Text('Error',
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
+                content: Text(
+                  errorMessage,
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text('OK',
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary)),
+                  ),
+                ],
+              );
+            },
+          );
+        }
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
 
-      // Check for requires-recent-login error
+      talker.error('Unexpected error during account deletion: $e');
+
+      // Check if the error message contains "requires-recent-login" or "recent authentication"
+      // This handles cases where the FirebaseAuthException is wrapped in another exception
       if (e.toString().contains('requires-recent-login') ||
           e.toString().contains('recent authentication')) {
-        talker.debug('Account deletion requires re-authentication');
-
-        // Show re-authentication dialog
-        setState(() {
-          _showReauthDialog = true;
-        });
-      } else {
-        // Show error message
+        talker.debug(
+            'Detected re-authentication requirement from generic exception');
         if (mounted) {
-          showThemedSnackBar(
-              context: context,
-              message: e is FirebaseAuthException
-                  ? ref.read(authServiceProvider).getReadableAuthError(e)
-                  : e.toString(),
-              isError: true);
+          _showReauthRequiredDialog();
         }
+        return;
+      }
+
+      if (mounted) {
+        showDialog<void>(
+          barrierDismissible: false,
+          context: context,
+          builder: (BuildContext context) {
+            String errorMessage =
+                'An unexpected error occurred. Please try again or contact support if the problem persists.';
+
+            // Try to provide a more specific error message if possible
+            if (e.toString().contains('requires-recent-login') ||
+                e.toString().contains('recent authentication')) {
+              errorMessage =
+                  'For security reasons, this operation requires recent authentication. Please sign in again to continue.';
+            }
+
+            return AlertDialog(
+              title: Text('Error',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              content: Text(
+                errorMessage,
+                style:
+                    TextStyle(color: Theme.of(context).colorScheme.onSurface),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('OK',
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary)),
+                ),
+              ],
+            );
+          },
+        );
       }
     }
+  }
+
+  void _showDeleteConfirmationDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Account?'),
+          content: const Text(
+            'Warning: This action cannot be undone. All your data will be permanently deleted.',
+            style: TextStyle(color: Colors.red),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteAccount();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Delete Account'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Show a dialog explaining that re-authentication is required
+  void _showReauthRequiredDialog({bool isForDeletion = true}) {
+    String operationText =
+        isForDeletion ? 'deleting your account' : 'updating your email';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Authentication Required'),
+          content: Text(
+            'For security reasons, you need to verify your identity before $operationText. '
+            'Please re-enter your credentials to continue.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _showReauthDialog = true;
+                  _isAccountDeletion = isForDeletion;
+                });
+              },
+              child: const Text('Re-authenticate'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _reauthenticateAndDeleteAccount() async {
     if (_reauthEmailController.text.isEmpty ||
         _reauthPasswordController.text.isEmpty) {
+      talker.debug('Email or password empty in reauthentication dialog');
       showThemedSnackBar(
           context: context,
           message: 'Please enter your email and password',
@@ -235,9 +389,12 @@ class _AccountPageState extends ConsumerState<AccountPage> {
     try {
       // Re-authenticate the user
       await ref.read(authServiceProvider).reauthenticateWithEmailAndPassword(
+            // Make sure to use the correct email and password
             _reauthEmailController.text.trim(),
             _reauthPasswordController.text,
           );
+      talker.debug(
+          'Re-authentication successful, proceeding with account deletion');
 
       // Now try to delete the account again
       await ref.read(authServiceProvider).deleteUser();
@@ -254,16 +411,38 @@ class _AccountPageState extends ConsumerState<AccountPage> {
     } catch (e) {
       setState(() {
         _isLoading = false;
+        // Keep the dialog open on error
+        _showReauthDialog = true;
       });
 
-      // Show error message
+      talker.error('Error during re-authentication or account deletion: $e');
+
+      // Show error message in a dialog
       if (mounted) {
-        showThemedSnackBar(
+        showDialog(
             context: context,
-            message: e is FirebaseAuthException
-                ? ref.read(authServiceProvider).getReadableAuthError(e)
-                : e.toString(),
-            isError: true);
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text('Authentication Error',
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
+                content: Text(
+                  e is FirebaseAuthException
+                      ? ref.read(authServiceProvider).getReadableAuthError(e)
+                      : 'An error occurred during authentication. Please check your credentials and try again.',
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text('OK',
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary)),
+                  ),
+                ],
+              );
+            });
       }
     }
   }
@@ -290,25 +469,68 @@ class _AccountPageState extends ConsumerState<AccountPage> {
             _reauthPasswordController.text,
           );
 
+      talker.debug('Re-authentication successful');
+
+      // Close the re-auth dialog
       setState(() {
         _isLoading = false;
         _showReauthDialog = false;
       });
 
-      // Show success message
-      if (mounted) {
-        showThemedSnackBar(
-            context: context,
-            message:
-                'Authentication successful. You can now continue with your action.',
-            isError: false);
-      }
+      // If this was for email update, try to update the email now
+      if (!_isAccountDeletion && _showChangeEmail) {
+        talker.debug('Proceeding with email update after re-authentication');
 
-      // If we were trying to delete the account, show the confirmation dialog again
-      if (_showDeleteConfirmation) {
+        // Show a loading indicator while updating email
         setState(() {
-          _showDeleteConfirmation = true;
+          _isLoading = true;
         });
+
+        try {
+          await ref.read(authServiceProvider).verifyBeforeUpdateEmail(
+                _emailController.text.trim(),
+              );
+
+          setState(() {
+            _isLoading = false;
+            _showChangeEmail = false;
+          });
+
+          // Show success message
+          if (mounted) {
+            showThemedSnackBar(
+                context: context,
+                message:
+                    'Verification email sent. Please check your email to complete the process.',
+                isError: false,
+                duration: const Duration(seconds: 10));
+          }
+        } catch (emailError) {
+          setState(() {
+            _isLoading = false;
+          });
+
+          // Show error message
+          if (mounted) {
+            showThemedSnackBar(
+                context: context,
+                message: emailError is FirebaseAuthException
+                    ? ref
+                        .read(authServiceProvider)
+                        .getReadableAuthError(emailError)
+                    : emailError.toString(),
+                isError: true);
+          }
+        }
+      } else {
+        // Just show a general success message
+        if (mounted) {
+          showThemedSnackBar(
+              context: context,
+              message:
+                  'Authentication successful. You can now continue with your action.',
+              isError: false);
+        }
       }
     } catch (e) {
       setState(() {
@@ -458,7 +680,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
                                 ),
                                 const SizedBox(width: 16),
                                 ElevatedButton(
-                                  onPressed: _showDeleteConfirmation
+                                  onPressed: _isAccountDeletion
                                       ? _reauthenticateAndDeleteAccount
                                       : _reauthenticateAndContinue,
                                   child: const Text('Authenticate'),
@@ -735,37 +957,10 @@ class _AccountPageState extends ConsumerState<AccountPage> {
                                         color: Colors.red),
                                     onTap: () {
                                       setState(() {
-                                        _showDeleteConfirmation = true;
+                                        _showDeleteConfirmationDialog();
                                       });
                                     },
                                   ),
-                                  if (_showDeleteConfirmation) ...[
-                                    const SizedBox(height: 16),
-                                    const Text(
-                                      'Warning: This action cannot be undone. All your data will be permanently deleted.',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        TextButton(
-                                          onPressed: () => setState(() =>
-                                              _showDeleteConfirmation = false),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        const SizedBox(width: 16),
-                                        ElevatedButton(
-                                          onPressed: _deleteAccount,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.red,
-                                            foregroundColor: Colors.white,
-                                          ),
-                                          child: const Text('Delete Account'),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
                                 ],
                               ],
                             ),

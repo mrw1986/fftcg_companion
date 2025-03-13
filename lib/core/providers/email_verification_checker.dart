@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:fftcg_companion/core/routing/app_router.dart';
 
 /// Provider that checks for email verification when the app is in the foreground
 /// and the user has an unverified email
@@ -60,12 +61,31 @@ Future<void> _checkEmailVerification(Ref ref) async {
       talker
           .info('Email verification detected for user: ${refreshedUser.email}');
 
-      // Update the verification status in Firestore
-      await authService.updateVerificationStatus();
+      // Handle email verification completion
+      // This will update Firestore and refresh the auth state
+      await authService.handleEmailVerificationComplete();
 
-      // Force refresh the auth state by getting a new ID token
-      // This will trigger a state change in authStateProvider
-      await refreshedUser.getIdToken(true);
+      // Force a reload of the current user to ensure we have the latest state
+      await FirebaseAuth.instance.currentUser?.reload();
+
+      // Force a refresh of the auth state provider
+      ref.invalidate(authStateProvider);
+
+      // Refresh the router to update the UI
+      final router = ref.read(routerProvider);
+      router.refresh();
+
+      // If we're on the profile page, navigate to it again to force a rebuild
+      final currentLocation =
+          router.routeInformationProvider.value.uri.toString();
+      if (currentLocation.contains('/profile') &&
+          !currentLocation.contains('/profile/')) {
+        talker.debug('Refreshing profile page after email verification');
+        // Use a slight delay to ensure the auth state has fully propagated
+        Timer(const Duration(milliseconds: 300), () {
+          router.go('/profile');
+        });
+      }
     }
   } catch (e) {
     talker.error('Error checking email verification status', e);
