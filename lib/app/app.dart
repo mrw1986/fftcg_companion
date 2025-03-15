@@ -5,7 +5,6 @@ import 'package:fftcg_companion/app/theme/theme_provider.dart';
 import 'package:fftcg_companion/core/routing/app_router.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/providers/auto_auth_provider.dart';
-import 'package:fftcg_companion/core/providers/email_verification_checker.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
 class FFTCGCompanionApp extends ConsumerWidget {
@@ -15,9 +14,6 @@ class FFTCGCompanionApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Initialize auto-authentication
     ref.watch(autoAuthProvider);
-
-    // Initialize email verification checker
-    ref.watch(emailVerificationCheckerProvider);
 
     return ErrorBoundary.run(
       () {

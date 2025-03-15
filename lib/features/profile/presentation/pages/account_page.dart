@@ -100,6 +100,35 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       return;
     }
 
+    // Show confirmation dialog to inform user they'll be logged out
+    final shouldProceed = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Update Email'),
+              content: const Text(
+                'After updating your email, you will be logged out for security reasons. '
+                'You will need to log back in with your new email after verifying it. '
+                '\n\nDo you want to continue?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Continue'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+
+    if (!shouldProceed) return;
+
     setState(() {
       _isLoading = true;
     });
@@ -113,14 +142,31 @@ class _AccountPageState extends ConsumerState<AccountPage> {
         _showChangeEmail = false;
       });
 
-      // Show success message as SnackBar with action button
+      // Show final logout confirmation dialog
       if (mounted) {
-        showThemedSnackBar(
-            context: context,
-            message:
-                'Verification email sent. Please check your email to complete the process.',
-            isError: false,
-            duration: const Duration(seconds: 10));
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Email Update Initiated'),
+              content: const Text(
+                'A verification email has been sent to your new email address. '
+                'For security reasons, you will now be logged out. '
+                '\n\nAfter verifying your email, please log back in with your new email address.',
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+
+        // Log out the user and redirect to profile page
+        await _signOut();
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -225,8 +271,10 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       });
 
       talker.debug('Caught FirebaseAuthException with code: ${e.code}');
-      if (e.code == 'requires-recent-login') {
-        talker.debug('Account deletion requires re-authentication');
+
+      // Handle specific error codes
+      if (e.code == 'requires-recent-login' || e.code == 'user-token-expired') {
+        talker.debug('Account deletion requires re-authentication: ${e.code}');
         if (mounted) {
           _showReauthRequiredDialog();
         }
@@ -278,10 +326,12 @@ class _AccountPageState extends ConsumerState<AccountPage> {
 
       talker.error('Unexpected error during account deletion: $e');
 
-      // Check if the error message contains "requires-recent-login" or "recent authentication"
+      // Check if the error message contains "requires-recent-login", "user-token-expired", or "recent authentication"
       // This handles cases where the FirebaseAuthException is wrapped in another exception
       if (e.toString().contains('requires-recent-login') ||
-          e.toString().contains('recent authentication')) {
+          e.toString().contains('user-token-expired') ||
+          e.toString().contains('recent authentication') ||
+          e.toString().contains('session has expired')) {
         talker.debug(
             'Detected re-authentication requirement from generic exception');
         if (mounted) {
@@ -300,7 +350,9 @@ class _AccountPageState extends ConsumerState<AccountPage> {
 
             // Try to provide a more specific error message if possible
             if (e.toString().contains('requires-recent-login') ||
-                e.toString().contains('recent authentication')) {
+                e.toString().contains('user-token-expired') ||
+                e.toString().contains('recent authentication') ||
+                e.toString().contains('session has expired')) {
               errorMessage =
                   'For security reasons, this operation requires recent authentication. Please sign in again to continue.';
             }
@@ -523,14 +575,31 @@ class _AccountPageState extends ConsumerState<AccountPage> {
             _showChangeEmail = false;
           });
 
-          // Show success message
+          // Show final logout confirmation dialog
           if (mounted) {
-            showThemedSnackBar(
-                context: context,
-                message:
-                    'Verification email sent. Please check your email to complete the process.',
-                isError: false,
-                duration: const Duration(seconds: 10));
+            await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: const Text('Email Update Initiated'),
+                  content: const Text(
+                    'A verification email has been sent to your new email address. '
+                    'For security reasons, you will now be logged out. '
+                    '\n\nAfter verifying your email, please log back in with your new email address.',
+                  ),
+                  actions: [
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                );
+              },
+            );
+
+            // Log out the user and redirect to profile page
+            await _signOut();
           }
         } catch (emailError) {
           setState(() {

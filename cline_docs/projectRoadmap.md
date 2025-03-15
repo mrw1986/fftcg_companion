@@ -37,6 +37,7 @@
    - [x] Re-authentication flow
    - [x] Provider management
    - [x] Anonymous accounts
+   - [x] Email update with proper logout flow
 
 ### In Progress Features
 
@@ -83,6 +84,7 @@
 - [x] Provide secure account deletion
 - [x] Implement re-authentication
 - [x] Support anonymous accounts
+- [x] Implement proper email update flow with logout
 
 ### Collection Management ✓
 
@@ -111,6 +113,8 @@
 3. Added better re-authentication handling
 4. Fixed token refresh issues in auth service
 5. Improved error messages and user feedback
+6. Refactored profile page into smaller components for better maintainability
+7. Improved "Change Email" flow with proper logout and user messaging
 
 ### Next Steps
 

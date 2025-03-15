@@ -12,7 +12,6 @@ import '../../features/profile/presentation/pages/theme_settings_page.dart';
 import '../../features/profile/presentation/pages/login_page.dart';
 import '../../features/profile/presentation/pages/register_page.dart';
 import '../../features/profile/presentation/pages/reset_password_page.dart';
-import '../../features/profile/presentation/pages/account_page.dart';
 import '../../features/collection/presentation/pages/collection_page.dart';
 import '../../features/collection/presentation/pages/collection_item_detail_page.dart';
 import '../../features/collection/presentation/pages/collection_edit_page.dart';
@@ -144,13 +143,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                 pageBuilder: (context, state) => MaterialPage(
                   key: state.pageKey,
                   child: const ResetPasswordPage(),
-                ),
-              ),
-              GoRoute(
-                path: 'account',
-                pageBuilder: (context, state) => MaterialPage(
-                  key: state.pageKey,
-                  child: const AccountPage(),
                 ),
               ),
             ],
