@@ -10,14 +10,14 @@ import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 import 'package:fftcg_companion/shared/widgets/styled_button.dart';
 import 'package:fftcg_companion/shared/widgets/themed_logo.dart';
 
-class LoginPage extends ConsumerStatefulWidget {
-  const LoginPage({super.key});
+class AuthPage extends ConsumerStatefulWidget {
+  const AuthPage({super.key});
 
   @override
-  ConsumerState<LoginPage> createState() => _LoginPageState();
+  ConsumerState<AuthPage> createState() => _AuthPageState();
 }
 
-class _LoginPageState extends ConsumerState<LoginPage> {
+class _AuthPageState extends ConsumerState<AuthPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -71,6 +71,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             setState(() {
               _isLoading = false;
             });
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Account not found. Please check your credentials or create a new account.',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                ),
+              );
+            }
           } else {
             // For other errors, rethrow to be caught by the outer catch
             rethrow;
@@ -92,28 +106,120 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       // Show user-friendly error message as SnackBar
       if (mounted) {
         String errorMessage =
-            'Failed to sign in. Please check your email and password.';
+            'Failed to sign in. Please check your credentials and try again.';
         bool isError = true;
+
+        // Log the error for debugging
+        talker.error('Error signing in with email/password: $e');
 
         if (e is FirebaseAuthException) {
           final authService = ref.read(authServiceProvider);
           errorMessage = authService.getReadableAuthError(e);
 
-          // Don't show cancellation as an error
-          if (e.code == 'cancelled-by-user') {
-            isError = false;
+          // Special handling for specific error codes
+          switch (e.code) {
+            case 'cancelled-by-user':
+              isError = false;
+              break;
+            case 'user-not-found':
+              // Show a dialog with options to register or try again
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: const Text('Account Not Found'),
+                    content: const Text(
+                        'No account found with this email address. Would you like to create a new account?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('Try Again'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          context.go('/profile/register');
+                        },
+                        child: const Text('Create Account'),
+                      ),
+                    ],
+                  );
+                },
+              );
+              break;
+            case 'wrong-password':
+              // Show a dialog with options to reset password or try again
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: const Text('Incorrect Password'),
+                    content: const Text(
+                        'The password you entered is incorrect. Would you like to reset your password?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('Try Again'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          context.go('/profile/reset-password');
+                        },
+                        child: const Text('Reset Password'),
+                      ),
+                    ],
+                  );
+                },
+              );
+              break;
+            case 'too-many-requests':
+              errorMessage =
+                  'Too many sign-in attempts. Please try again later or reset your password.';
+              break;
+            case 'invalid-credential':
+              errorMessage =
+                  'Invalid login credentials. Please check your email and password.';
+              break;
+            case 'network-request-failed':
+              errorMessage =
+                  'Network error. Please check your internet connection and try again.';
+              break;
           }
         } else {
           errorMessage = e.toString();
         }
 
-        showThemedSnackBar(
-          context: context,
-          message: errorMessage,
-          isError: isError,
-          duration: isError
-              ? const Duration(seconds: 10)
-              : const Duration(seconds: 3),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              errorMessage,
+              style: TextStyle(
+                color: isError
+                    ? Theme.of(context).colorScheme.onErrorContainer
+                    : Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            backgroundColor: isError
+                ? Theme.of(context).colorScheme.errorContainer
+                : Theme.of(context).colorScheme.primaryContainer,
+            duration: isError
+                ? const Duration(seconds: 10)
+                : const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: isError
+                  ? Theme.of(context).colorScheme.onErrorContainer
+                  : Theme.of(context).colorScheme.onPrimaryContainer,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
         );
       }
     }
@@ -125,16 +231,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
 
     try {
-      talker.debug('Login page: Starting Google Sign-In');
+      talker.debug('Auth page: Starting Google Sign-In');
       final authState = ref.read(authStateProvider);
       final authService = ref.read(authServiceProvider);
 
       // If user is anonymous, link the account instead of creating a new one
       if (authState.isAnonymous) {
         try {
-          talker.debug('Login page: Calling authService.linkWithGoogle()');
+          talker.debug('Auth page: Calling authService.linkWithGoogle()');
           await authService.linkWithGoogle();
-          talker.debug('Login page: Google linking successful');
+          talker.debug('Auth page: Google linking successful');
 
           if (mounted) {
             context.go('/profile');
@@ -170,21 +276,40 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               talker.debug('Showing non-Firebase error: $errorMessage');
             }
 
-            showThemedSnackBar(
-              context: context,
-              message: errorMessage,
-              isError: isError,
-              duration: isError
-                  ? const Duration(seconds: 10)
-                  : const Duration(seconds: 3),
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  errorMessage,
+                  style: TextStyle(
+                    color: isError
+                        ? Theme.of(context).colorScheme.onErrorContainer
+                        : Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                backgroundColor: isError
+                    ? Theme.of(context).colorScheme.errorContainer
+                    : Theme.of(context).colorScheme.primaryContainer,
+                duration: isError
+                    ? const Duration(seconds: 10)
+                    : const Duration(seconds: 3),
+                action: SnackBarAction(
+                  label: 'OK',
+                  textColor: isError
+                      ? Theme.of(context).colorScheme.onErrorContainer
+                      : Theme.of(context).colorScheme.onPrimaryContainer,
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  },
+                ),
+              ),
             );
           }
         }
       } else {
         // Normal Google sign in for non-anonymous users
-        talker.debug('Login page: Calling authService.signInWithGoogle()');
+        talker.debug('Auth page: Calling authService.signInWithGoogle()');
         await authService.signInWithGoogle();
-        talker.debug('Login page: Google Sign-In successful');
+        talker.debug('Auth page: Google Sign-In successful');
 
         if (mounted) {
           context.go('/profile');
@@ -200,29 +325,68 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         String errorMessage = 'Failed to sign in with Google';
         bool isError = true;
 
+        // Log the error for debugging
+        talker.error('Error signing in with Google: $e');
+
         if (e is FirebaseAuthException) {
           final authService = ref.read(authServiceProvider);
           errorMessage = authService.getReadableAuthError(e);
 
-          // Don't show cancellation as an error
-          if (e.code == 'cancelled-by-user') {
-            isError = false;
+          // Special handling for specific error codes
+          switch (e.code) {
+            case 'cancelled-by-user':
+              isError = false;
+              break;
+            case 'account-exists-with-different-credential':
+              errorMessage =
+                  'An account already exists with the same email address but different sign-in credentials. Please sign in using your original provider.';
+              break;
+            case 'network-request-failed':
+              errorMessage =
+                  'Network error. Please check your internet connection and try again.';
+              break;
           }
         } else if (e.toString().contains('sign in was cancelled')) {
           errorMessage =
               'Sign-in was cancelled. You can try again when you\'re ready.';
           isError = false;
+        } else if (e.toString().contains('network_error')) {
+          errorMessage =
+              'Network error occurred. Please check your internet connection and try again.';
+        } else if (e.toString().contains('popup_closed')) {
+          errorMessage =
+              'Sign-in popup was closed before completing the process. Please try again.';
+          isError = false;
         } else {
           errorMessage = e.toString();
         }
 
-        showThemedSnackBar(
-          context: context,
-          message: errorMessage,
-          isError: isError,
-          duration: isError
-              ? const Duration(seconds: 10)
-              : const Duration(seconds: 3),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              errorMessage,
+              style: TextStyle(
+                color: isError
+                    ? Theme.of(context).colorScheme.onErrorContainer
+                    : Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            backgroundColor: isError
+                ? Theme.of(context).colorScheme.errorContainer
+                : Theme.of(context).colorScheme.primaryContainer,
+            duration: isError
+                ? const Duration(seconds: 10)
+                : const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: isError
+                  ? Theme.of(context).colorScheme.onErrorContainer
+                  : Theme.of(context).colorScheme.onPrimaryContainer,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
         );
       }
     }
@@ -230,9 +394,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authStateProvider);
+    final isAnonymous = authState.isAnonymous;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      appBar: AppBarFactory.createAppBar(context,
-          ref.watch(authStateProvider).isAnonymous ? 'Account' : 'Login'),
+      appBar: AppBarFactory.createAppBar(context, 'Sign In'),
       body: _isLoading
           ? const Center(child: LoadingIndicator())
           : Center(
@@ -243,24 +411,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 16),
-                    const ThemedLogo(height: 120), // Reduced height
-                    const SizedBox(height: 16), // Reduced spacing
-                    if (ref.watch(authStateProvider).isAnonymous)
+                    const ThemedLogo(height: 120),
+                    const SizedBox(height: 16),
+
+                    // Information banner for anonymous users
+                    if (isAnonymous)
                       Container(
                         padding: const EdgeInsets.all(16),
-                        margin:
-                            const EdgeInsets.only(bottom: 16), // Reduced margin
+                        margin: const EdgeInsets.only(bottom: 16),
                         decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withAlpha(51), // 0.2 * 255 = 51
-                          borderRadius: BorderRadius.circular(8),
+                          color: colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withAlpha(128),
+                            color: colorScheme.primary,
                             width: 1,
                           ),
                         ),
@@ -272,10 +435,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? Theme.of(context).colorScheme.onSurface
-                                    : Theme.of(context).colorScheme.onSurface,
+                                color: colorScheme.onPrimaryContainer,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -283,10 +443,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               '1. Link this anonymous account to preserve your current data',
                               style: TextStyle(
                                 fontSize: 16,
-                                color: Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? Theme.of(context).colorScheme.onSurface
-                                    : Theme.of(context).colorScheme.onSurface,
+                                color: colorScheme.onPrimaryContainer,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -294,10 +451,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               '2. Sign in with an existing account (will replace anonymous data)',
                               style: TextStyle(
                                 fontSize: 16,
-                                color: Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? Theme.of(context).colorScheme.onSurface
-                                    : Theme.of(context).colorScheme.onSurface,
+                                color: colorScheme.onPrimaryContainer,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -306,9 +460,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               style: TextStyle(
                                 fontSize: 14,
                                 fontStyle: FontStyle.italic,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+                                color: colorScheme.onPrimaryContainer,
                               ),
                             ),
                           ],
@@ -348,7 +500,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   _showPassword
                                       ? Icons.visibility_off
                                       : Icons.visibility,
-                                  color: Theme.of(context).colorScheme.primary,
+                                  color: colorScheme.primary,
                                 ),
                                 onPressed: () => setState(
                                     () => _showPassword = !_showPassword),
@@ -372,38 +524,37 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           Center(
                             child: StyledButton(
                               onPressed: _signInWithEmailAndPassword,
-                              text: ref.watch(authStateProvider).isAnonymous
-                                  ? 'Sign In / Link Account'
-                                  : 'Login',
+                              text: isAnonymous ? 'Sign In' : 'Sign In',
                             ),
                           ),
                         ],
                       ),
                     ),
 
-                    // Move Google sign-in button here - below the Sign In / Link Account button
-                    if (ref.watch(authStateProvider).isAnonymous)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16.0),
-                        child: GoogleSignInButton(
-                          onPressed: () async {
-                            await _signInWithGoogle();
-                          },
-                          onError: (e) {
-                            talker.error(
-                                'Google Sign-In error in login page: $e');
-                            showThemedSnackBar(
-                              context: context,
-                              message: 'Google Sign-In failed: ${e.toString()}',
-                              isError: true,
-                              duration: const Duration(seconds: 10),
-                            );
-                          },
-                          text: 'Continue with Google',
-                        ),
-                      ),
+                    const SizedBox(height: 16),
+                    GoogleSignInButton(
+                      onPressed: () async {
+                        await _signInWithGoogle();
+                      },
+                      onError: (e) {
+                        talker.error('Google Sign-In error: $e');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Google Sign-In failed: ${e.toString()}',
+                              style: TextStyle(
+                                color: colorScheme.onErrorContainer,
+                              ),
+                            ),
+                            backgroundColor: colorScheme.errorContainer,
+                            duration: const Duration(seconds: 10),
+                          ),
+                        );
+                      },
+                      text: 'Continue with Google',
+                    ),
 
-                    const SizedBox(height: 8), // Reduced spacing
+                    const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -412,12 +563,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
-                            foregroundColor:
-                                Theme.of(context).colorScheme.primary,
+                            foregroundColor: colorScheme.primary,
                           ),
-                          child: Text(ref.watch(authStateProvider).isAnonymous
-                              ? 'Create a new account'
-                              : 'Don\'t have an account? Register'),
+                          child: const Text('Create a new account'),
                         ),
                       ],
                     ),
@@ -430,35 +578,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
-                            foregroundColor:
-                                Theme.of(context).colorScheme.primary,
+                            foregroundColor: colorScheme.primary,
                           ),
                           child: const Text('Forgot password?'),
                         ),
                       ],
                     ),
-                    // Only show the Google button here for non-anonymous users
-                    if (!ref.watch(authStateProvider).isAnonymous) ...[
-                      const SizedBox(height: 16),
-                      const Divider(thickness: 1),
-                      const SizedBox(height: 16),
-                      GoogleSignInButton(
-                        onPressed: () async {
-                          await _signInWithGoogle();
-                        },
-                        onError: (e) {
-                          talker
-                              .error('Google Sign-In error in login page: $e');
-                          showThemedSnackBar(
-                            context: context,
-                            message: 'Google Sign-In failed: ${e.toString()}',
-                            isError: true,
-                            duration: const Duration(seconds: 10),
-                          );
-                        },
-                        text: 'Sign in with Google',
-                      ),
-                    ]
                   ],
                 ),
               ),

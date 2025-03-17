@@ -85,11 +85,14 @@ Future<void> _checkEmailVerification(Ref ref) async {
 
       // Wait for the auth state to be updated.  A short delay helps ensure
       // that the providers have time to update before the router refresh.
-      await Future.delayed(const Duration(milliseconds: 300));
+      // Increased delay to ensure UI has time to update
+      await Future.delayed(const Duration(milliseconds: 500));
 
       // Refresh the router to update the UI.
       final router = ref.read(routerProvider);
       router.refresh();
+
+      talker.debug('Router refreshed after email verification');
     }
   } catch (e) {
     talker.error('Error checking email verification status', e);

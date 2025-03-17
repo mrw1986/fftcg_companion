@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:fftcg_companion/app/theme/contrast_extension.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 
 /// A button that follows Google's branding guidelines for Sign-In buttons
@@ -58,7 +57,6 @@ class _GoogleSignInButtonStateState extends State<_GoogleSignInButtonState> {
     final theme = Theme.of(context);
     final brightness = theme.brightness;
     final isDark = brightness == Brightness.dark;
-    theme.extension<ContrastExtension>();
 
     // Use SVG files for better scaling and quality - dark for dark mode, neutral for light mode
     final String assetPath = isDark

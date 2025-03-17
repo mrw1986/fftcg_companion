@@ -49,16 +49,24 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     final currentSize = viewPrefs.type == ViewType.grid
         ? viewPrefs.gridSize
         : viewPrefs.listSize;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        elevation: 1,
         title: _isSearching
             ? TextField(
                 controller: _searchController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Search collection...',
                   border: InputBorder.none,
+                  hintStyle: TextStyle(
+                      color:
+                          colorScheme.onPrimary.withAlpha(179)), // 70% opacity
                 ),
+                style: TextStyle(color: colorScheme.onPrimary),
                 onChanged: (value) {
                   ref.read(collectionSearchQueryProvider.notifier).state =
                       value;
@@ -128,7 +136,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                 ViewSize.normal => 24.0,
                 ViewSize.large => 30.0,
               },
-              color: Theme.of(context).colorScheme.onSurface,
+              color: colorScheme.onPrimary,
             ),
             tooltip: 'Change Size',
             onPressed: () {
@@ -201,6 +209,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddCardDialog(context),
+        backgroundColor: colorScheme.primaryContainer,
+        foregroundColor: colorScheme.onPrimaryContainer,
         tooltip: 'Add Card',
         child: const Icon(Icons.add),
       ),
@@ -220,12 +230,26 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   }
 
   void _showSortOptions(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black54,
-      builder: (context) => const CollectionSortBottomSheet(),
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHigh,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(51), // 0.2 * 255 = 51
+              blurRadius: 10,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: const CollectionSortBottomSheet(),
+      ),
     );
   }
 

@@ -30,13 +30,35 @@ class ProfileAccountInformation extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.email_outlined),
               title: const Text('Email'),
-              subtitle: Text(user.email ?? 'No email'),
+              subtitle: Row(
+                children: [
+                  Expanded(
+                    child: Text(user.email ?? 'No email'),
+                  ),
+                  if (authState.isEmailNotVerified)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.error,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Unverified',
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.onError,
+                            fontSize: 12),
+                      ),
+                    ),
+                ],
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.account_circle_outlined),
-              title: const Text('Account Type'),
-              subtitle: Text(_getProviderName(user)),
-            ),
+            if (!authState.isEmailNotVerified)
+              ListTile(
+                leading: const Icon(Icons.account_circle_outlined),
+                title: const Text('Account Type'),
+                subtitle: Text(_getProviderName(user)),
+              ),
           ],
         ),
       ),

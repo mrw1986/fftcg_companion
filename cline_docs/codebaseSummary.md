@@ -2,6 +2,23 @@
 
 ## Recent Changes
 
+### Theme System Improvements
+
+- Removed ContrastExtension dependency from all UI components
+- Simplified theme handling by using standard Material ColorScheme
+- Updated all affected files to use direct theme colors instead of extension
+- Improved theme consistency across the application
+- Files updated:
+  - profile_page.dart
+  - auth_page.dart
+  - register_page.dart
+  - account_settings_page.dart
+  - login_page.dart
+  - profile_auth_section.dart
+  - google_sign_in_button.dart
+  - styled_button.dart
+  - theme_settings_page.dart
+
 ### Authentication Improvements
 
 - Enhanced email verification with proper UI updates
@@ -111,20 +128,40 @@
 
 ### Recent Significant Changes
 
-1. Profile and Account Settings Consolidation
+1. AppBar and Navigation Bar Theming Consistency
+   - Created AppBarFactory utility class for consistent AppBar creation
+   - Updated AppBar theme to use primary color consistently across the app
+   - Enhanced NavigationBar theming with proper color scheme integration
+   - Replaced hardcoded colors with theme-based alternatives
+   - Maintained special case for Theme Settings page with dynamic AppBar color
+   - Files updated:
+     - app_theme.dart
+     - app_router.dart (for NavigationBar)
+     - All profile-related pages
+     - Added new utility: app_bar_factory.dart
+
+2. Theme System Simplification
+   - Removed ContrastExtension dependency to simplify theme management
+   - Updated all UI components to use standard Material ColorScheme
+   - Improved theme consistency across the application
+   - Enhanced theme settings page with interactive color selection
+   - Fixed theme mode selection to properly use the selected theme color
+   - Made theme changes apply immediately throughout the app
+
+3. Profile and Account Settings Consolidation
    - Consolidated Profile and Account Settings pages into a single page
    - Removed redundant UI elements while maintaining all functionality
    - Updated navigation to remove the separate account page route
    - Improved user experience by having all settings in one place
    - Fixed related issues to ensure a seamless experience
 
-2. Email Verification
+4. Email Verification
    - Added proper token refresh
    - Improved UI updates
    - Enhanced error handling
    - Better user feedback
 
-3. Account Management
+5. Account Management
    - Added confirmation dialogs
    - Improved re-authentication flow:
      - Added dedicated re-authentication dialog with clear explanations
@@ -140,22 +177,22 @@
      - Added `updateUserEmail` method to `UserRepository`.
      - Called `updateUserEmail` in `AuthService.verifyBeforeUpdateEmail` after successful verification.
 
-4. UI Improvements
+6. UI Improvements
    - Consistent dialog styling
    - Better error presentation with specific messages
    - Improved loading states
    - Enhanced user feedback throughout sensitive operations
 
-5. Fixed Multiple UI Refreshes
+7. Fixed Multiple UI Refreshes
    - Removed redundant navigation calls in `email_verification_checker.dart` to prevent multiple UI refreshes after email verification.
 
-6. Code Organization
+8. Code Organization
    - Refactored profile page into smaller, more focused components
    - Improved separation of concerns
    - Enhanced maintainability with smaller files
    - Better state management between components
 
-7. Profile UI Cleanup
+9. Profile UI Cleanup
    - Removed "Continue with Google" button from the Profile page for anonymous users
      - Simplified the UI for anonymous users
      - Reduced redundancy as users can still sign in with Google from the login page

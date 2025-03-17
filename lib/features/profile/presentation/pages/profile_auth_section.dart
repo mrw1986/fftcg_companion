@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:fftcg_companion/app/theme/contrast_extension.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/shared/widgets/styled_button.dart';
@@ -150,8 +149,8 @@ class ProfileAuthSection extends ConsumerWidget {
                       },
                       text: 'Resend Verification Email',
                       // Use a fixed color that works well with the red background
-                      backgroundColor: Colors.white,
-                      textColor: Colors.red.shade900,
+                      backgroundColor: colorScheme.surface,
+                      textColor: colorScheme.error,
                     ),
                   ),
                 ],
@@ -178,13 +177,36 @@ class ProfileAuthSection extends ConsumerWidget {
                   ListTile(
                     leading: const Icon(Icons.email_outlined),
                     title: const Text('Email'),
-                    subtitle: Text(user.email ?? 'No email'),
+                    trailing:
+                        null, // No "Change" button for unverified accounts
+                    subtitle: Row(
+                      children: [
+                        Expanded(
+                          child: Text(user.email ?? 'No email'),
+                        ),
+                        if (authState.isEmailNotVerified)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: colorScheme.error,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'Unverified',
+                              style: TextStyle(
+                                  color: colorScheme.onError, fontSize: 12),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.account_circle_outlined),
-                    title: const Text('Account Type'),
-                    subtitle: Text(_getProviderName(user)),
-                  ),
+                  if (!authState.isEmailNotVerified)
+                    ListTile(
+                      leading: const Icon(Icons.account_circle_outlined),
+                      title: const Text('Account Type'),
+                      subtitle: Text(_getProviderName(user)),
+                    ),
                 ],
               ),
             ),
@@ -195,7 +217,6 @@ class ProfileAuthSection extends ConsumerWidget {
       // Get theme colors with guaranteed contrast
       final theme = Theme.of(context);
       final colorScheme = theme.colorScheme;
-      final contrast = theme.extension<ContrastExtension>();
 
       return Column(
         children: [
@@ -245,8 +266,8 @@ class ProfileAuthSection extends ConsumerWidget {
                                 fontWeight: FontWeight.bold,
                                 color: Theme.of(context).brightness ==
                                         Brightness.dark
-                                    ? Colors.white
-                                    : null,
+                                    ? colorScheme.onPrimaryContainer
+                                    : colorScheme.onPrimaryContainer,
                               ),
                             ),
                           ],
@@ -255,10 +276,7 @@ class ProfileAuthSection extends ConsumerWidget {
                         Text(
                           'Your data is only stored on this device. To save your data across devices, upgrade to a permanent account.',
                           style: TextStyle(
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                    ? Colors.white
-                                    : null,
+                            color: colorScheme.onPrimaryContainer,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -268,12 +286,8 @@ class ProfileAuthSection extends ConsumerWidget {
                               child: ElevatedButton(
                                 onPressed: () => context.go('/profile/login'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      contrast?.primaryWithContrast ??
-                                          colorScheme.primary,
-                                  foregroundColor:
-                                      contrast?.onPrimaryWithContrast ??
-                                          colorScheme.onPrimary,
+                                  backgroundColor: colorScheme.primary,
+                                  foregroundColor: colorScheme.onPrimary,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(24),
                                   ),
@@ -289,12 +303,8 @@ class ProfileAuthSection extends ConsumerWidget {
                                 onPressed: () =>
                                     context.go('/profile/register'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      contrast?.primaryWithContrast ??
-                                          colorScheme.primary,
-                                  foregroundColor:
-                                      contrast?.onPrimaryWithContrast ??
-                                          colorScheme.onPrimary,
+                                  backgroundColor: colorScheme.primary,
+                                  foregroundColor: colorScheme.onPrimary,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(24),
                                   ),
@@ -320,7 +330,6 @@ class ProfileAuthSection extends ConsumerWidget {
       // Get theme colors with guaranteed contrast
       final theme = Theme.of(context);
       final colorScheme = theme.colorScheme;
-      final contrast = theme.extension<ContrastExtension>();
 
       return Card(
         margin: const EdgeInsets.all(16),
@@ -335,8 +344,7 @@ class ProfileAuthSection extends ConsumerWidget {
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   // Ensure text is visible by using onSurface color
-                  color:
-                      contrast?.onSurfaceWithContrast ?? colorScheme.onSurface,
+                  color: colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 8),
@@ -345,8 +353,7 @@ class ProfileAuthSection extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 16,
                   // Ensure text is visible by using onSurface color
-                  color:
-                      contrast?.onSurfaceWithContrast ?? colorScheme.onSurface,
+                  color: colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 16),
@@ -357,10 +364,8 @@ class ProfileAuthSection extends ConsumerWidget {
                       onPressed: () => context.go('/profile/login'),
                       style: ElevatedButton.styleFrom(
                         // Use primary color with high contrast
-                        backgroundColor: contrast?.primaryWithContrast ??
-                            colorScheme.primary,
-                        foregroundColor: contrast?.onPrimaryWithContrast ??
-                            colorScheme.onPrimary,
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(24),
                         ),
@@ -375,8 +380,7 @@ class ProfileAuthSection extends ConsumerWidget {
                       onPressed: () => context.go('/profile/register'),
                       style: TextButton.styleFrom(
                         // Use primary color with high contrast
-                        foregroundColor: contrast?.primaryWithContrast ??
-                            colorScheme.primary,
+                        foregroundColor: colorScheme.primary,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       child: Text(
@@ -384,8 +388,7 @@ class ProfileAuthSection extends ConsumerWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
                           // Ensure text is visible
-                          color: contrast?.primaryWithContrast ??
-                              colorScheme.primary,
+                          color: colorScheme.primary,
                         ),
                       ),
                     ),

@@ -72,6 +72,12 @@ class AuthService {
           )
           .timeout(_timeout);
 
+      // Force refresh verification status after login
+      if (credential.user != null) {
+        talker.debug('Refreshing verification status after login');
+        await refreshVerificationStatus();
+      }
+
       // Check if email is verified if required
       if (requireVerification &&
           credential.user != null &&
@@ -247,13 +253,13 @@ class AuthService {
       try {
         userCredential =
             await _auth.currentUser!.linkWithCredential(credential);
-      } catch (e) {
-        talker.error('Error linking with email/password: $e');
+      } catch (linkError) {
+        talker.error('Error linking with email/password: $linkError');
 
         // If the error is related to reCAPTCHA, try a different approach
-        if (e.toString().contains('reCAPTCHA') ||
-            e.toString().contains('App Check') ||
-            e.toString().contains('token')) {
+        if (linkError.toString().contains('reCAPTCHA') ||
+            linkError.toString().contains('App Check') ||
+            linkError.toString().contains('token')) {
           talker.debug('Attempting alternative linking approach');
 
           // Create a new user with the email/password
@@ -274,6 +280,19 @@ class AuthService {
             code: 'manual-linking-required',
             message:
                 'Please check your email for verification and then sign in with your new account.',
+          );
+        }
+
+        // If the error is email-already-in-use, convert it to a FirebaseAuthException
+        // so it can be properly handled by the calling code
+        if (linkError is FirebaseAuthException &&
+            linkError.code == 'email-already-in-use') {
+          talker.debug(
+              'Email already in use during linking, converting to standard exception');
+          throw FirebaseAuthException(
+            code: 'email-already-in-use',
+            message:
+                'An account already exists with this email address. Please sign in or use a different email.',
           );
         }
 
@@ -673,6 +692,77 @@ class AuthService {
     }
   }
 
+  /// Refresh the verification status by checking both Firebase Auth and Firestore
+  /// This method ensures that the verification status is consistent between Firebase Auth and Firestore
+  Future<bool> refreshVerificationStatus() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        talker.debug('No user found when refreshing verification status');
+        return false;
+      }
+
+      // Force refresh to get the latest user data from Firebase Auth
+      talker.debug(
+          'Reloading user to get latest verification status from Firebase Auth');
+      await currentUser.reload();
+
+      // Get the refreshed user
+      final refreshedUser = _auth.currentUser;
+      if (refreshedUser == null) {
+        talker.warning(
+            'User not found after reload in refreshVerificationStatus');
+        return false;
+      }
+
+      // Get the verification status from Firebase Auth
+      final isVerifiedInAuth = refreshedUser.emailVerified;
+      talker.debug('Verification status in Firebase Auth: $isVerifiedInAuth');
+
+      // Get the verification status from Firestore
+      final firestoreUser =
+          await _userRepository.getUserById(refreshedUser.uid);
+      if (firestoreUser == null) {
+        talker.warning(
+            'User not found in Firestore when refreshing verification status');
+        return isVerifiedInAuth;
+      }
+
+      final isVerifiedInFirestore = firestoreUser.isVerified;
+      talker.debug('Verification status in Firestore: $isVerifiedInFirestore');
+
+      // If the verification status is inconsistent, update it
+      if (isVerifiedInAuth != isVerifiedInFirestore) {
+        talker.info(
+            'Verification status is inconsistent between Firebase Auth and Firestore');
+
+        if (isVerifiedInAuth) {
+          // If verified in Auth but not in Firestore, update Firestore
+          talker.info(
+              'Updating verification status in Firestore to match Firebase Auth');
+          await _userRepository.createOrUpdateUser(
+            firestoreUser.copyWith(isVerified: true),
+          );
+        } else if (isVerifiedInFirestore) {
+          // If verified in Firestore but not in Auth, handle email verification completion
+          talker.info(
+              'Email is verified in Firestore but not in Firebase Auth. Handling verification completion.');
+          await handleEmailVerificationComplete();
+
+          // Reload the user again to get the updated verification status
+          await refreshedUser.reload();
+          final updatedUser = _auth.currentUser;
+          return updatedUser?.emailVerified ?? false;
+        }
+      }
+
+      return isVerifiedInAuth || isVerifiedInFirestore;
+    } catch (e) {
+      talker.error('Error refreshing verification status', e);
+      return false;
+    }
+  }
+
   /// Send verification email
   Future<void> sendEmailVerification() async {
     try {
@@ -760,7 +850,7 @@ class AuthService {
       // Update the verification status in Firestore
       await updateVerificationStatus();
 
-      // Force refresh the ID token to update the auth state
+      // Force refresh the ID token to update the auth state - more aggressive approach
       talker.info('Refreshing auth tokens after email verification');
       final newToken = await refreshedUser.getIdToken(true);
       talker.debug('New ID token obtained, length: ${newToken?.length ?? 0}');
@@ -770,24 +860,33 @@ class AuthService {
       talker.debug('Token issued at: ${tokenResult.issuedAtTime}');
       talker.debug('Token expiration: ${tokenResult.expirationTime}');
 
-      // Sign out and sign back in to fully refresh the auth state
-      // This is a more aggressive approach but ensures the UI updates
+      // For email/password users, perform additional steps to ensure auth state updates
       if (refreshedUser.providerData
           .any((element) => element.providerId == 'password')) {
-        talker.debug('Performing a re-authentication to refresh auth state');
+        talker.debug(
+            'Performing additional steps to refresh auth state for email/password user');
         try {
-          // We don't have the password here, so we can't do a full re-auth
-          // Instead, we'll just reload the user again
+          // First, reload the user again
           await refreshedUser.reload();
-          talker.debug('User reloaded again after verification');
+          talker.debug('User reloaded after verification');
+
+          // Get a fresh ID token with force refresh
+          await refreshedUser.getIdToken(true);
+          talker.debug('ID token forcefully refreshed');
+
+          // Get the latest ID token result
+          final latestTokenResult = await refreshedUser.getIdTokenResult(true);
+          talker.debug(
+              'Latest token issued at: ${latestTokenResult.issuedAtTime}');
+
+          // Force Firebase Auth to refresh internal state
+          _auth.authStateChanges().listen((user) {
+            talker.debug('Auth state change detected: ${user?.uid}');
+          });
         } catch (reloadError) {
           talker.error('Error reloading user after verification', reloadError);
-          // Continue with the process despite the error
         }
       }
-
-      // Reload the user one more time to ensure we have the latest state
-      await refreshedUser.reload();
 
       talker.info(
           'Email verification completed for user: ${refreshedUser.email}');
@@ -835,7 +934,13 @@ class AuthService {
 
   /// Get a user-friendly error message for Firebase authentication errors
   String getReadableAuthError(FirebaseAuthException e) {
-    switch (e.code) {
+    // Remove 'auth/' prefix if present for consistent error handling
+    String errorCode = e.code;
+    if (errorCode.startsWith('auth/')) {
+      errorCode = errorCode.substring(5); // Remove 'auth/' prefix
+    }
+
+    switch (errorCode) {
       case 'cancelled-by-user':
         return 'Sign-in was cancelled. You can try again when you\'re ready.';
       case 'too-many-requests':
@@ -866,6 +971,12 @@ class AuthService {
         return 'No internet connection. Please check your connection and try again.';
       case 'google-sign-in-cancelled':
         return 'Google sign in was cancelled. Please try again.';
+      case 'account-exists-with-different-credential':
+        return 'An account already exists with the same email address but different sign-in credentials. Please sign in using your original provider.';
+      case 'invalid-verification-code':
+        return 'The verification code is invalid. Please try again with a new code.';
+      case 'invalid-verification-id':
+        return 'The verification ID is invalid. Please restart the verification process.';
       default:
         return e.message ?? 'An error occurred. Please try again.';
     }
@@ -883,7 +994,13 @@ class AuthService {
     }
 
     if (e is FirebaseAuthException) {
-      switch (e.code) {
+      // Remove 'auth/' prefix if present for consistent error handling
+      String errorCode = e.code;
+      if (errorCode.startsWith('auth/')) {
+        errorCode = errorCode.substring(5); // Remove 'auth/' prefix
+      }
+
+      switch (errorCode) {
         // Email/Password Authentication Errors
         case 'user-not-found':
           return Exception(

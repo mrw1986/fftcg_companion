@@ -9,8 +9,9 @@ import '../../features/cards/presentation/pages/cards_page.dart';
 import '../../features/cards/presentation/pages/card_details_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/pages/theme_settings_page.dart';
-import '../../features/profile/presentation/pages/login_page.dart';
 import '../../features/profile/presentation/pages/register_page.dart';
+import '../../features/profile/presentation/pages/auth_page.dart';
+import '../../features/profile/presentation/pages/account_settings_page.dart';
 import '../../features/profile/presentation/pages/reset_password_page.dart';
 import '../../features/collection/presentation/pages/collection_page.dart';
 import '../../features/collection/presentation/pages/collection_item_detail_page.dart';
@@ -114,6 +115,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                 ),
               ),
               GoRoute(
+                path: 'account',
+                pageBuilder: (context, state) => MaterialPage(
+                  key: state.pageKey,
+                  child: const AccountSettingsPage(),
+                ),
+              ),
+              GoRoute(
                 path: 'logs',
                 builder: (context, state) => TalkerScreen(
                   talker: talker,
@@ -126,9 +134,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
               GoRoute(
                 path: 'login',
+                redirect: (_, __) => '/profile/auth',
+              ),
+              GoRoute(
+                path: 'auth',
                 pageBuilder: (context, state) => MaterialPage(
                   key: state.pageKey,
-                  child: const LoginPage(),
+                  child: const AuthPage(),
                 ),
               ),
               GoRoute(
@@ -166,11 +178,19 @@ class NavigationDestinationItem {
     required this.label,
   });
 
-  NavigationDestination toNavigationDestination() {
+  NavigationDestination toNavigationDestination(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return NavigationDestination(
       key: key,
-      icon: icon,
-      selectedIcon: selectedIcon ?? icon,
+      icon: IconTheme(
+        data: IconThemeData(
+            color: colorScheme.onPrimary.withAlpha(179)), // 0.7 * 255 = 179
+        child: icon,
+      ),
+      selectedIcon: IconTheme(
+        data: IconThemeData(color: colorScheme.onPrimary),
+        child: selectedIcon ?? icon,
+      ),
       label: label,
     );
   }
@@ -358,6 +378,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
   @override
   Widget build(BuildContext context) {
     final selectedIndex = _calculateSelectedIndex(context);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return PopScope(
       canPop: false,
@@ -371,8 +392,13 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
       child: Scaffold(
         body: widget.child,
         bottomNavigationBar: NavigationBar(
+          backgroundColor: colorScheme.primary,
+          indicatorColor: colorScheme.onPrimary.withAlpha(51), // 0.2 * 255 = 51
+          elevation: 1,
+          height: 65,
+          labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
           destinations: _destinations
-              .map((item) => item.toNavigationDestination())
+              .map((item) => item.toNavigationDestination(context))
               .toList(),
           selectedIndex: selectedIndex,
           onDestinationSelected: (index) => _onItemTapped(index, context),

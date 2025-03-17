@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:fftcg_companion/app/theme/contrast_extension.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/shared/widgets/google_sign_in_button.dart';
+import 'package:fftcg_companion/shared/widgets/app_bar_factory.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 import 'package:fftcg_companion/shared/widgets/styled_button.dart';
 import 'package:fftcg_companion/shared/widgets/themed_logo.dart';
@@ -82,13 +82,78 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         if (e is FirebaseAuthException) {
           final authService = ref.read(authServiceProvider);
           errorMessage = authService.getReadableAuthError(e);
+
+          talker.error('Error creating account: ${e.code} - ${e.message}');
+
+          // Special handling for email-already-in-use error
+          if (e.code == 'email-already-in-use') {
+            // Set a more specific error message
+            errorMessage =
+                'An account with this email address already exists. Please sign in instead.';
+
+            // Show the snackbar first
+            showThemedSnackBar(
+              context: context,
+              message: errorMessage,
+              isError: true,
+              duration: const Duration(seconds: 5),
+            );
+
+            // Then show a dialog with options
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) {
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    final theme = Theme.of(context);
+                    final colorScheme = theme.colorScheme;
+
+                    return AlertDialog(
+                      title: Text(
+                        'Account Already Exists',
+                        style: TextStyle(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      content: const Text(
+                          'An account with this email address already exists. Would you like to sign in instead?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text('Try Again'),
+                        ),
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            foregroundColor: colorScheme.primary,
+                          ),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            context.go('/profile/auth');
+                          },
+                          child: const Text('Sign In'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              }
+            });
+
+            // Return early to avoid showing the snackbar twice
+            return;
+          }
+        } else {
+          talker.error('Error creating account: $e');
         }
 
         showThemedSnackBar(
           context: context,
           message: errorMessage,
           isError: true,
-          duration: const Duration(seconds: 10),
+          duration: const Duration(seconds: 5),
         );
       }
     }
@@ -160,9 +225,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     final isAnonymous = authState.isAnonymous;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isAnonymous ? 'Complete Registration' : 'Register'),
-      ),
+      appBar: AppBarFactory.createAppBar(
+          context, isAnonymous ? 'Complete Registration' : 'Register'),
       body: _isLoading
           ? const Center(child: LoadingIndicator())
           : _registrationComplete
@@ -238,17 +302,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                             decoration: BoxDecoration(
                               color: Theme.of(context)
                                   .colorScheme
-                                  .primary
-                                  .withAlpha(51), // 0.2 * 255 = 51
+                                  .primaryContainer,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: Theme.of(context)
-                                        .extension<ContrastExtension>()
-                                        ?.primaryWithContrast ??
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withAlpha(128),
+                                color: Theme.of(context).colorScheme.primary,
                                 width: 1,
                               ),
                             ),
@@ -257,10 +314,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
-                                color: Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? Colors.white
-                                    : Theme.of(context).colorScheme.onSurface,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
                               ),
                             ),
                           ),
@@ -453,13 +509,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               TextButton(
-                                onPressed: () => context.go('/profile/login'),
+                                onPressed: () => context.go('/profile/auth'),
                                 style: TextButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16, vertical: 8),
-                                  foregroundColor: Theme.of(context)
-                                          .extension<ContrastExtension>()
-                                          ?.primaryWithContrast ??
+                                  foregroundColor:
                                       Theme.of(context).colorScheme.primary,
                                 ),
                                 child: const Text(

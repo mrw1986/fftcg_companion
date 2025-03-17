@@ -77,11 +77,17 @@ class _CardsPageState extends ConsumerState<CardsPage>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black54,
       builder: (context) => Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(51), // 0.2 * 255 = 51
+              blurRadius: 10,
+              spreadRadius: 2,
+            ),
+          ],
         ),
         child: TweenAnimationBuilder<double>(
           duration: const Duration(milliseconds: 300),
@@ -126,6 +132,7 @@ class _CardsPageState extends ConsumerState<CardsPage>
     final viewPrefs = ref.watch(viewPreferencesProvider);
     final searchController = ref.watch(searchControllerProvider);
     final searchQuery = ref.watch(searchQueryProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     // Use the filtered search provider which combines search and filter functionality
     final filteredSearchResults = ref.watch(filteredSearchProvider);
@@ -158,6 +165,9 @@ class _CardsPageState extends ConsumerState<CardsPage>
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        elevation: 1,
         title: CardSearchBar(
           controller: searchController,
           isSearching: _isSearching,

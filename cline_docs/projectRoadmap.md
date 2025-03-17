@@ -108,13 +108,19 @@
 
 ### Recently Completed
 
-1. Enhanced email verification with proper UI updates
-2. Improved account deletion flow with confirmation dialogs
-3. Added better re-authentication handling
-4. Fixed token refresh issues in auth service
-5. Improved error messages and user feedback
-6. Refactored profile page into smaller components for better maintainability
-7. Improved "Change Email" flow with proper logout and user messaging
+1. Simplified theme system by removing ContrastExtension dependency
+2. Fixed Profile screen redundancies and improved UI layout
+3. Enhanced theme settings page with interactive color selection
+4. Improved theme consistency across the application
+5. Updated all UI components to use standard Material ColorScheme
+
+6. Enhanced email verification with proper UI updates
+7. Improved account deletion flow with confirmation dialogs
+8. Added better re-authentication handling
+9. Fixed token refresh issues in auth service
+10. Improved error messages and user feedback
+11. Refactored profile page into smaller components for better maintainability
+12. Improved "Change Email" flow with proper logout and user messaging
 
 ### Next Steps
 

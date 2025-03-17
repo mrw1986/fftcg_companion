@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:fftcg_companion/app/theme/contrast_extension.dart';
 
 /// A styled button that matches the app's design language
 /// This button has a consistent style with the Google Sign-In button
@@ -33,14 +32,9 @@ class StyledButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Get the contrast extension
-    final contrast = theme.extension<ContrastExtension>();
-
-    // Use the provided colors or default to theme colors with guaranteed contrast
-    final bgColor = backgroundColor ??
-        (contrast?.primaryWithContrast ?? theme.colorScheme.primary);
-    final txtColor = textColor ??
-        (contrast?.onPrimaryWithContrast ?? theme.colorScheme.onPrimary);
+    // Use the provided colors or default to theme colors
+    final bgColor = backgroundColor ?? theme.colorScheme.primary;
+    final txtColor = textColor ?? theme.colorScheme.onPrimary;
 
     return Center(
       child: SizedBox(
