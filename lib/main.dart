@@ -8,9 +8,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
-import 'package:talker_riverpod_logger/talker_riverpod_logger.dart';
 
 import 'package:fftcg_companion/app/app.dart';
+import 'package:fftcg_companion/app/theme/theme_provider.dart';
 import 'package:fftcg_companion/firebase_options.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
@@ -51,7 +51,26 @@ Future<void> initializeApp() async {
     // Initialize image cache
     CardImageCacheManager.initCache();
 
-    talker.debug('Basic initialization completed');
+    talker.debug('Initializing theme settings');
+    // Initialize theme settings
+    try {
+      await _container
+          .read(themeModeControllerProvider.notifier)
+          .initThemeMode();
+      talker.debug('Theme mode initialized successfully');
+    } catch (e, stack) {
+      talker.error('Error initializing theme mode', e, stack);
+    }
+    try {
+      await _container
+          .read(themeColorControllerProvider.notifier)
+          .initThemeColor();
+      talker.debug('Theme color initialized successfully');
+    } catch (e, stack) {
+      talker.error('Error initializing theme color', e, stack);
+    }
+
+    talker.debug('App initialization completed');
   } catch (e, stack) {
     talker.error('Error during basic initialization', e, stack);
     rethrow;
@@ -79,29 +98,14 @@ void main() {
       };
 
       runApp(
-        ProviderScope(
-          observers: [
-            TalkerRiverpodObserver(
-              talker: talker,
-              settings: const TalkerRiverpodLoggerSettings(
-                enabled: true,
-                printProviderAdded: false,
-                printProviderUpdated: false,
-                printProviderDisposed: false,
-                printProviderFailed: true,
-                printStateFullData: false,
-              ),
-            ),
-          ],
+        UncontrolledProviderScope(
+          container: _container,
           child: const FFTCGCompanionApp(),
         ),
       );
 
       // Remove the native splash screen after the app is initialized
       FlutterNativeSplash.remove();
-
-      // Dispose the temporary container after app is running
-      _container.dispose();
     } catch (e, stack) {
       talker.error('Error during app initialization', e, stack);
     }

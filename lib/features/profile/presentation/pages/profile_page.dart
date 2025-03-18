@@ -6,6 +6,7 @@ import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_settings.dart';
 import 'package:fftcg_companion/features/profile/presentation/providers/splash_screen_provider.dart';
+import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
@@ -151,12 +152,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               // Resend verification email
                               final scaffoldMessenger =
                                   ScaffoldMessenger.of(context);
-                              scaffoldMessenger.showSnackBar(
-                                const SnackBar(
-                                  content:
-                                      Text('Sending verification email...'),
-                                  duration: Duration(seconds: 2),
-                                ),
+                              SnackBarHelper.showSnackBar(
+                                context: context,
+                                message: 'Sending verification email...',
+                                duration: const Duration(seconds: 2),
                               );
 
                               try {
@@ -165,11 +164,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                     .sendEmailVerification();
                                 if (context.mounted) {
                                   scaffoldMessenger.clearSnackBars();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          'Verification email resent. Please check your inbox.'),
-                                    ),
+                                  SnackBarHelper.showSuccessSnackBar(
+                                    context: context,
+                                    message:
+                                        'Verification email resent. Please check your inbox.',
                                   );
                                 }
                               } catch (error) {
@@ -189,10 +187,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                     }
                                   }
 
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(errorMessage),
-                                    ),
+                                  SnackBarHelper.showErrorSnackBar(
+                                    context: context,
+                                    message: errorMessage,
                                   );
                                 }
                               }

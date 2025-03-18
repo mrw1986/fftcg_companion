@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/widgets/corner_mask_painter.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/card_description_text.dart';
+import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
@@ -142,15 +143,12 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
                     _isFavorite = !_isFavorite;
                     _isFabExpanded = false;
                   });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        _isFavorite
-                            ? 'Added to favorites'
-                            : 'Removed from favorites',
-                      ),
-                      duration: const Duration(seconds: 1),
-                    ),
+                  SnackBarHelper.showSnackBar(
+                    context: context,
+                    message: _isFavorite
+                        ? 'Added to favorites'
+                        : 'Removed from favorites',
+                    duration: const Duration(seconds: 1),
                   );
                 },
                 backgroundColor: _isFavorite
@@ -170,15 +168,12 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
                     _isInWishlist = !_isInWishlist;
                     _isFabExpanded = false;
                   });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        _isInWishlist
-                            ? 'Added to wishlist'
-                            : 'Removed from wishlist',
-                      ),
-                      duration: const Duration(seconds: 1),
-                    ),
+                  SnackBarHelper.showSnackBar(
+                    context: context,
+                    message: _isInWishlist
+                        ? 'Added to wishlist'
+                        : 'Removed from wishlist',
+                    duration: const Duration(seconds: 1),
                   );
                 },
                 backgroundColor: _isInWishlist

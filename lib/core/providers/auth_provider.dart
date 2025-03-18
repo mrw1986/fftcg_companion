@@ -5,7 +5,7 @@ import 'package:fftcg_companion/core/services/auth_service.dart';
 
 /// Provider for the AuthService
 final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService(ref);
+  return AuthService();
 });
 
 /// Provider for the current user

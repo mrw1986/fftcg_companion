@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 import '../../../../core/widgets/cached_card_image.dart';
 import '../../../../core/providers/card_cache_provider.dart';
 import '../../../../core/storage/card_cache.dart';
@@ -768,8 +769,9 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
 
   void _saveCard() {
     if (_selectedCardId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a card first')),
+      SnackBarHelper.showErrorSnackBar(
+        context: context,
+        message: 'Please select a card first',
       );
       return;
     }

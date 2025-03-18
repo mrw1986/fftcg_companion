@@ -31,12 +31,33 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
+  void _navigateToProfile() {
+    if (!mounted) return;
+    context.go('/profile');
+  }
+
+  void _showError(String message, {bool isError = true}) {
+    if (!mounted) return;
+    showThemedSnackBar(
+      context: context,
+      message: message,
+      isError: isError,
+      duration:
+          isError ? const Duration(seconds: 10) : const Duration(seconds: 3),
+    );
+  }
+
+  void _setLoading(bool loading) {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = loading;
+    });
+  }
+
   Future<void> _signInWithEmailAndPassword() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    _setLoading(true);
 
     try {
       final authState = ref.read(authStateProvider);
@@ -44,85 +65,158 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      // If user is anonymous, we need to handle linking differently
+      // If user is anonymous, we need to handle both linking and sign-in cases
       if (authState.isAnonymous) {
-        // First check if the account exists by trying to sign in
         try {
-          // Create a secondary auth instance to check if the account exists
-          // without affecting the current user
-          final secondaryAuth = FirebaseAuth.instance;
-          await secondaryAuth.signInWithEmailAndPassword(
-            email: email,
-            password: password,
-          );
+          // Try to sign in directly with the existing account
+          await authService.signInWithEmailAndPassword(email, password);
 
-          // If we get here, the account exists, so we can link it
-          await authService.linkWithEmailAndPassword(email, password);
-
-          if (mounted) {
-            context.go('/profile');
-          }
+          // If we get here, the account exists, so sign out and sign in again
+          await authService.signOut();
+          await authService.signInWithEmailAndPassword(email, password);
+          _navigateToProfile();
+          return;
         } catch (signInError) {
-          // Check if the error is because the user doesn't exist
+          // If the error is user-not-found, try to link the account
           if (signInError is FirebaseAuthException &&
-              (signInError.code == 'user-not-found' ||
-                  signInError.code == 'wrong-password')) {
-            // Show a specific error message for this case
-            setState(() {
-              _isLoading = false;
-            });
+              signInError.code == 'user-not-found') {
+            try {
+              // Create the credential for linking
+              final credential = EmailAuthProvider.credential(
+                  email: email, password: password);
+
+              // Attempt to link the account
+              final currentUser = FirebaseAuth.instance.currentUser;
+              if (currentUser == null) {
+                throw FirebaseAuthException(
+                    code: 'no-current-user',
+                    message: 'No user is currently signed in.');
+              }
+
+              // Check if provider is already linked
+              final providerData = currentUser.providerData;
+              final isPasswordLinked = providerData.any(
+                  (info) => info.providerId == EmailAuthProvider.PROVIDER_ID);
+
+              if (isPasswordLinked) {
+                throw FirebaseAuthException(
+                    code: 'provider-already-linked',
+                    message:
+                        'This authentication provider is already linked to your account.');
+              }
+
+              await currentUser.linkWithCredential(credential);
+              _navigateToProfile();
+            } catch (linkError) {
+              if (linkError is FirebaseAuthException) {
+                switch (linkError.code) {
+                  case 'credential-already-in-use':
+                  case 'email-already-in-use':
+                    // Account exists, sign out anonymous user and sign in with existing account
+                    await authService.signOut();
+                    await authService.signInWithEmailAndPassword(
+                        email, password);
+                    _navigateToProfile();
+                    break;
+                  case 'provider-already-linked':
+                    // Show a more user-friendly error message
+                    throw FirebaseAuthException(
+                        code: 'provider-already-linked',
+                        message:
+                            'This email is already linked to your account. You can sign in directly.');
+                  case 'invalid-credential':
+                    throw FirebaseAuthException(
+                        code: 'invalid-credential',
+                        message:
+                            'The provided email/password combination is incorrect.');
+                  case 'weak-password':
+                    throw FirebaseAuthException(
+                        code: 'weak-password',
+                        message:
+                            'The password must be at least 6 characters long.');
+                  case 'account-exists-with-different-credential':
+                    // Instead of checking sign-in methods, provide a generic message
+                    throw FirebaseAuthException(
+                        code: 'account-exists-with-different-credential',
+                        message:
+                            'An account already exists with this email. Please sign in with your existing account.');
+                  default:
+                    rethrow;
+                }
+              } else {
+                rethrow;
+              }
+            }
           } else {
-            // For other errors, rethrow to be caught by the outer catch
+            // For other errors, rethrow
             rethrow;
           }
         }
       } else {
         // Normal sign in for non-anonymous users
-        await authService.signInWithEmailAndPassword(email, password);
-
-        if (mounted) {
-          context.go('/profile');
+        try {
+          await authService.signInWithEmailAndPassword(email, password);
+          _navigateToProfile();
+        } catch (signInError) {
+          if (signInError is FirebaseAuthException) {
+            switch (signInError.code) {
+              case 'user-not-found':
+                throw FirebaseAuthException(
+                    code: 'user-not-found',
+                    message:
+                        'No account found with this email. Please check the email or create an account.');
+              case 'wrong-password':
+                throw FirebaseAuthException(
+                    code: 'wrong-password',
+                    message:
+                        'Incorrect password. Please try again or use the "Forgot password" option.');
+              case 'invalid-credential':
+                throw FirebaseAuthException(
+                    code: 'invalid-credential',
+                    message:
+                        'The provided email/password combination is incorrect.');
+              case 'too-many-requests':
+                throw FirebaseAuthException(
+                    code: 'too-many-requests',
+                    message:
+                        'Too many sign-in attempts. Please try again later or reset your password.');
+              default:
+                rethrow;
+            }
+          } else {
+            rethrow;
+          }
         }
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      String errorMessage =
+          'Failed to sign in. Please check your email and password.';
+      bool isError = true;
 
-      // Show user-friendly error message as SnackBar
-      if (mounted) {
-        String errorMessage =
-            'Failed to sign in. Please check your email and password.';
-        bool isError = true;
+      if (e is FirebaseAuthException) {
+        final authService = ref.read(authServiceProvider);
+        errorMessage = authService.getReadableAuthError(e);
 
-        if (e is FirebaseAuthException) {
-          final authService = ref.read(authServiceProvider);
-          errorMessage = authService.getReadableAuthError(e);
-
-          // Don't show cancellation as an error
-          if (e.code == 'cancelled-by-user') {
-            isError = false;
-          }
-        } else {
-          errorMessage = e.toString();
+        // Don't show cancellation as an error
+        if (e.code == 'cancelled-by-user') {
+          isError = false;
         }
 
-        showThemedSnackBar(
-          context: context,
-          message: errorMessage,
-          isError: isError,
-          duration: isError
-              ? const Duration(seconds: 10)
-              : const Duration(seconds: 3),
-        );
+        // Log the error for debugging
+        talker.error('Error in login page: ${e.code} - ${e.message}');
+      } else {
+        errorMessage = e.toString();
+        talker.error('Non-Firebase error in login page: $e');
       }
+
+      _showError(errorMessage, isError: isError);
+    } finally {
+      _setLoading(false);
     }
   }
 
   Future<void> _signInWithGoogle() async {
-    setState(() {
-      _isLoading = true;
-    });
+    _setLoading(true);
 
     try {
       talker.debug('Login page: Starting Google Sign-In');
@@ -132,34 +226,56 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       // If user is anonymous, link the account instead of creating a new one
       if (authState.isAnonymous) {
         try {
+          // Check if provider is already linked
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser == null) {
+            throw FirebaseAuthException(
+                code: 'no-current-user',
+                message: 'No user is currently signed in.');
+          }
+
+          final providerData = currentUser.providerData;
+          final isGoogleLinked = providerData
+              .any((info) => info.providerId == GoogleAuthProvider.PROVIDER_ID);
+
+          if (isGoogleLinked) {
+            throw FirebaseAuthException(
+                code: 'provider-already-linked',
+                message: 'Google sign-in is already linked to your account.');
+          }
+
           talker.debug('Login page: Calling authService.linkWithGoogle()');
           await authService.linkWithGoogle();
           talker.debug('Login page: Google linking successful');
-
-          if (mounted) {
-            context.go('/profile');
-          }
+          _navigateToProfile();
         } catch (linkError) {
-          setState(() {
-            _isLoading = false;
-          });
-
-          // Show user-friendly error message
-          if (mounted) {
+          if (linkError is FirebaseAuthException) {
+            switch (linkError.code) {
+              case 'credential-already-in-use':
+                // Account exists, sign out anonymous user and sign in with Google
+                await authService.signOut();
+                await authService.signInWithGoogle();
+                _navigateToProfile();
+                break;
+              case 'account-exists-with-different-credential':
+                throw FirebaseAuthException(
+                    code: 'account-exists-with-different-credential',
+                    message:
+                        'An account already exists with this email. Please sign in with your existing account.');
+              case 'provider-already-linked':
+                // Show a more user-friendly error message
+                throw FirebaseAuthException(
+                    code: 'provider-already-linked',
+                    message:
+                        'Google sign-in is already linked to your account.');
+              default:
+                rethrow;
+            }
+          } else {
             String errorMessage = 'Failed to sign in with Google';
             bool isError = true;
 
-            if (linkError is FirebaseAuthException) {
-              errorMessage = authService.getReadableAuthError(linkError);
-
-              // Don't show cancellation as an error
-              if (linkError.code == 'cancelled-by-user') {
-                isError = false;
-                talker.debug('Showing cancellation message');
-              } else {
-                talker.debug('Showing error message: $errorMessage');
-              }
-            } else if (linkError.toString().contains('sign in was cancelled')) {
+            if (linkError.toString().contains('sign in was cancelled')) {
               errorMessage =
                   'Sign-in was cancelled. You can try again when you\'re ready.';
               isError = false;
@@ -170,14 +286,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               talker.debug('Showing non-Firebase error: $errorMessage');
             }
 
-            showThemedSnackBar(
-              context: context,
-              message: errorMessage,
-              isError: isError,
-              duration: isError
-                  ? const Duration(seconds: 10)
-                  : const Duration(seconds: 3),
-            );
+            _showError(errorMessage, isError: isError);
           }
         }
       } else {
@@ -185,46 +294,35 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         talker.debug('Login page: Calling authService.signInWithGoogle()');
         await authService.signInWithGoogle();
         talker.debug('Login page: Google Sign-In successful');
-
-        if (mounted) {
-          context.go('/profile');
-        }
+        _navigateToProfile();
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      String errorMessage = 'Failed to sign in with Google';
+      bool isError = true;
 
-      // Show user-friendly error message as SnackBar
-      if (mounted) {
-        String errorMessage = 'Failed to sign in with Google';
-        bool isError = true;
+      if (e is FirebaseAuthException) {
+        final authService = ref.read(authServiceProvider);
+        errorMessage = authService.getReadableAuthError(e);
 
-        if (e is FirebaseAuthException) {
-          final authService = ref.read(authServiceProvider);
-          errorMessage = authService.getReadableAuthError(e);
-
-          // Don't show cancellation as an error
-          if (e.code == 'cancelled-by-user') {
-            isError = false;
-          }
-        } else if (e.toString().contains('sign in was cancelled')) {
-          errorMessage =
-              'Sign-in was cancelled. You can try again when you\'re ready.';
+        // Don't show cancellation as an error
+        if (e.code == 'cancelled-by-user') {
           isError = false;
-        } else {
-          errorMessage = e.toString();
         }
 
-        showThemedSnackBar(
-          context: context,
-          message: errorMessage,
-          isError: isError,
-          duration: isError
-              ? const Duration(seconds: 10)
-              : const Duration(seconds: 3),
-        );
+        // Log the error for debugging
+        talker.error('Google sign-in error: ${e.code} - ${e.message}');
+      } else if (e.toString().contains('sign in was cancelled')) {
+        errorMessage =
+            'Sign-in was cancelled. You can try again when you\'re ready.';
+        isError = false;
+      } else {
+        errorMessage = e.toString();
+        talker.error('Non-Firebase Google sign-in error: $e');
       }
+
+      _showError(errorMessage, isError: isError);
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -392,12 +490,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           onError: (e) {
                             talker.error(
                                 'Google Sign-In error in login page: $e');
-                            showThemedSnackBar(
-                              context: context,
-                              message: 'Google Sign-In failed: ${e.toString()}',
-                              isError: true,
-                              duration: const Duration(seconds: 10),
-                            );
+                            _showError(
+                                'Google Sign-In failed: ${e.toString()}');
                           },
                           text: 'Continue with Google',
                         ),
@@ -449,12 +543,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         onError: (e) {
                           talker
                               .error('Google Sign-In error in login page: $e');
-                          showThemedSnackBar(
-                            context: context,
-                            message: 'Google Sign-In failed: ${e.toString()}',
-                            isError: true,
-                            duration: const Duration(seconds: 10),
-                          );
+                          _showError('Google Sign-In failed: ${e.toString()}');
                         },
                         text: 'Sign in with Google',
                       ),

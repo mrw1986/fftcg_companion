@@ -10,6 +10,7 @@ part 'theme_provider.g.dart';
 class ThemeModeController extends _$ThemeModeController {
   static const _boxName = 'settings';
   static const _themeModeKey = 'theme_mode';
+  static const _defaultMode = 'system';
 
   Box? _getBox() {
     if (!Hive.isBoxOpen(_boxName)) {
@@ -20,10 +21,23 @@ class ThemeModeController extends _$ThemeModeController {
 
   @override
   ThemeMode build() {
-    final box = _getBox();
-    final savedMode =
-        box?.get(_themeModeKey, defaultValue: 'system') ?? 'system';
-    return _stringToThemeMode(savedMode);
+    try {
+      // Try to get the box if it's already open
+      Box? box = _getBox();
+
+      // If the box is not open, return the default mode
+      if (box == null) {
+        talker.debug('Settings box not open, using default theme mode');
+        return ThemeMode.system;
+      }
+
+      final savedMode =
+          box.get(_themeModeKey, defaultValue: _defaultMode) ?? _defaultMode;
+      return _stringToThemeMode(savedMode);
+    } catch (e, stack) {
+      talker.error('Error loading theme mode', e, stack);
+      return ThemeMode.system; // Return default mode on error
+    }
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -38,6 +52,29 @@ class ThemeModeController extends _$ThemeModeController {
     } catch (e, stack) {
       talker.error('Error setting theme mode', e, stack);
       rethrow;
+    }
+  }
+
+  /// Initialize the theme mode by ensuring the box is open
+  /// This should be called during app initialization
+  Future<void> initThemeMode() async {
+    try {
+      // Ensure the box is open
+      if (!Hive.isBoxOpen(_boxName)) {
+        await Hive.openBox(_boxName);
+      }
+      final box = Hive.box(_boxName);
+
+      // Get the saved mode or use the default
+      final savedMode =
+          box.get(_themeModeKey, defaultValue: _defaultMode) ?? _defaultMode;
+      talker.debug('Loaded theme mode: $savedMode');
+
+      // Update the state with the loaded mode
+      state = _stringToThemeMode(savedMode);
+    } catch (e, stack) {
+      talker.error('Error loading theme mode', e, stack);
+      // Don't update state on error, let build() handle it
     }
   }
 
@@ -64,6 +101,10 @@ class ThemeColorController extends _$ThemeColorController {
   static const _themeColorKey = 'theme_color';
   static const _recentColorsKey = 'recent_colors';
 
+  // FFTCG Red theme color (extracted from the card backgrounds)
+  static const _defaultColor =
+      0xFFB71C1C; // Deep red color that matches FFTCG cards
+
   Box? _getBox() {
     if (!Hive.isBoxOpen(_boxName)) {
       return null;
@@ -73,11 +114,51 @@ class ThemeColorController extends _$ThemeColorController {
 
   @override
   Color build() {
-    final box = _getBox();
-    // Default to Material You Purple (0xFF6750A4)
-    final savedColor =
-        box?.get(_themeColorKey, defaultValue: 0xFF6750A4) ?? 0xFF6750A4;
-    return Color(savedColor);
+    try {
+      // Try to get the box if it's already open
+      Box? box = _getBox();
+
+      // If the box is not open, return the default color
+      // The box will be opened when setThemeColor is called
+      if (box == null) {
+        talker.debug('Settings box not open, using default FFTCG red color');
+        return Color(_defaultColor);
+      }
+
+      // Get the saved color or use the default
+      final savedColor =
+          box.get(_themeColorKey, defaultValue: _defaultColor) ?? _defaultColor;
+      talker.debug(
+          'Loaded theme color: 0x${savedColor.toRadixString(16).toUpperCase()}');
+      return Color(savedColor);
+    } catch (e, stack) {
+      talker.error('Error loading theme color', e, stack);
+      return Color(_defaultColor); // Return default color on error
+    }
+  }
+
+  /// Initialize the theme color by ensuring the box is open
+  /// This should be called during app initialization
+  Future<void> initThemeColor() async {
+    try {
+      // Ensure the box is open
+      if (!Hive.isBoxOpen(_boxName)) {
+        await Hive.openBox(_boxName);
+      }
+      final box = Hive.box(_boxName);
+
+      // Get the saved color or use the default
+      final savedColor =
+          box.get(_themeColorKey, defaultValue: _defaultColor) ?? _defaultColor;
+      talker.debug(
+          'Loaded theme color: 0x${savedColor.toRadixString(16).toUpperCase()}');
+
+      // Update the state with the loaded color
+      state = Color(savedColor);
+    } catch (e, stack) {
+      talker.error('Error loading theme color', e, stack);
+      // Don't update state on error, let build() handle it
+    }
   }
 
   Future<void> setThemeColor(Color color) async {

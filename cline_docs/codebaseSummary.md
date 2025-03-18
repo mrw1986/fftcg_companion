@@ -19,6 +19,22 @@
   - styled_button.dart
   - theme_settings_page.dart
 
+### SnackBar Theming Improvements
+
+- Updated SnackBarHelper to use Material 3 container colors consistently
+- Standardized snackbar appearance across the app:
+  - Standard/Success snackbars use primaryContainer/onPrimaryContainer
+  - Error snackbars use errorContainer/onErrorContainer
+- Improved visual hierarchy and contrast with container colors
+- Consolidated snackbar styling to match existing implementations
+- Files updated:
+  - snackbar_helper.dart
+  - profile_display_name.dart
+  - register_page.dart
+  - login_page.dart
+  - theme_settings_page.dart
+  - account_settings_page.dart
+
 ### Authentication Improvements
 
 - Enhanced email verification with proper UI updates
@@ -128,7 +144,19 @@
 
 ### Recent Significant Changes
 
-1. AppBar and Navigation Bar Theming Consistency
+1. SnackBar Theming Consistency
+   - Created centralized SnackBarHelper utility class
+   - Implemented consistent Material 3 container colors:
+     - primaryContainer/onPrimaryContainer for standard/success messages
+     - errorContainer/onErrorContainer for error messages
+   - Added support for centered text and custom widths
+   - Enhanced visual feedback with proper contrast
+   - Files updated:
+     - snackbar_helper.dart (new utility)
+     - All profile-related pages
+     - Theme settings page
+
+2. AppBar and Navigation Bar Theming Consistency
    - Created AppBarFactory utility class for consistent AppBar creation
    - Updated AppBar theme to use primary color consistently across the app
    - Enhanced NavigationBar theming with proper color scheme integration
@@ -140,7 +168,7 @@
      - All profile-related pages
      - Added new utility: app_bar_factory.dart
 
-2. Theme System Simplification
+3. Theme System Simplification
    - Removed ContrastExtension dependency to simplify theme management
    - Updated all UI components to use standard Material ColorScheme
    - Improved theme consistency across the application
@@ -148,20 +176,20 @@
    - Fixed theme mode selection to properly use the selected theme color
    - Made theme changes apply immediately throughout the app
 
-3. Profile and Account Settings Consolidation
+4. Profile and Account Settings Consolidation
    - Consolidated Profile and Account Settings pages into a single page
    - Removed redundant UI elements while maintaining all functionality
    - Updated navigation to remove the separate account page route
    - Improved user experience by having all settings in one place
    - Fixed related issues to ensure a seamless experience
 
-4. Email Verification
+5. Email Verification
    - Added proper token refresh
    - Improved UI updates
    - Enhanced error handling
    - Better user feedback
 
-5. Account Management
+6. Account Management
    - Added confirmation dialogs
    - Improved re-authentication flow:
      - Added dedicated re-authentication dialog with clear explanations
@@ -177,48 +205,57 @@
      - Added `updateUserEmail` method to `UserRepository`.
      - Called `updateUserEmail` in `AuthService.verifyBeforeUpdateEmail` after successful verification.
 
-6. UI Improvements
+7. UI Improvements
    - Consistent dialog styling
    - Better error presentation with specific messages
    - Improved loading states
    - Enhanced user feedback throughout sensitive operations
 
-7. Fixed Multiple UI Refreshes
+8. Fixed Multiple UI Refreshes
    - Removed redundant navigation calls in `email_verification_checker.dart` to prevent multiple UI refreshes after email verification.
 
-8. Code Organization
+9. Code Organization
    - Refactored profile page into smaller, more focused components
    - Improved separation of concerns
    - Enhanced maintainability with smaller files
    - Better state management between components
 
-9. Profile UI Cleanup
-   - Removed "Continue with Google" button from the Profile page for anonymous users
-     - Simplified the UI for anonymous users
-     - Reduced redundancy as users can still sign in with Google from the login page
-   - Removed "Show Splash Screen" toggle from the Profile Settings
-     - Simplified the settings UI
-     - Removed a setting that was not essential for the user experience
+10. Profile UI Cleanup
+
+- Removed "Continue with Google" button from the Profile page for anonymous users
+- Simplified the UI for anonymous users
+- Reduced redundancy as users can still sign in with Google from the login page
+- Removed "Show Splash Screen" toggle from the Profile Settings
+- Simplified the settings UI
+- Removed a setting that was not essential for the user experience
 
 ### User Feedback Integration
 
 1. Authentication Feedback
-   - Clear error messages
-   - Verification status updates
-   - Loading indicators
-   - Success confirmations
+   - Error messages
 
-2. Account Management Feedback
+- uses error container colors
+  - Status updates
+- uses primary container colors
+  - Loading indicators
+  - Success confirmations
+- uses theme-consistent styling
+
+1. Account Management Feedback
    - Confirmation dialogs
    - Progress indicators
    - Error explanations
-   - Success notifications
 
-3. Email Update Feedback
+- uses error container colors
+  - Success notifications with primary container colors
+
+1. Email Update Feedback
    - Clear messaging about logout requirement
    - Confirmation dialogs
    - Success notifications
-   - Proper redirection after logout
+
+- uses theme-consistent styling
+  - Proper redirection after logout
 
 ## Core Features
 

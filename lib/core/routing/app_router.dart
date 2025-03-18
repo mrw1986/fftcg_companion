@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 import 'package:fftcg_companion/app/theme/theme_provider.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import '../providers/root_route_history_notifier.dart';
@@ -296,30 +297,12 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
         now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
       _lastBackPress = now;
       if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Center(
-            child: Text(
-              'Press back again to exit',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          duration: const Duration(seconds: 2),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          margin: EdgeInsets.only(
-            bottom: 24,
-            left: MediaQuery.of(context).size.width * 0.25,
-            right: MediaQuery.of(context).size.width * 0.25,
-          ),
-          elevation: 6,
-        ),
+      SnackBarHelper.showSnackBar(
+        context: context,
+        message: 'Press back again to exit',
+        duration: const Duration(seconds: 2),
+        centered: true,
+        width: MediaQuery.of(context).size.width * 0.5,
       );
       return false;
     }

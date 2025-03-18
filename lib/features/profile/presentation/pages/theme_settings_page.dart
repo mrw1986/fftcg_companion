@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/app/theme/theme_provider.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:fftcg_companion/shared/widgets/app_bar_factory.dart';
+import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 
 class ThemeSettingsPage extends ConsumerStatefulWidget {
   const ThemeSettingsPage({super.key});
@@ -206,12 +207,10 @@ class _ThemeSettingsPageState extends ConsumerState<ThemeSettingsPage> {
                           child: InkWell(
                             onTap: () {
                               // Show a confirmation message
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Theme color updated'),
-                                  duration: const Duration(seconds: 2),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
+                              SnackBarHelper.showSuccessSnackBar(
+                                context: context,
+                                message: 'Theme color updated',
+                                centered: true,
                               );
                             },
                             borderRadius: BorderRadius.circular(24),
