@@ -96,7 +96,7 @@ class CardAppBarActions extends ConsumerWidget {
               ViewSize.normal => 24.0,
               ViewSize.large => 30.0,
             },
-            color: Theme.of(context).colorScheme.onSurface,
+            color: Theme.of(context).colorScheme.onPrimary,
           ),
           onPressed: () {
             ref.read(viewPreferencesProvider.notifier).cycleSize();

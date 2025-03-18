@@ -271,16 +271,14 @@ class _ThemeSettingsPageState extends ConsumerState<ThemeSettingsPage> {
   ) {
     final isSelected = currentMode == mode;
     final colorScheme = Theme.of(context).colorScheme;
-    final brightness = Theme.of(context).brightness;
     final themeColor = ref.watch(themeColorControllerProvider);
 
     // Use higher contrast colors for text and icons
     final Color textColor = isSelected
         ? _getTextColorForBackground(
             themeColor) // Use contrasting text color based on theme color
-        : brightness == Brightness.dark
-            ? Colors.white
-            : Colors.black87;
+        : colorScheme
+            .onSurface; // Use onSurface for non-selected items for better Material 3 consistency
 
     return InkWell(
       onTap: () {

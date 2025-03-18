@@ -209,8 +209,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddCardDialog(context),
-        backgroundColor: colorScheme.primaryContainer,
-        foregroundColor: colorScheme.onPrimaryContainer,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
         tooltip: 'Add Card',
         child: const Icon(Icons.add),
       ),

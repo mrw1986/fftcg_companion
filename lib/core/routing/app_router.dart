@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fftcg_companion/app/theme/theme_provider.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import '../providers/root_route_history_notifier.dart';
 import '../utils/logger.dart';
@@ -179,21 +180,32 @@ class NavigationDestinationItem {
   });
 
   NavigationDestination toNavigationDestination(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final themeColor =
+        ProviderScope.containerOf(context).read(themeColorControllerProvider);
+    final textColor = _getTextColorForBackground(themeColor);
+
     return NavigationDestination(
       key: key,
       icon: IconTheme(
-        data: IconThemeData(
-            color: colorScheme.onPrimary.withAlpha(179)), // 0.7 * 255 = 179
+        data: IconThemeData(color: textColor.withAlpha(179)), // 0.7 * 255 = 179
         child: icon,
       ),
       selectedIcon: IconTheme(
-        data: IconThemeData(color: colorScheme.onPrimary),
+        data: IconThemeData(color: textColor),
         child: selectedIcon ?? icon,
       ),
       label: label,
     );
   }
+}
+
+/// Helper method to determine text color based on background color
+Color _getTextColorForBackground(Color backgroundColor) {
+  // Calculate the luminance of the background color
+  final luminance = backgroundColor.computeLuminance();
+
+  // Use white text on dark backgrounds, black text on light backgrounds
+  return luminance > 0.5 ? Colors.black : Colors.white;
 }
 
 class ScaffoldWithNavBar extends ConsumerStatefulWidget {
@@ -378,7 +390,8 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
   @override
   Widget build(BuildContext context) {
     final selectedIndex = _calculateSelectedIndex(context);
-    final colorScheme = Theme.of(context).colorScheme;
+    final themeColor = ref.watch(themeColorControllerProvider);
+    final textColor = _getTextColorForBackground(themeColor);
 
     return PopScope(
       canPop: false,
@@ -392,10 +405,17 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
       child: Scaffold(
         body: widget.child,
         bottomNavigationBar: NavigationBar(
-          backgroundColor: colorScheme.primary,
-          indicatorColor: colorScheme.onPrimary.withAlpha(51), // 0.2 * 255 = 51
+          backgroundColor: themeColor,
+          indicatorColor: textColor.withAlpha(51), // 0.2 * 255 = 51
           elevation: 1,
           height: 65,
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return TextStyle(color: textColor);
+            }
+            return TextStyle(
+                color: textColor.withAlpha(179)); // 0.7 * 255 = 179
+          }),
           labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
           destinations: _destinations
               .map((item) => item.toNavigationDestination(context))

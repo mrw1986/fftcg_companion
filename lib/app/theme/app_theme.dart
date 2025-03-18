@@ -36,8 +36,15 @@ class AppTheme {
   /// Light theme with custom primary color
   static ThemeData lightCustomColor(Color color) {
     // Create a color scheme using the provided color
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: color,
+    final colorScheme = ColorScheme.light(
+      primary: color,
+      onPrimary: _getTextColorForBackground(color),
+      primaryContainer: color.withAlpha(204), // 0.8 * 255 = 204
+      onPrimaryContainer: _getTextColorForBackground(color.withAlpha(204)),
+      secondary: color,
+      onSecondary: _getTextColorForBackground(color),
+      secondaryContainer: color.withAlpha(204), // 0.8 * 255 = 204
+      onSecondaryContainer: _getTextColorForBackground(color.withAlpha(204)),
       brightness: Brightness.light,
     );
 
@@ -48,8 +55,15 @@ class AppTheme {
   /// Dark theme with custom primary color
   static ThemeData darkCustomColor(Color color) {
     // Create a color scheme using the provided color
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: color,
+    final colorScheme = ColorScheme.dark(
+      primary: color,
+      onPrimary: _getTextColorForBackground(color),
+      primaryContainer: color.withAlpha(204), // 0.8 * 255 = 204
+      onPrimaryContainer: _getTextColorForBackground(color.withAlpha(204)),
+      secondary: color,
+      onSecondary: _getTextColorForBackground(color),
+      secondaryContainer: color.withAlpha(204), // 0.8 * 255 = 204
+      onSecondaryContainer: _getTextColorForBackground(color.withAlpha(204)),
       brightness: Brightness.dark,
     );
 
@@ -61,6 +75,7 @@ class AppTheme {
   static ThemeData _createThemeData(ColorScheme colorScheme) {
     return ThemeData(
       colorScheme: colorScheme,
+      primaryColor: colorScheme.primary, // Ensure primary color is set
       useMaterial3: true,
       fontFamily: GoogleFonts.roboto().fontFamily,
 
@@ -75,9 +90,37 @@ class AppTheme {
       // Card theme
       cardTheme: CardTheme(
         elevation: 1,
+        color: colorScheme.surface, // Ensure card color is set
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+      ),
+
+      // Navigation bar theme
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: colorScheme.primary,
+        indicatorColor: colorScheme.onPrimary.withAlpha(51), // 0.2 * 255 = 51
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return IconThemeData(color: colorScheme.onPrimary);
+          }
+          return IconThemeData(
+              color: colorScheme.onPrimary.withAlpha(179)); // 0.7 * 255 = 179
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return TextStyle(color: colorScheme.onPrimary);
+          }
+          return TextStyle(
+              color: colorScheme.onPrimary.withAlpha(179)); // 0.7 * 255 = 179
+        }),
+      ),
+
+      // Floating action button theme
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        elevation: 4,
       ),
 
       // Button themes
@@ -119,4 +162,13 @@ class AppTheme {
       ),
     );
   }
+}
+
+/// Helper method to determine text color based on background color
+Color _getTextColorForBackground(Color backgroundColor) {
+  // Calculate the luminance of the background color
+  final luminance = backgroundColor.computeLuminance();
+
+  // Use white text on dark backgrounds, black text on light backgrounds
+  return luminance > 0.5 ? Colors.black : Colors.white;
 }
