@@ -103,7 +103,7 @@ class ThemeColorController extends _$ThemeColorController {
 
   // FFTCG Red theme color (extracted from the card backgrounds)
   static const _defaultColor =
-      0xFFB71C1C; // Deep red color that matches FFTCG cards
+      0xFF6B0000; // Deep red color that matches FFTCG cards
 
   Box? _getBox() {
     if (!Hive.isBoxOpen(_boxName)) {

@@ -127,8 +127,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       if (mounted) {
         await showEmailUpdateCompletedDialog(context);
 
-        // Log out the user and redirect to profile page
-        await _signOut();
+        // Log out the user and redirect to profile page without confirmation
+        await _signOutWithoutConfirmation();
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -197,11 +197,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     }
   }
 
-  Future<void> _signOut() async {
-    // Show confirmation dialog
-    final shouldSignOut = await showSignOutConfirmationDialog(context);
-    if (!shouldSignOut) return;
-
+  // Sign out without showing confirmation dialog
+  Future<void> _signOutWithoutConfirmation() async {
     setState(() {
       _isLoading = true;
     });
@@ -234,6 +231,14 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     }
   }
 
+  Future<void> _signOut() async {
+    // Show confirmation dialog
+    final shouldSignOut = await showSignOutConfirmationDialog(context);
+    if (!shouldSignOut) return;
+
+    await _signOutWithoutConfirmation();
+  }
+
   Future<void> _deleteAccount() async {
     final shouldDelete = await showDeleteConfirmationDialog(context);
     if (!shouldDelete) return;
@@ -246,10 +251,18 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
       await ref.read(authServiceProvider).deleteUser();
 
+      // Sign out to reset the authentication state
+      await ref.read(authServiceProvider).signOut();
+
       setState(() {
         _isLoading = false;
       });
       talker.info('Account deleted successfully');
+
+      // Navigate back to profile page after successful deletion
+      if (mounted) {
+        context.go('/profile');
+      }
     } on FirebaseAuthException catch (e) {
       setState(() {
         _isLoading = false;
@@ -299,10 +312,11 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                 ),
                 actions: [
                   TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
-                    child: Text('OK',
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary)),
+                    child: const Text('OK'),
                   ),
                 ],
               );
@@ -363,10 +377,11 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
               ),
               actions: [
                 TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                  ),
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text('OK',
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary)),
+                  child: const Text('OK'),
                 ),
               ],
             );
@@ -404,10 +419,18 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       // Now try to delete the account again
       await ref.read(authServiceProvider).deleteUser();
 
+      // Sign out to reset the authentication state
+      await ref.read(authServiceProvider).signOut();
+
       setState(() {
         _isLoading = false;
         _showReauthDialog = false;
       });
+
+      // Navigate back to profile page after successful deletion
+      if (mounted) {
+        context.go('/profile');
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -435,10 +458,11 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                 ),
                 actions: [
                   TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
-                    child: Text('OK',
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary)),
+                    child: const Text('OK'),
                   ),
                 ],
               );
@@ -500,8 +524,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           if (mounted) {
             await showEmailUpdateCompletedDialog(context);
 
-            // Log out the user
-            await _signOut();
+            // Log out the user without confirmation
+            await _signOutWithoutConfirmation();
           }
         } catch (emailError) {
           setState(() {
@@ -927,7 +951,7 @@ Future<bool> showSignOutConfirmationDialog(BuildContext context) async {
               ),
               TextButton(
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.red,
+                  foregroundColor: Theme.of(context).colorScheme.primary,
                 ),
                 onPressed: () => Navigator.of(context).pop(true),
                 child: const Text('Yes, Sign Out'),
@@ -950,10 +974,16 @@ Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
                 'After updating your email, you will need to verify the new email address and sign in again. You will be signed out after this operation. Continue?'),
             actions: <Widget>[
               TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text('Cancel'),
               ),
               TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 onPressed: () => Navigator.of(context).pop(true),
                 child: const Text('Continue'),
               ),
@@ -975,6 +1005,9 @@ Future<void> showEmailUpdateCompletedDialog(BuildContext context) async {
             'A verification email has been sent to your new email address. Please check your inbox and verify your email. You will be signed out now and need to sign in again after verification.'),
         actions: <Widget>[
           TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.primary,
+            ),
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('OK'),
           ),
@@ -1001,7 +1034,7 @@ Future<bool> showDeleteConfirmationDialog(BuildContext context) async {
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.red,
+                  foregroundColor: Theme.of(context).colorScheme.primary,
                 ),
                 child: const Text('Delete Account'),
               ),
@@ -1024,10 +1057,16 @@ Future<bool> showReauthRequiredDialog(BuildContext context,
                 'For security reasons, you need to re-authenticate before ${isForDeletion ? 'deleting your account' : 'updating your email'}.'),
             actions: <Widget>[
               TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text('Cancel'),
               ),
               TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 onPressed: () => Navigator.of(context).pop(true),
                 child: const Text('Continue'),
               ),

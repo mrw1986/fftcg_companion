@@ -68,87 +68,46 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       // If user is anonymous, we need to handle both linking and sign-in cases
       if (authState.isAnonymous) {
         try {
-          // Try to sign in directly with the existing account
-          await authService.signInWithEmailAndPassword(email, password);
+          // If the user is anonymous, we should try to link the account with email/password
+          // This preserves the user's data since the user ID remains the same
+          talker.debug(
+              'Login page: Linking anonymous account with email/password');
 
-          // If we get here, the account exists, so sign out and sign in again
-          await authService.signOut();
-          await authService.signInWithEmailAndPassword(email, password);
+          // Create the credential for linking
+          final credential =
+              EmailAuthProvider.credential(email: email, password: password);
+
+          // Attempt to link the account
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser == null) {
+            throw FirebaseAuthException(
+                code: 'no-current-user',
+                message: 'No user is currently signed in.');
+          }
+
+          await currentUser.linkWithCredential(credential);
+          talker.debug('Login page: Email/password linking successful');
           _navigateToProfile();
           return;
         } catch (signInError) {
-          // If the error is user-not-found, try to link the account
-          if (signInError is FirebaseAuthException &&
-              signInError.code == 'user-not-found') {
-            try {
-              // Create the credential for linking
-              final credential = EmailAuthProvider.credential(
-                  email: email, password: password);
-
-              // Attempt to link the account
-              final currentUser = FirebaseAuth.instance.currentUser;
-              if (currentUser == null) {
-                throw FirebaseAuthException(
-                    code: 'no-current-user',
-                    message: 'No user is currently signed in.');
-              }
-
-              // Check if provider is already linked
-              final providerData = currentUser.providerData;
-              final isPasswordLinked = providerData.any(
-                  (info) => info.providerId == EmailAuthProvider.PROVIDER_ID);
-
-              if (isPasswordLinked) {
-                throw FirebaseAuthException(
-                    code: 'provider-already-linked',
-                    message:
-                        'This authentication provider is already linked to your account.');
-              }
-
-              await currentUser.linkWithCredential(credential);
-              _navigateToProfile();
-            } catch (linkError) {
-              if (linkError is FirebaseAuthException) {
-                switch (linkError.code) {
-                  case 'credential-already-in-use':
-                  case 'email-already-in-use':
-                    // Account exists, sign out anonymous user and sign in with existing account
-                    await authService.signOut();
-                    await authService.signInWithEmailAndPassword(
-                        email, password);
-                    _navigateToProfile();
-                    break;
-                  case 'provider-already-linked':
-                    // Show a more user-friendly error message
-                    throw FirebaseAuthException(
-                        code: 'provider-already-linked',
-                        message:
-                            'This email is already linked to your account. You can sign in directly.');
-                  case 'invalid-credential':
-                    throw FirebaseAuthException(
-                        code: 'invalid-credential',
-                        message:
-                            'The provided email/password combination is incorrect.');
-                  case 'weak-password':
-                    throw FirebaseAuthException(
-                        code: 'weak-password',
-                        message:
-                            'The password must be at least 6 characters long.');
-                  case 'account-exists-with-different-credential':
-                    // Instead of checking sign-in methods, provide a generic message
-                    throw FirebaseAuthException(
-                        code: 'account-exists-with-different-credential',
-                        message:
-                            'An account already exists with this email. Please sign in with your existing account.');
-                  default:
-                    rethrow;
-                }
-              } else {
+          // Handle specific errors during linking
+          if (signInError is FirebaseAuthException) {
+            switch (signInError.code) {
+              case 'email-already-in-use':
+              case 'credential-already-in-use':
+                // Account exists, sign out anonymous user and sign in with existing account
+                talker.debug(
+                    'Login page: Account exists, signing out anonymous user and signing in with existing account');
+                await authService.signOut();
+                await authService.signInWithEmailAndPassword(email, password);
+                _navigateToProfile();
+                return;
+              default:
+                // For other errors, rethrow
                 rethrow;
-              }
             }
           } else {
-            // For other errors, rethrow
+            // For non-Firebase errors, rethrow
             rethrow;
           }
         }
@@ -226,67 +185,33 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       // If user is anonymous, link the account instead of creating a new one
       if (authState.isAnonymous) {
         try {
-          // Check if provider is already linked
-          final currentUser = FirebaseAuth.instance.currentUser;
-          if (currentUser == null) {
-            throw FirebaseAuthException(
-                code: 'no-current-user',
-                message: 'No user is currently signed in.');
-          }
-
-          final providerData = currentUser.providerData;
-          final isGoogleLinked = providerData
-              .any((info) => info.providerId == GoogleAuthProvider.PROVIDER_ID);
-
-          if (isGoogleLinked) {
-            throw FirebaseAuthException(
-                code: 'provider-already-linked',
-                message: 'Google sign-in is already linked to your account.');
-          }
-
-          talker.debug('Login page: Calling authService.linkWithGoogle()');
+          // Link the anonymous account with Google
+          // This preserves the user's data since the user ID remains the same
+          talker.debug('Login page: Linking anonymous account with Google');
           await authService.linkWithGoogle();
+
           talker.debug('Login page: Google linking successful');
           _navigateToProfile();
         } catch (linkError) {
+          // Handle specific errors during linking
           if (linkError is FirebaseAuthException) {
             switch (linkError.code) {
               case 'credential-already-in-use':
-                // Account exists, sign out anonymous user and sign in with Google
+              case 'provider-already-linked':
+                // Account exists, sign out anonymous user and sign in with existing account
+                talker.debug(
+                    'Login page: Google account exists, signing out anonymous user and signing in with existing Google account');
                 await authService.signOut();
                 await authService.signInWithGoogle();
                 _navigateToProfile();
-                break;
-              case 'account-exists-with-different-credential':
-                throw FirebaseAuthException(
-                    code: 'account-exists-with-different-credential',
-                    message:
-                        'An account already exists with this email. Please sign in with your existing account.');
-              case 'provider-already-linked':
-                // Show a more user-friendly error message
-                throw FirebaseAuthException(
-                    code: 'provider-already-linked',
-                    message:
-                        'Google sign-in is already linked to your account.');
+                return;
               default:
+                // For other errors, rethrow
                 rethrow;
             }
           } else {
-            String errorMessage = 'Failed to sign in with Google';
-            bool isError = true;
-
-            if (linkError.toString().contains('sign in was cancelled')) {
-              errorMessage =
-                  'Sign-in was cancelled. You can try again when you\'re ready.';
-              isError = false;
-              talker
-                  .debug('Showing cancellation message for non-Firebase error');
-            } else {
-              errorMessage = linkError.toString();
-              talker.debug('Showing non-Firebase error: $errorMessage');
-            }
-
-            _showError(errorMessage, isError: isError);
+            // For non-Firebase errors, rethrow
+            rethrow;
           }
         }
       } else {

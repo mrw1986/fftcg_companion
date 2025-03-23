@@ -49,16 +49,21 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
       // If user is anonymous, link the account
       if (authState.isAnonymous) {
+        talker.debug(
+            'Register page: Linking anonymous account with email/password');
         await authService.linkWithEmailAndPassword(
           _emailController.text.trim(),
           _passwordController.text,
         );
+        talker.debug('Register page: Email/password linking successful');
       } else {
         // Otherwise create a new account
+        talker.debug('Register page: Creating new account with email/password');
         await authService.createUserWithEmailAndPassword(
           _emailController.text.trim(),
           _passwordController.text,
         );
+        talker.debug('Register page: Email/password registration successful');
       }
 
       if (mounted) {
@@ -172,13 +177,43 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       // If user is anonymous, link the account
       if (authState.isAnonymous) {
         talker.debug('Register page: Linking anonymous account with Google');
-        await authService.linkWithGoogle();
-        talker.debug('Register page: Google linking successful');
+        try {
+          await authService.linkWithGoogle();
+          talker.debug('Register page: Google linking successful');
+
+          // Navigate to profile page after successful linking
+          if (mounted) {
+            context.go('/profile');
+          }
+        } catch (linkError) {
+          // If the credential is already linked to another account, sign out and sign in with Google
+          if (linkError is FirebaseAuthException &&
+              (linkError.code == 'credential-already-in-use' ||
+                  linkError.code == 'provider-already-linked')) {
+            talker.debug(
+                'Register page: Google account exists, signing out anonymous user and signing in with existing Google account');
+            await authService.signOut();
+            await authService.signInWithGoogle();
+
+            // Navigate to profile page after successful sign-in
+            if (mounted) {
+              context.go('/profile');
+            }
+          } else {
+            // Rethrow other errors
+            rethrow;
+          }
+        }
       } else {
         // Otherwise sign in with Google
         talker.debug('Register page: Creating new account with Google');
         await authService.signInWithGoogle();
         talker.debug('Register page: Google Sign-In successful');
+
+        // Navigate to profile page after successful sign-in
+        if (mounted) {
+          context.go('/profile');
+        }
       }
 
       if (mounted) {
@@ -189,9 +224,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           isError: false,
           duration: const Duration(seconds: 5),
         );
-
-        // Navigate to profile page
-        context.go('/profile');
       }
     } catch (e) {
       setState(() {

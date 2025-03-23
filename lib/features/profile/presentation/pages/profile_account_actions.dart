@@ -82,15 +82,17 @@ Future<bool> showDeleteConfirmationDialog(BuildContext context) async {
             ),
             actions: [
               TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text('Cancel'),
               ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
                 ),
+                onPressed: () => Navigator.of(context).pop(true),
                 child: const Text('Delete Account'),
               ),
             ],
@@ -118,10 +120,16 @@ Future<bool> showReauthRequiredDialog(BuildContext context,
             ),
             actions: [
               TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text('Cancel'),
               ),
-              ElevatedButton(
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 onPressed: () => Navigator.of(context).pop(true),
                 child: const Text('Re-authenticate'),
               ),

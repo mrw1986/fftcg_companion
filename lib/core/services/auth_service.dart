@@ -98,29 +98,48 @@ class AuthService {
   Future<UserCredential> linkWithGoogle() async {
     try {
       // Trigger the authentication flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        throw FirebaseAuthException(
-          code: 'sign-in-cancelled',
-          message: 'Google sign in was cancelled.',
+      try {
+        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+        if (googleUser == null) {
+          throw FirebaseAuthException(
+            code: 'sign-in-cancelled',
+            message: 'Google sign in was cancelled.',
+          );
+        }
+
+        // Obtain the auth details from the request
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+
+        // Create a new credential
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
         );
+
+        // Link the credential to the current user
+        final userCredential =
+            await _auth.currentUser!.linkWithCredential(credential);
+        await _userRepository.createUserFromAuth(userCredential.user!);
+        return userCredential;
+      } catch (linkError) {
+        if (linkError is FirebaseAuthException) {
+          if (linkError.code == 'provider-already-linked') {
+            // If the provider is already linked, just return the current user credential
+            talker.debug(
+                'Provider already linked to this account, signing out and signing in with Google');
+            await signOut();
+            return await signInWithGoogle();
+          } else if (linkError.code == 'credential-already-in-use') {
+            // If the credential is already in use by another account, sign out and sign in with that account
+            talker.debug(
+                'Credential already in use by another account, signing out and signing in with that account');
+            await signOut();
+            return await signInWithGoogle();
+          }
+        }
+        rethrow;
       }
-
-      // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      // Create a new credential
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      // Link the credential to the current user
-      final userCredential =
-          await _auth.currentUser!.linkWithCredential(credential);
-      await _userRepository.createUserFromAuth(userCredential.user!);
-      return userCredential;
     } catch (e) {
       throw _handleAuthException(e);
     }
@@ -277,7 +296,17 @@ class AuthService {
   /// Update email
   Future<void> verifyBeforeUpdateEmail(String newEmail) async {
     try {
+      // Store the user ID before updating email
+      final userId = _auth.currentUser?.uid;
+
+      // Update the email in Firebase Auth
       await _auth.currentUser?.verifyBeforeUpdateEmail(newEmail);
+
+      // Update the email in Firestore as well
+      // This ensures that when the user logs back in, the email in Firestore matches
+      if (userId != null) {
+        await _userRepository.updateUserEmail(userId, newEmail);
+      }
     } catch (e) {
       throw _handleAuthException(e);
     }
@@ -417,7 +446,8 @@ class AuthService {
   /// Handle authentication exceptions
   Exception _handleAuthException(dynamic e) {
     if (e is FirebaseAuthException) {
-      talker.error('Firebase Auth Exception: ${e.code} - ${e.message}');
+      talker.error(
+          'Firebase Auth Exception: ${e.code} - ${e.message ?? "No message"}');
       return e;
     } else if (e is TimeoutException) {
       talker.error('Timeout Exception: ${e.message}');

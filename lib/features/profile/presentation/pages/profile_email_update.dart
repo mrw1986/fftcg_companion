@@ -69,9 +69,15 @@ Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 child: const Text('Cancel'),
               ),
-              ElevatedButton(
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 onPressed: () => Navigator.of(context).pop(true),
                 child: const Text('Continue'),
               ),
@@ -96,7 +102,10 @@ Future<void> showEmailUpdateCompletedDialog(BuildContext context) async {
           '\n\nAfter verifying your email, please log back in with your new email address.',
         ),
         actions: [
-          ElevatedButton(
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.primary,
+            ),
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('OK'),
           ),

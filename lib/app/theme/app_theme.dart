@@ -180,6 +180,17 @@ class AppTheme {
         actionsPadding: const EdgeInsets.all(16),
       ),
 
+      // Dialog button theme - ensure buttons in dialogs use appropriate contrast colors
+      // This is applied through the Material 3 theme extension mechanism
+      extensions: {
+        DialogButtonTheme(
+          textButtonStyle: TextButton.styleFrom(
+            foregroundColor: colorScheme
+                .onSurface, // Use onSurface for better contrast in dialogs
+          ),
+        ),
+      },
+
       // Snackbar theme
       snackBarTheme: SnackBarThemeData(
         backgroundColor: colorScheme.surfaceContainerHigh,
@@ -234,4 +245,36 @@ Color _getTextColorForBackground(Color backgroundColor) {
 
   // Use white text on dark backgrounds, black text on light backgrounds
   return luminance > 0.5 ? Colors.black : Colors.white;
+}
+
+/// Custom theme extension for dialog buttons
+class DialogButtonTheme extends ThemeExtension<DialogButtonTheme> {
+  final ButtonStyle? textButtonStyle;
+
+  DialogButtonTheme({
+    this.textButtonStyle,
+  });
+
+  @override
+  ThemeExtension<DialogButtonTheme> copyWith({
+    ButtonStyle? textButtonStyle,
+  }) {
+    return DialogButtonTheme(
+      textButtonStyle: textButtonStyle ?? this.textButtonStyle,
+    );
+  }
+
+  @override
+  ThemeExtension<DialogButtonTheme> lerp(
+    ThemeExtension<DialogButtonTheme>? other,
+    double t,
+  ) {
+    if (other is! DialogButtonTheme) {
+      return this;
+    }
+    return DialogButtonTheme(
+      textButtonStyle:
+          ButtonStyle.lerp(textButtonStyle, other.textButtonStyle, t),
+    );
+  }
 }

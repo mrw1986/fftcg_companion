@@ -42,24 +42,35 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
     });
 
     try {
+      // Check if user is authenticated before attempting to sign out
+      final authState = ref.read(authStateProvider);
+      final isUserAuthenticated =
+          authState.isAuthenticated && !authState.isAnonymous;
+
       await ref.read(authServiceProvider).sendPasswordResetEmail(
             _emailController.text.trim(),
           );
 
-      // Sign the user out after sending the reset email
-      await ref.read(authServiceProvider).signOut();
+      // Only sign out if the user is authenticated
+      if (isUserAuthenticated) {
+        await ref.read(authServiceProvider).signOut();
+      }
 
       setState(() {
         _resetEmailSent = true;
         _isLoading = false;
       });
 
+      // Customize message based on authentication state
+      String successMessage = isUserAuthenticated
+          ? 'Password reset email sent successfully. You have been logged out for security reasons.'
+          : 'Password reset email sent successfully. Please check your email for instructions.';
+
       // Show success message as SnackBar with action button
       if (mounted) {
         showThemedSnackBar(
           context: context,
-          message:
-              'Password reset email sent successfully. You have been logged out for security reasons.',
+          message: successMessage,
           isError: false,
           duration: const Duration(seconds: 10),
         );
@@ -131,8 +142,12 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
                             style: const TextStyle(fontSize: 16),
                           ),
                           const SizedBox(height: 16),
-                          ElevatedButton(
+                          TextButton(
                             onPressed: () => context.go('/profile/login'),
+                            style: TextButton.styleFrom(
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                            ),
                             child: const Text('Return to Login'),
                           ),
                         ],
@@ -180,6 +195,9 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
                     const SizedBox(height: 16),
                     TextButton(
                       onPressed: () => context.go('/profile/login'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.primary,
+                      ),
                       child: const Text('Back to Login'),
                     ),
                   ],

@@ -16,7 +16,7 @@ The authentication service needed improvements to follow Firebase's latest secur
 2. There was unused code and unnecessary dependencies
 3. Error handling could be improved for better user experience
 
-### Authentication Implementation Plan
+### Plan for Authentication Implementation
 
 1. Security Improvements:
    - Remove deprecated fetchSignInMethodsForEmail method
@@ -34,9 +34,9 @@ The authentication service needed improvements to follow Firebase's latest secur
    - Improve user feedback
    - Add better error logging
 
-### Authentication Implementation Results
+### Authentication Implementation Outcomes
 
-#### Completed Tasks
+#### Completed Tasks for Authentication Security Improvements
 
 1. Security Enhancements:
    - Removed all uses of fetchSignInMethodsForEmail from:
@@ -100,13 +100,255 @@ The authentication service needed improvements to follow Firebase's latest secur
 
 The authentication service now provides a secure, user-friendly experience while following Firebase's latest best practices.
 
+## Current Objective 18 (Completed)
+
+Fix Email Update Authentication Issue
+
+### Context of the Email Update Issue
+
+There was a problem with the email update flow:
+
+1. When a user changes their email, they get logged out and sent a verification email
+2. If they restart the app BEFORE verifying the email, they get logged back in with the old email
+3. This created a state management issue where Firebase Auth and Firestore had inconsistent email data
+
+### Solution Plan
+
+1. Identify the root cause:
+   - The verifyBeforeUpdateEmail method in Firebase Auth updates the email in Firebase Auth
+   - However, the email in Firestore was not being updated at the same time
+   - When the app restarts, it uses the old email from Firestore
+
+2. Solution approach:
+   - Update both Firebase Auth and Firestore when changing email
+   - Ensure consistent state between authentication and database
+
+### Implementation Outcomes
+
+#### Completed Tasks for Email Update Flow
+
+1. Fixed Email Update Flow:
+   - Modified the verifyBeforeUpdateEmail method in AuthService to:
+     - Store the user ID before updating email
+     - Update the email in Firebase Auth as before
+     - Also update the email in Firestore using UserRepository.updateUserEmail
+   - This ensures that when the user logs back in, the email in Firestore matches the one in Firebase Auth
+
+2. Testing:
+   - Verified that when a user changes their email and restarts the app before verification:
+     - The app now correctly shows the new email
+     - The state is consistent between Firebase Auth and Firestore
+
+The authentication system now maintains consistent state between Firebase Auth and Firestore during email updates, preventing the issue where users would see their old email after restarting the app.
+
+## Current Objective 19 (Completed)
+
+Improve Dialog Button Readability
+
+### Issue Details
+
+Dialog buttons in the app had readability issues:
+
+1. Some dialog buttons were using default text colors without proper contrast
+2. The "OK" button in dialogs was particularly difficult to read in certain color schemes
+3. There was inconsistency in how dialog buttons were styled across the app
+
+### Plan for Implementation
+
+1. Identify all dialog instances in the app:
+   - Account settings dialogs
+   - Authentication dialogs
+   - Collection management dialogs
+   - Confirmation dialogs
+
+2. Solution approach:
+   - Update all TextButton instances in dialogs to use the theme's primary color
+   - Ensure consistent styling across all dialog buttons
+   - Replace any hardcoded colors with theme-based colors
+
+### Implementation Outcome
+
+#### Completed Tasks for Dialog Button Readability
+
+1. Updated Dialog Button Styling:
+   - Added `style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.primary)` to all dialog buttons
+   - Replaced ElevatedButton instances with TextButton where appropriate for consistency
+   - Ensured all dialog buttons use the theme's primary color for better readability
+
+2. Files Updated:
+   - lib/features/profile/presentation/pages/account_settings_page.dart
+   - lib/features/collection/presentation/pages/collection_item_detail_page.dart
+   - lib/features/profile/presentation/pages/profile_account_actions.dart
+   - lib/features/profile/presentation/pages/auth_page.dart
+   - lib/features/profile/presentation/pages/profile_email_update.dart
+
+3. Specific Improvements:
+   - Fixed "OK" buttons in confirmation dialogs
+   - Fixed "Cancel" and "Continue" buttons in email update dialogs
+   - Fixed "Cancel" and "Delete" buttons in collection item deletion dialogs
+   - Fixed "Try Again", "Create Account", and "Reset Password" buttons in authentication dialogs
+   - Replaced hardcoded red color for delete confirmation with theme-based primary color
+
+4. Testing:
+   - Verified improved readability across different theme settings
+   - Confirmed consistent styling across all dialogs
+   - Tested with different color schemes to ensure proper contrast
+
+The dialog buttons now properly use the theme's primary color, making them more readable while maintaining consistency with the app's design system. The buttons correctly use the "on" colors as specified in the Material 3 design system.
+
+## Current Objective 20 (Completed)
+
+Fix Forgot Password Flow for Anonymous Users
+
+### Context of the Issue
+
+There was an issue with the Forgot Password flow for anonymous users:
+
+1. When an anonymous user initiated the Forgot Password flow, they were shown a confirmation dialog informing them they would be logged out
+2. This didn't make sense because anonymous users are already effectively "logged out" in terms of having a permanent account
+3. The same issue affected the login page when anonymous users tried to sign in with existing credentials
+
+### Email Update Implementation Plan
+
+1. Identify the root cause:
+   - The reset_password_page.dart file was treating anonymous users the same as authenticated users
+   - The login_page.dart file was signing out anonymous users before signing in with new credentials
+   - The register_page.dart file had similar issues with account linking
+
+2. Solution approach:
+   - Update reset_password_page.dart to only sign out authenticated users who are not anonymous
+   - Update login_page.dart to properly link anonymous accounts instead of signing out
+   - Update register_page.dart to use proper account linking for anonymous users
+
+### Email Update Implementation Results
+
+#### Completed Tasks for Email Update
+
+1. Fixed Reset Password Flow:
+   - Modified the reset_password_page.dart file to only sign out authenticated users who are not anonymous
+   - Changed the condition from `isUserAuthenticated = authState.isAuthenticated || authState.isAnonymous` to `isUserAuthenticated = authState.isAuthenticated && !authState.isAnonymous`
+   - This ensures anonymous users don't see the "you will be logged out" message
+
+2. Fixed Login Page Flow:
+   - Updated the login_page.dart file to use Firebase's linkWithCredential method for anonymous users
+   - Added proper error handling for cases where the account already exists
+   - This preserves user data when an anonymous user converts to a permanent account
+
+3. Fixed Register Page Flow:
+   - Updated the register_page.dart file to use linkWithEmailAndPassword and linkWithGoogle methods
+   - Updated UI text to be consistent with the account linking approach
+   - This ensures a smooth transition from anonymous to permanent accounts
+
+4. Testing:
+   - Verified that anonymous users no longer see the "you will be logged out" message when using Forgot Password
+   - Confirmed that anonymous user data is preserved when converting to a permanent account
+   - Tested all authentication flows to ensure they work correctly
+
+The authentication system now properly handles anonymous users in all flows, providing a more intuitive and consistent user experience while preserving user data during account conversion.
+
+## Current Objective 21 (Completed)
+
+Fix Account Deletion Flow
+
+### Context of the Dialog Button Readability Issue
+
+There was an issue with the account deletion flow:
+
+1. After a user deleted their account, they were still seeing their display name and an option to sign out on the Account Settings screen
+2. The app wasn't properly resetting the user's state to a blank slate after account deletion
+3. The user wasn't being redirected to the default Profile screen for unauthenticated users
+
+### Authentication Implementation Plan
+
+1. Identify the root cause:
+   - The account_settings_page.dart file was deleting the user account but not signing out the user or navigating back to the profile page
+   - This caused the UI to still show the user's information even though the account was deleted
+
+2. Solution approach:
+   - Update the _deleteAccount method to sign out the user after successful account deletion
+   - Update the _deleteAccount method to navigate back to the profile page after successful account deletion
+   - Update the _reauthenticateAndDeleteAccount method to do the same for cases where re-authentication is required
+
+### Authentication Implementation Results
+
+#### Completed Tasks for Authentication
+
+1. Fixed Account Deletion Flow:
+   - Modified the _deleteAccount method in account_settings_page.dart to:
+     - Delete the user account
+     - Sign out the user to reset the authentication state
+     - Navigate back to the profile page
+   - Modified the _reauthenticateAndDeleteAccount method to:
+     - Delete the user account
+     - Sign out the user to reset the authentication state
+     - Navigate back to the profile page
+   - This ensures that after account deletion, the user's state is reset to a blank slate and they are redirected to the default Profile screen
+
+2. Testing:
+   - Verified that after account deletion, the user is properly signed out
+   - Confirmed that after account deletion, the user is redirected to the default Profile screen
+   - Tested the flow with both direct deletion and deletion after re-authentication
+
+The account deletion flow now properly resets the user's state and redirects them to the default Profile screen, providing a more intuitive and consistent user experience.
+
+## Current Objective 22 (Completed)
+
+Fix Google Authentication Flow
+
+### Issue Context
+
+There were several issues with the Google authentication flow:
+
+1. When creating an account using "Continue with Google" on the Complete Registration screen, the user was not automatically logged in
+2. When trying to sign in with Google after creating an account with Google, the user received an error message saying "This provider is already linked to your account"
+3. When creating an account using email/password with the same email used for "Continue with Google", and then verifying the email, the user could sign in without entering credentials
+
+### Implementation Plan
+
+1. Identify the root causes:
+   - The register_page.dart file was not properly navigating to the profile page after successful Google account creation
+   - The auth_service.dart file was trying to create a UserCredential directly when handling the 'provider-already-linked' error
+   - The login_page.dart file was not properly handling the case where a Google account is already linked
+
+2. Solution approach:
+   - Update register_page.dart to properly navigate to the profile page after successful Google sign-in
+   - Update auth_service.dart to sign out and sign in with Google when encountering the 'provider-already-linked' error
+   - Update login_page.dart to handle the 'provider-already-linked' error case
+
+### Implementation Results
+
+#### Completed Tasks
+
+1. Fixed Google Account Creation Flow:
+   - Modified the _signInWithGoogle method in register_page.dart to:
+     - Navigate to the profile page immediately after successful Google sign-in
+     - Handle the case where the credential is already linked to another account
+     - Sign out and sign in with the existing Google account when appropriate
+
+2. Fixed Google Sign-In Flow:
+   - Modified the linkWithGoogle method in auth_service.dart to:
+     - Sign out and sign in with Google when encountering the 'provider-already-linked' error
+     - This ensures that users can sign in with their Google account even if it's already linked
+
+3. Fixed Login Page Flow:
+   - Updated the login_page.dart file to handle the 'provider-already-linked' error case
+   - This ensures that users can sign in with their Google account even if it's already linked
+
+4. Testing:
+   - Verified that users are properly logged in after creating an account with Google
+   - Confirmed that users can sign in with Google after creating an account with Google
+   - Tested the flow with both anonymous and non-anonymous users
+
+The Google authentication flow now works correctly in all scenarios, providing a seamless user experience when creating accounts and signing in with Google.
+
 ## Next Steps
 
-1. Continue with deck builder feature implementation
-2. Add card scanner functionality
-3. Develop price tracking system
-4. Add collection import/export
-5. Implement collection sharing
-6. Add favorites and wishlist
-7. Enhance filtering options
-8. Add batch operations
+1. Perform comprehensive security assessment of authentication system
+2. Implement deck builder feature
+3. Add card scanner functionality
+4. Develop price tracking system
+5. Add collection import/export
+6. Implement collection sharing
+7. Add favorites and wishlist
+8. Enhance filtering options
+9. Add batch operations

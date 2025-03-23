@@ -179,12 +179,20 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                             'No account found with this email address. Would you like to create a new account?'),
                         actions: [
                           TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                            ),
                             onPressed: () {
                               Navigator.of(context).pop();
                             },
                             child: const Text('Try Again'),
                           ),
                           TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                            ),
                             onPressed: () {
                               Navigator.of(context).pop();
                               context.go('/profile/register');
@@ -209,12 +217,20 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                             'The password you entered is incorrect. Would you like to reset your password?'),
                         actions: [
                           TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                            ),
                             onPressed: () {
                               Navigator.of(context).pop();
                             },
                             child: const Text('Try Again'),
                           ),
                           TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                            ),
                             onPressed: () {
                               Navigator.of(context).pop();
                               context.go('/profile/reset-password');

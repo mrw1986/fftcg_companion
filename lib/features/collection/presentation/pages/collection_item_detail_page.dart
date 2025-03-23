@@ -523,10 +523,16 @@ class CollectionItemDetailPage extends ConsumerWidget {
         ),
         actions: [
           TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.primary,
+            ),
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.primary,
+            ),
             onPressed: () {
               Navigator.of(context).pop();
               ref.read(userCollectionProvider.notifier).removeCard(item.id);
