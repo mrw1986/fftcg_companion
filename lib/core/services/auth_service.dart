@@ -1,8 +1,45 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:fftcg_companion/features/profile/data/repositories/user_repository.dart';
+
+/// Enum for categorizing authentication errors
+enum AuthErrorCategory {
+  /// Authentication errors (wrong password, user not found, etc.)
+  authentication,
+
+  /// Network errors (timeout, no internet, etc.)
+  network,
+
+  /// Permission errors (insufficient permissions, etc.)
+  permission,
+
+  /// Validation errors (invalid email, weak password, etc.)
+  validation,
+
+  /// Unknown errors
+  unknown
+}
+
+/// Custom exception for authentication errors
+class AuthException implements Exception {
+  final String code;
+  final String message;
+  final AuthErrorCategory category;
+  final dynamic originalException;
+
+  AuthException({
+    required this.code,
+    required this.message,
+    required this.category,
+    this.originalException,
+  });
+
+  @override
+  String toString() => 'AuthException: [$code] $message';
+}
 
 /// Service for handling Firebase Authentication operations
 class AuthService {
@@ -409,6 +446,12 @@ class AuthService {
 
   /// Get readable auth error message
   String getReadableAuthError(FirebaseAuthException e) {
+    // In production, use more generic error messages for security
+    if (kReleaseMode) {
+      return _getSecureErrorMessage(e);
+    }
+
+    // In development, provide detailed error messages
     switch (e.code) {
       case 'user-not-found':
         return 'No user found with this email.';
@@ -443,24 +486,150 @@ class AuthService {
     }
   }
 
+  /// Get secure error message for production
+  String _getSecureErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Invalid email or password. Please try again.';
+
+      case 'email-already-in-use':
+      case 'account-exists':
+      case 'credential-already-in-use':
+        return 'An account already exists with this email.';
+
+      case 'weak-password':
+      case 'invalid-email':
+        return 'Please provide a valid email and a strong password.';
+
+      case 'user-disabled':
+        return 'This account has been disabled. Please contact support.';
+
+      case 'too-many-requests':
+      case 'verification-throttled':
+        return 'Too many attempts. Please try again later.';
+
+      case 'requires-recent-login':
+        return 'This operation requires recent authentication. Please log in again.';
+
+      case 'provider-already-linked':
+        return 'This provider is already linked to your account.';
+
+      case 'operation-not-allowed':
+        return 'This operation is not allowed. Please contact support.';
+
+      default:
+        return 'An error occurred. Please try again later.';
+    }
+  }
+
+  /// Categorize authentication error
+  AuthErrorCategory _categorizeError(dynamic e) {
+    if (e is FirebaseAuthException) {
+      switch (e.code) {
+        case 'user-not-found':
+        case 'wrong-password':
+        case 'user-disabled':
+        case 'requires-recent-login':
+        case 'provider-already-linked':
+          return AuthErrorCategory.authentication;
+
+        case 'network-request-failed':
+        case 'timeout':
+          return AuthErrorCategory.network;
+
+        case 'operation-not-allowed':
+          return AuthErrorCategory.permission;
+
+        case 'weak-password':
+        case 'invalid-email':
+        case 'email-already-in-use':
+        case 'invalid-credential':
+          return AuthErrorCategory.validation;
+
+        default:
+          return AuthErrorCategory.unknown;
+      }
+    } else if (e is TimeoutException) {
+      return AuthErrorCategory.network;
+    }
+
+    return AuthErrorCategory.unknown;
+  }
+
   /// Handle authentication exceptions
   Exception _handleAuthException(dynamic e) {
     if (e is FirebaseAuthException) {
+      final category = _categorizeError(e);
+      final message = getReadableAuthError(e);
+
       talker.error(
-          'Firebase Auth Exception: ${e.code} - ${e.message ?? "No message"}');
-      return e;
+          'Firebase Auth Exception: [${e.code}] ${e.message ?? "No message"} - Category: $category');
+
+      return AuthException(
+        code: e.code,
+        message: message,
+        category: category,
+        originalException: e,
+      );
     } else if (e is TimeoutException) {
-      talker.error('Timeout Exception: ${e.message}');
-      return FirebaseAuthException(
+      talker.error('Timeout Exception: ${e.message ?? "No message"}');
+
+      return AuthException(
         code: 'timeout',
         message: 'The operation timed out. Please try again.',
+        category: AuthErrorCategory.network,
+        originalException: e,
       );
     } else {
-      talker.error('Unknown Exception: $e');
-      return FirebaseAuthException(
+      talker.error('Unknown Exception: ${e.toString()}');
+
+      return AuthException(
         code: 'unknown',
         message: 'An unexpected error occurred. Please try again.',
+        category: AuthErrorCategory.unknown,
+        originalException: e,
       );
     }
+  }
+
+  /// Check if a user's email is verified
+  /// This is used to enforce email verification for sensitive operations
+  Future<bool> isEmailVerified() async {
+    try {
+      // Reload the user to get the latest email verification status
+      await _auth.currentUser?.reload();
+      return _auth.currentUser?.emailVerified ?? false;
+    } catch (e) {
+      talker.error('Error checking email verification status: $e');
+      return false;
+    }
+  }
+
+  /// Check if a user's account is older than the specified number of days
+  /// This is used to implement progressive security based on account age
+  Future<bool> isAccountOlderThan(int days) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      final metadata = user.metadata;
+      final creationTime = metadata.creationTime;
+      if (creationTime == null) return false;
+
+      final now = DateTime.now();
+      final difference = now.difference(creationTime);
+
+      return difference.inDays > days;
+    } catch (e) {
+      talker.error('Error checking account age: $e');
+      return false;
+    }
+  }
+
+  /// Check if the current user is anonymous
+  bool isAnonymous() {
+    return _auth.currentUser?.isAnonymous ?? false;
   }
 }

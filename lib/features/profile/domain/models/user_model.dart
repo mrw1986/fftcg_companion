@@ -11,6 +11,7 @@ class UserModel {
   final bool isVerified;
   final Timestamp lastLogin;
   final Timestamp? lastAccessed;
+  final int collectionCount;
 
   UserModel({
     required this.id,
@@ -21,6 +22,7 @@ class UserModel {
     Timestamp? createdAt,
     Timestamp? lastLogin,
     this.lastAccessed,
+    this.collectionCount = 0,
     this.isVerified = false,
   })  : settings = settings ?? {},
         createdAt = createdAt ?? Timestamp.now(),
@@ -37,6 +39,7 @@ class UserModel {
       createdAt: map['createdAt'] ?? Timestamp.now(),
       lastLogin: map['lastLogin'] ?? Timestamp.now(),
       lastAccessed: map['lastAccessed'],
+      collectionCount: map['collectionCount'] ?? 0,
       isVerified: map['isVerified'] ?? false,
     );
   }
@@ -51,6 +54,7 @@ class UserModel {
       'createdAt': createdAt,
       'lastLogin': lastLogin,
       'lastAccessed': lastAccessed,
+      'collectionCount': collectionCount,
       'isVerified': isVerified,
     };
   }
@@ -63,6 +67,7 @@ class UserModel {
     Map<String, dynamic>? settings,
     Timestamp? lastLogin,
     Timestamp? lastAccessed,
+    int? collectionCount,
     bool? isVerified,
   }) {
     return UserModel(
@@ -74,6 +79,7 @@ class UserModel {
       createdAt: createdAt,
       lastLogin: lastLogin ?? this.lastLogin,
       lastAccessed: lastAccessed ?? this.lastAccessed,
+      collectionCount: collectionCount ?? this.collectionCount,
       isVerified: isVerified ?? this.isVerified,
     );
   }

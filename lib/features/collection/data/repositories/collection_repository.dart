@@ -1,13 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fftcg_companion/features/collection/domain/models/collection_item.dart';
+import 'package:fftcg_companion/features/profile/data/repositories/user_repository.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 /// Repository for managing collection data in Firestore
 class CollectionRepository {
   final FirebaseFirestore _firestore;
+  final UserRepository _userRepository;
+  final Talker talker = Talker();
 
   CollectionRepository({
     FirebaseFirestore? firestore,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance;
+    UserRepository? userRepository,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _userRepository = userRepository ?? UserRepository();
 
   /// Collection reference for collection items
   CollectionReference<Map<String, dynamic>> get _collectionRef =>
@@ -25,7 +31,7 @@ class CollectionRepository {
           .map((doc) => CollectionItem.fromMap(doc.data(), id: doc.id))
           .toList();
     } catch (e) {
-      // Log error
+      talker.error('Error getting user collection: $e');
       return [];
     }
   }
@@ -45,7 +51,7 @@ class CollectionRepository {
       }
       return null;
     } catch (e) {
-      // Log error
+      talker.error('Error getting user card: $e');
       return null;
     }
   }
@@ -78,6 +84,9 @@ class CollectionRepository {
         await _collectionRef.doc(existingCard.id).update(updatedCard.toMap());
         return updatedCard;
       } else {
+        // Increment the user's collection count
+        await _userRepository.updateCollectionCount(userId, 1, increment: true);
+
         // Create new card
         final newCard = CollectionItem(
           id: '', // Will be set after document creation
@@ -106,7 +115,7 @@ class CollectionRepository {
         );
       }
     } catch (e) {
-      // Log error
+      talker.error('Error adding or updating card: $e');
       rethrow;
     }
   }
@@ -114,9 +123,22 @@ class CollectionRepository {
   /// Remove a card from a user's collection
   Future<void> removeCard(String documentId) async {
     try {
-      await _collectionRef.doc(documentId).delete();
+      // Get the card to find the userId
+      final doc = await _collectionRef.doc(documentId).get();
+      if (doc.exists) {
+        final card = CollectionItem.fromMap(doc.data()!, id: doc.id);
+
+        // Delete the card
+        await _collectionRef.doc(documentId).delete();
+
+        // Decrement the user's collection count
+        await _userRepository.updateCollectionCount(card.userId, -1,
+            increment: true);
+      } else {
+        talker.warning('Card not found for deletion: $documentId');
+      }
     } catch (e) {
-      // Log error
+      talker.error('Error removing card: $e');
       rethrow;
     }
   }
@@ -151,7 +173,7 @@ class CollectionRepository {
         'gradedCards': gradedCards,
       };
     } catch (e) {
-      // Log error
+      talker.error('Error getting user collection stats: $e');
       return {
         'totalCards': 0,
         'uniqueCards': 0,
@@ -165,6 +187,16 @@ class CollectionRepository {
   /// Batch update multiple cards in a collection
   Future<void> batchUpdateCards(List<CollectionItem> cards) async {
     try {
+      // Count new cards (those without an ID)
+      final newCardCount = cards.where((card) => card.id.isEmpty).length;
+
+      // If there are new cards, update the collection count
+      if (newCardCount > 0 && cards.isNotEmpty) {
+        final userId = cards.first.userId;
+        await _userRepository.updateCollectionCount(userId, newCardCount,
+            increment: true);
+      }
+
       final batch = _firestore.batch();
 
       for (final card in cards) {
@@ -179,7 +211,7 @@ class CollectionRepository {
 
       await batch.commit();
     } catch (e) {
-      // Log error
+      talker.error('Error batch updating cards: $e');
       rethrow;
     }
   }

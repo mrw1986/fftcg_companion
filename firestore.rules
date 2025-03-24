@@ -1,12 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper Functions
+    // Authentication Helper Functions
     function isAuthorizedUser() {
       return request.auth != null && 
-             (request.auth.token.email == 'mrw1986@gmail.com' ||
-              request.auth.token.email == 'preliatorzero@gmail.com' ||
-              request.auth.token.email == 'fftcgcompanion@gmail.com');
+exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     function isCloudFunction() {
@@ -23,6 +21,26 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function isAccountOlderThan(days) {
+      return request.time.toMillis() - request.auth.token.auth_time * 1000 > days * 86400000;
+    }
+
+    function isAnonymous() {
+      return request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function isAnonymousWithinLimits() {
+      return isAnonymous() && getCollectionCount() < 50;
+    }
+
+    function getCollectionCount() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.collectionCount;
+    }
+
     // Validation Functions
     function isValidCard() {
       let data = request.resource.data;
@@ -37,8 +55,10 @@ service cloud.firestore {
       let data = request.resource.data;
       return data.keys().hasAll(['productId', 'lastUpdated']) &&
              data.productId is number &&
+             data.lastUpdated is timestamp &&
              (data.get('normal', {}).get('marketPrice', null) is number || 
-              data.get('foil', {}).get('marketPrice', null) is number);
+              data.get('foil', {}).get('marketPrice', null) is number) &&
+             (data.get('normal', {}).get('marketPrice', null) == null || data.get('normal', {}).get('marketPrice', null) >= 0);
     }
 
     function isValidDeck() {
@@ -46,16 +66,39 @@ service cloud.firestore {
       return data.keys().hasAll(['userId', 'name', 'cards']) &&
              data.userId == request.auth.uid &&
              data.name is string &&
+             data.name.size() <= 100 &&
              data.cards is list &&
-             data.cards.size() >= 50;
+             data.cards.size() >= 50 &&
+             data.cards.size() <= 100;
+    }
+
+    function isValidDeckUpdate() {
+      let data = request.resource.data;
+      let oldData = resource.data;
+      
+      // Ensure userId cannot be changed
+      return data.userId == oldData.userId &&
+             // Validate other fields
+             data.name is string &&
+             data.name.size() <= 100 &&
+             data.cards is list &&
+             data.cards.size() >= 50 &&
+             data.cards.size() <= 100 &&
+             // Only owner can change isPublic
+             (data.isPublic == oldData.isPublic || request.auth.uid == data.userId);
     }
 
     function isValidCollection() {
       let data = request.resource.data;
       return data.keys().hasAll(['userId', 'cardId', 'lastModified']) &&
              data.userId == request.auth.uid &&
+             data.cardId is string &&
              data.lastModified is timestamp &&
-             (data.regularQty is number || data.foilQty is number);
+             (data.regularQty is number || data.foilQty is number) &&
+             (data.regularQty == null || (data.regularQty is number && data.regularQty >= 0 && data.regularQty <= 100)) &&
+             (data.foilQty == null || (data.foilQty is number && data.foilQty >= 0 && data.foilQty <= 100)) &&
+             (!data.keys().hasAny(['condition']) || data.condition is map) &&
+             (!data.keys().hasAny(['purchaseInfo']) || data.purchaseInfo is map);
     }
 
     // Cards Collection (Public read, admin write)
@@ -86,16 +129,33 @@ service cloud.firestore {
 
     // Collections (User specific)
     match /collections/{collectionId} {
-      allow read: if isOwner(resource.data.userId);
-      allow write: if isOwner(request.resource.data.userId) && isValidCollection();
-      allow delete: if isOwner(resource.data.userId);
+      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && 
+                    isOwner(request.resource.data.userId) && 
+                    isValidCollection() && 
+                    (isEmailVerified() || !isAccountOlderThan(7) || isAnonymousWithinLimits());
+      allow update: if isAuthenticated() && 
+                    isOwner(resource.data.userId) && 
+                    isValidCollection() && 
+                    (isEmailVerified() || !isAccountOlderThan(7) || isAnonymousWithinLimits());
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
     }
 
     // Decks
     match /decks/{deckId} {
-      allow read: if resource.data.isPublic || isOwner(resource.data.userId);
-      allow create: if isAuthenticated() && isValidDeck();
-      allow update: if isOwner(resource.data.userId) && isValidDeck();
+      allow read: if isAuthenticated() && (resource.data.isPublic || isOwner(resource.data.userId));
+      allow create: if isAuthenticated() && 
+                    isValidDeck() && 
+                    (isEmailVerified() || !isAccountOlderThan(7));
+      allow update: if isAuthenticated() && 
+                    isOwner(resource.data.userId) && 
+                    isValidDeckUpdate() && 
+                    (isEmailVerified() || !isAccountOlderThan(7));
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+    
+    // Admin users collection
+    match /admins/{userId} {
       allow delete: if isOwner(resource.data.userId);
     }
     
@@ -107,8 +167,16 @@ service cloud.firestore {
     
     // User Documents
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId);
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isAuthenticated() && isOwner(userId) && 
+                    (
+                      // Ensure collectionCount can only be incremented by 1 or decremented
+                      !request.resource.data.keys().hasAny(['collectionCount']) ||
+                      request.resource.data.collectionCount == resource.data.collectionCount + 1 ||
+                      request.resource.data.collectionCount < resource.data.collectionCount
+                    );
+      allow delete: if isAuthenticated() && isOwner(userId);
     }
 
     // User Settings
