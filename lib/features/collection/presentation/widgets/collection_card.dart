@@ -215,7 +215,7 @@ class CollectionCard extends ConsumerWidget {
                   vertical: 2,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.black.withAlpha(179), // 0.7 * 255 ≈ 179
+                  color: Colors.black.withValues(alpha: 0.7), // 0.7 * 255 ≈ 179
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(

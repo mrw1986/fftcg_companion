@@ -55,29 +55,35 @@ class _GoogleSignInButtonStateState extends State<_GoogleSignInButtonState> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final brightness = theme.brightness;
-    final isDark = brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
-    // Use SVG files for better scaling and quality - dark for dark mode, neutral for light mode
-    final String assetPath = isDark
-        ? 'assets/images/google_branding/signin-assets/android_dark_rd_ctn.svg'
-        : 'assets/images/google_branding/signin-assets/android_neutral_rd_ctn.svg';
+    // Use the specified Google logo assets
+    final String logoAssetPath = isDark
+        ? 'assets/images/google_branding/signin-assets/android_dark_rd_na.svg'
+        : 'assets/images/google_branding/signin-assets/android_neutral_rd_na.svg';
 
     if (_isLoading) {
       return Center(
         child: Container(
-          width: 240,
+          width: double.infinity,
           height: 48,
           decoration: BoxDecoration(
-            color: isDark ? Colors.grey[800] : Colors.grey[200],
-            borderRadius: BorderRadius.circular(4),
+            color:
+                isDark ? colorScheme.surfaceContainerHighest : Colors.grey[100],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+              width: 1,
+            ),
           ),
-          child: const Center(
+          child: Center(
             child: SizedBox(
               width: 24,
               height: 24,
               child: CircularProgressIndicator(
                 strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
               ),
             ),
           ),
@@ -88,8 +94,9 @@ class _GoogleSignInButtonStateState extends State<_GoogleSignInButtonState> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Center(
-          child: GestureDetector(
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
             onTap: () async {
               if (_isLoading) return;
 
@@ -117,20 +124,75 @@ class _GoogleSignInButtonStateState extends State<_GoogleSignInButtonState> {
                 }
               }
             },
-            child: SvgPicture.asset(
-              assetPath,
-              width: 240, // Fixed width to match our UI
-              height: 48, // Standard height for buttons
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: double.infinity,
+              height: 48,
+              decoration: BoxDecoration(
+                color: isDark ? colorScheme.surface : Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 1,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: SvgPicture.asset(
+                      logoAssetPath,
+                      height: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    widget.text,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
         if (_errorMessage != null) ...[
           const SizedBox(height: 8),
-          Text(
-            _errorMessage!,
-            style: TextStyle(
-              color: theme.colorScheme.error,
-              fontSize: 12,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              _errorMessage!,
+              style: TextStyle(
+                color: colorScheme.onErrorContainer,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],

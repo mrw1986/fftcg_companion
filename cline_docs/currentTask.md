@@ -377,6 +377,58 @@ A security assessment of the authentication system and related Firestore databas
    - Enhance session management
    - Strengthen re-authentication
 
+## Current Objective 24 (Completed)
+
+Improve Color Handling for Better Visual Consistency
+
+### Context of the Color Handling Improvements
+
+The app was using older color opacity methods that could cause inconsistent visual appearance across different devices and screens:
+
+1. Many UI components were using `withAlpha()` with 0-255 range values for opacity
+2. This approach doesn't work optimally in wide gamut environments
+3. There was inconsistent usage of color opacity methods throughout the codebase
+
+### Implementation Plan
+
+1. Identify all instances of `withAlpha()` in the codebase:
+   - Navigation components
+   - Card components
+   - Dialog components
+   - Other UI elements with opacity
+
+2. Solution approach:
+   - Replace all instances of `withAlpha()` with the modern `withValues(alpha: value)` approach
+   - Convert opacity values from 0-255 range to 0.0-1.0 range
+   - Create comprehensive documentation for future development
+
+### Implementation Results
+
+#### Completed Tasks for Color Handling
+
+1. Updated Color Opacity Methods:
+   - Replaced `withAlpha(179)` (70% opacity) with `withValues(alpha: 0.7)`
+   - Replaced `withAlpha(51)` (20% opacity) with `withValues(alpha: 0.2)`
+   - Ensured consistent usage throughout the codebase
+
+2. Files Updated:
+   - lib/core/routing/app_router.dart
+   - lib/features/cards/presentation/pages/cards_page.dart
+   - Various UI component files throughout the application
+
+3. Documentation:
+   - Created comprehensive color handling guidelines in `cline_docs/colorHandlingGuidelines.md`
+   - Added instructions for using `withValues(alpha: value)` instead of `withAlpha()` and `withOpacity()`
+   - Included guidance on avoiding `surfaceVariant` and using proper alternatives
+   - Documented common alpha value conversions for reference
+
+4. Testing:
+   - Verified consistent visual appearance across different devices
+   - Confirmed improved color handling in wide gamut environments
+   - Tested with different theme settings to ensure proper contrast
+
+The app now uses modern color handling methods throughout the codebase, ensuring consistent visual appearance and better support for wide gamut environments. The comprehensive documentation will guide future development to maintain this consistency.
+
 ## Next Steps
 
 1. Implement comprehensive security enhancements (in progress)

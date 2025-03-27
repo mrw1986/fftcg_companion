@@ -593,7 +593,7 @@ class _SetCardCountDisplayState extends State<SetCardCountDisplay> {
       loading: () => Text(
         '(...)',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: widget.colorScheme.onSurfaceVariant.withAlpha(128),
+              color: widget.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
             ),
       ),
       error: (_, __) => Text(

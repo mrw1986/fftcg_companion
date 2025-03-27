@@ -63,8 +63,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                   hintText: 'Search collection...',
                   border: InputBorder.none,
                   hintStyle: TextStyle(
-                      color:
-                          colorScheme.onPrimary.withAlpha(179)), // 70% opacity
+                      color: colorScheme.onPrimary
+                          .withValues(alpha: 0.7)), // 70% opacity
                 ),
                 style: TextStyle(color: colorScheme.onPrimary),
                 onChanged: (value) {
@@ -242,7 +242,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(51), // 0.2 * 255 = 51
+              color: Colors.black.withValues(alpha: 0.2), // 0.2 * 255 = 51
               blurRadius: 10,
               spreadRadius: 2,
             ),

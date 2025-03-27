@@ -32,6 +32,7 @@ class ProfileAuthMethods extends ConsumerWidget {
     final providers = user!.providerData.map((e) => e.providerId).toList();
     final hasPassword = providers.contains('password');
     final hasGoogle = providers.contains('google.com');
+    final colorScheme = Theme.of(context).colorScheme;
 
     // Get Google account info if available
     UserInfo? googleProvider;
@@ -46,108 +47,215 @@ class ProfileAuthMethods extends ConsumerWidget {
 
     final String? googleEmail = googleProvider?.email;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Authentication Methods section with proper alignment
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (hasPassword || hasGoogle) ...[
-                  const SizedBox(height: 8),
-                  Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Authentication Methods section with proper alignment
+          if (hasPassword || hasGoogle) ...[
+            // Email/Password method
+            if (hasPassword)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
                     children: [
-                      const Icon(Icons.password_outlined),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Email/Password',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w500),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.password_outlined,
+                          color: colorScheme.onPrimaryContainer,
+                          size: 20,
+                        ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Email/Password',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Password authentication is enabled',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       if (providers.length > 1)
                         IconButton(
-                          icon: const Icon(Icons.link_off),
+                          icon: Icon(
+                            Icons.link_off,
+                            color: colorScheme.primary,
+                          ),
                           tooltip: 'Unlink Email/Password',
                           onPressed: () => onUnlinkProvider('password'),
                         ),
                     ],
                   ),
-                  const Padding(
-                    padding: EdgeInsets.only(left: 36),
-                    child: Text('Password authentication is enabled'),
+                ),
+              ),
+
+            // Google method
+            if (hasGoogle)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                    width: 1,
                   ),
-                  const SizedBox(height: 12),
-                  Row(
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
                     children: [
-                      SvgPicture.asset(
-                        Theme.of(context).brightness == Brightness.dark
-                            ? 'assets/images/google_branding/signin-assets/android_dark_rd_na.svg'
-                            : 'assets/images/google_branding/signin-assets/android_neutral_rd_na.svg',
-                        height: 24,
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 2,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: SvgPicture.asset(
+                          Theme.of(context).brightness == Brightness.dark
+                              ? 'assets/images/google_branding/signin-assets/android_dark_rd_na.svg'
+                              : 'assets/images/google_branding/signin-assets/android_neutral_rd_na.svg',
+                          height: 20,
+                        ),
                       ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Google',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w500),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Google',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            if (googleEmail != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Signed in as $googleEmail',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
-                      const Spacer(),
                       if (providers.length > 1)
                         IconButton(
-                          icon: const Icon(Icons.link_off),
+                          icon: Icon(
+                            Icons.link_off,
+                            color: colorScheme.primary,
+                          ),
                           tooltip: 'Unlink Google',
                           onPressed: () => onUnlinkProvider('google.com'),
                         ),
                     ],
                   ),
-                  if (googleEmail != null)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 36),
-                      child: Text('Signed in as $googleEmail'),
-                    ),
-                ],
-              ],
-            ),
-
-            // Add authentication methods section - only show if there are methods to add
-            if (!hasPassword && isEmailVerified || !hasGoogle) ...[
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-
-              // Add Email/Password
-              if (!hasPassword && isEmailVerified)
-                ListTile(
-                  leading: const Icon(Icons.password_outlined),
-                  title: const Text('Add Email/Password'),
-                  subtitle: const Text('Set a password for your account'),
-                  trailing: const Icon(Icons.add_circle_outline),
-                  onTap: onShowLinkEmailPasswordDialog,
                 ),
+              ),
+          ],
 
-              // Add Google
-              if (!hasGoogle)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: GoogleSignInButton(
-                    onPressed: onLinkWithGoogle,
-                    onError: (e) {
-                      SnackBarHelper.showErrorSnackBar(
-                        context: context,
-                        message: 'Error linking Google: ${e.toString()}',
-                      );
-                    },
-                    text: 'Link with Google',
+          // Add authentication methods section - only show if there are methods to add
+          if (!hasPassword && isEmailVerified || !hasGoogle) ...[
+            const SizedBox(height: 8),
+
+            // Add Email/Password
+            if (!hasPassword && isEmailVerified)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.2),
+                    width: 1,
                   ),
                 ),
-            ],
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.password_outlined,
+                      color: colorScheme.onSecondaryContainer,
+                      size: 20,
+                    ),
+                  ),
+                  title: const Text('Add Email/Password'),
+                  subtitle: const Text('Set a password for your account'),
+                  trailing: Icon(
+                    Icons.add_circle_outline,
+                    color: colorScheme.primary,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  onTap: onShowLinkEmailPasswordDialog,
+                ),
+              ),
+
+            // Add Google
+            if (!hasGoogle)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: GoogleSignInButton(
+                  onPressed: onLinkWithGoogle,
+                  onError: (e) {
+                    SnackBarHelper.showErrorSnackBar(
+                      context: context,
+                      message: 'Error linking Google: ${e.toString()}',
+                    );
+                  },
+                  text: 'Link with Google',
+                ),
+              ),
           ],
-        ),
+        ],
       ),
     );
   }

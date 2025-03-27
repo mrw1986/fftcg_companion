@@ -208,7 +208,7 @@ class CollectionItemDetailPage extends ConsumerWidget {
                   Icon(
                     Icons.collections_bookmark_outlined,
                     size: 64,
-                    color: colorScheme.primary.withAlpha(128),
+                    color: colorScheme.primary.withValues(alpha: 0.5),
                   ),
                   const SizedBox(height: 16),
                   Text(

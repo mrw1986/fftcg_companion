@@ -444,7 +444,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                       color: Theme.of(context)
                                           .colorScheme
                                           .outline
-                                          .withAlpha(128), // 0.5 * 255 = 128
+                                          .withValues(
+                                              alpha: 0.5), // 0.5 * 255 = 128
                                     ),
                                   ),
                                   child: Column(

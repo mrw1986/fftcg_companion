@@ -293,8 +293,10 @@ class _ThemeSettingsPageState extends ConsumerState<ThemeSettingsPage> {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isSelected
-                ? themeColor.withAlpha(200) // Slightly transparent border
-                : colorScheme.onSurface.withAlpha(31), // 0.12 * 255 ≈ 31
+                ? themeColor.withValues(
+                    alpha: 0.78) // Slightly transparent border
+                : colorScheme.onSurface
+                    .withValues(alpha: 0.12), // 0.12 * 255 ≈ 31
           ),
         ),
         child: Column(

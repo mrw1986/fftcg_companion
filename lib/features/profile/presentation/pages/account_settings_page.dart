@@ -6,11 +6,12 @@ import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_display_name.dart'
     as display_name;
-import 'package:fftcg_companion/features/profile/presentation/pages/profile_email_update.dart';
 import 'package:fftcg_companion/shared/widgets/app_bar_factory.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_reauth_dialog.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
-import 'package:fftcg_companion/features/profile/presentation/widgets/profile_auth_methods.dart';
+import 'package:fftcg_companion/features/profile/presentation/widgets/profile_header_card.dart';
+import 'package:fftcg_companion/features/profile/presentation/widgets/account_info_card.dart';
+import 'package:fftcg_companion/features/profile/presentation/widgets/account_actions_card.dart';
 
 class AccountSettingsPage extends ConsumerStatefulWidget {
   const AccountSettingsPage({super.key});
@@ -293,6 +294,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
             barrierDismissible: false,
             context: context,
             builder: (BuildContext context) {
+              final colorScheme = Theme.of(context).colorScheme;
               String errorMessage =
                   ref.read(authServiceProvider).getReadableAuthError(e);
 
@@ -303,23 +305,32 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
               }
 
               return AlertDialog(
-                title: Text('Error',
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: colorScheme.error),
+                    const SizedBox(width: 12),
+                    const Text('Error'),
+                  ],
+                ),
                 content: Text(
                   errorMessage,
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                  style: TextStyle(color: colorScheme.onSurface),
                 ),
                 actions: [
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.primary,
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
                     ),
                     onPressed: () => Navigator.of(context).pop(),
                     child: const Text('OK'),
                   ),
                 ],
+                actionsPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               );
             },
           );
@@ -356,6 +367,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           barrierDismissible: false,
           context: context,
           builder: (BuildContext context) {
+            final colorScheme = Theme.of(context).colorScheme;
             String errorMessage =
                 'An unexpected error occurred. Please try again or contact support if the problem persists.';
 
@@ -369,22 +381,32 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
             }
 
             return AlertDialog(
-              title: Text('Error',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(Icons.error_outline, color: colorScheme.error),
+                  const SizedBox(width: 12),
+                  const Text('Error'),
+                ],
+              ),
               content: Text(
                 errorMessage,
-                style:
-                    TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                style: TextStyle(color: colorScheme.onSurface),
               ),
               actions: [
-                TextButton(
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.primary,
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
                   ),
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('OK'),
                 ),
               ],
+              actionsPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             );
           },
         );
@@ -446,26 +468,36 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
         showDialog(
             context: context,
             builder: (BuildContext context) {
+              final colorScheme = Theme.of(context).colorScheme;
               return AlertDialog(
-                title: Text('Authentication Error',
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: colorScheme.error),
+                    const SizedBox(width: 12),
+                    const Text('Authentication Error'),
+                  ],
+                ),
                 content: Text(
                   e is FirebaseAuthException
                       ? ref.read(authServiceProvider).getReadableAuthError(e)
                       : 'An error occurred during authentication. Please check your credentials and try again.',
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                  style: TextStyle(color: colorScheme.onSurface),
                 ),
                 actions: [
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.primary,
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
                     ),
                     onPressed: () => Navigator.of(context).pop(),
                     child: const Text('OK'),
                   ),
                 ],
+                actionsPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               );
             });
       }
@@ -659,186 +691,6 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     }
   }
 
-  Widget _buildProfileHeader(User? user, ColorScheme colorScheme) {
-    if (user == null) return const SizedBox.shrink();
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            const CircleAvatar(
-              radius: 40,
-              child: Icon(Icons.person, size: 40),
-            ),
-            const SizedBox(height: 16),
-            display_name.ProfileDisplayName(
-              displayNameController: _displayNameController,
-              onUpdateProfile: _updateProfile,
-              isLoading: _isLoading,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAccountInfo(
-      User? user, ColorScheme colorScheme, bool isEmailNotVerified) {
-    if (user == null) return const SizedBox.shrink();
-
-    final providers = user.providerData.map((e) => e.providerId).toList();
-    final hasPassword = providers.contains('password');
-    providers.contains('google.com');
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Account Information',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Email with verification status
-            ListTile(
-              leading: const Icon(Icons.email_outlined),
-              title: const Text('Email'),
-              subtitle: Row(
-                children: [
-                  Expanded(
-                    child: Text(user.email ?? 'No email'),
-                  ),
-                  if (isEmailNotVerified)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: colorScheme.error,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text('Unverified',
-                          style: TextStyle(
-                              color: colorScheme.onError, fontSize: 12)),
-                    ),
-                ],
-              ),
-              trailing: user.email != null &&
-                      !user.isAnonymous &&
-                      !isEmailNotVerified &&
-                      hasPassword
-                  ? TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _showChangeEmail = !_showChangeEmail;
-                        });
-                      },
-                      child: Text(_showChangeEmail ? 'Cancel' : 'Change',
-                          style: TextStyle(color: Colors.green)),
-                    )
-                  : null,
-            ),
-
-            if (_showChangeEmail) ...[
-              const SizedBox(height: 16),
-              ProfileEmailUpdate(
-                emailController: _emailController,
-                onUpdateEmail: _updateEmail,
-                isLoading: _isLoading,
-              ),
-            ],
-
-            // Authentication Methods section
-            const SizedBox(height: 8),
-            const Text(
-              'Authentication Methods',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Use ProfileAuthMethods instead of duplicating authentication logic
-            ProfileAuthMethods(
-              user: user,
-              onUnlinkProvider: _unlinkProvider,
-              onLinkWithGoogle: _linkWithGoogle,
-              onLinkWithEmailPassword: (email, password) {
-                ref
-                    .read(authServiceProvider)
-                    .linkWithEmailAndPassword(email, password);
-              },
-              onShowLinkEmailPasswordDialog: () {
-                setState(() {
-                  _showChangeEmail = !_showChangeEmail;
-                });
-              },
-            ),
-
-            // Reset password option for password users
-            if (!user.isAnonymous && hasPassword)
-              ListTile(
-                title: const Text('Reset Password'),
-                subtitle: const Text('Send a password reset email'),
-                leading: const Icon(Icons.lock_reset_outlined),
-                onTap: () => context.go('/profile/reset-password'),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAccountActions(User? user, ColorScheme colorScheme) {
-    if (user == null) return const SizedBox.shrink();
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Account Actions',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              title: const Text('Sign Out'),
-              subtitle: const Text('Sign out of your current account'),
-              leading: const Icon(Icons.logout_outlined),
-              onTap: _signOut,
-            ),
-            if (!user.isAnonymous) ...[
-              const Divider(),
-              ListTile(
-                title: const Text('Delete Account'),
-                subtitle: const Text(
-                    'Permanently delete your account and all associated data'),
-                leading: const Icon(Icons.delete_forever_outlined,
-                    color: Colors.red),
-                onTap: _deleteAccount,
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
@@ -880,47 +732,104 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
     return Scaffold(
       appBar: AppBarFactory.createAppBar(context, 'Account Settings'),
+      backgroundColor: colorScheme.surface,
       body: _isLoading
           ? const Center(child: LoadingIndicator())
-          : ListView(
-              children: [
-                // Profile Header with display name
-                _buildProfileHeader(authState.user, colorScheme),
+          : Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    colorScheme.primary.withValues(alpha: 0.05),
+                    colorScheme.surface,
+                  ],
+                ),
+              ),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                children: [
+                  // Profile Header with display name
+                  ProfileHeaderCard(
+                    user: authState.user,
+                    displayNameController: _displayNameController,
+                    onUpdateProfile: _updateProfile,
+                    isLoading: _isLoading,
+                  ),
 
-                // Account Information
-                _buildAccountInfo(
-                    authState.user, colorScheme, authState.isEmailNotVerified),
+                  // Account Information
+                  AccountInfoCard(
+                    user: authState.user,
+                    isEmailNotVerified: authState.isEmailNotVerified,
+                    emailController: _emailController,
+                    showChangeEmail: _showChangeEmail,
+                    onToggleChangeEmail: () {
+                      setState(() {
+                        _showChangeEmail = !_showChangeEmail;
+                      });
+                    },
+                    onUpdateEmail: _updateEmail,
+                    onUnlinkProvider: _unlinkProvider,
+                    onLinkWithGoogle: _linkWithGoogle,
+                    onLinkWithEmailPassword: (email, password) {
+                      ref
+                          .read(authServiceProvider)
+                          .linkWithEmailAndPassword(email, password);
+                    },
+                    isLoading: _isLoading,
+                  ),
 
-                // Account Actions
-                _buildAccountActions(authState.user, colorScheme),
-              ],
+                  // Account Actions
+                  AccountActionsCard(
+                    user: authState.user,
+                    onSignOut: _signOut,
+                    onDeleteAccount: _deleteAccount,
+                  ),
+                ],
+              ),
             ),
     );
   }
 }
 
 Future<bool> showSignOutConfirmationDialog(BuildContext context) async {
+  final colorScheme = Theme.of(context).colorScheme;
   return await showDialog<bool>(
         context: context,
         barrierDismissible: true,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: const Text('Sign Out'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.logout_outlined, color: colorScheme.primary),
+                const SizedBox(width: 12),
+                const Text('Sign Out'),
+              ],
+            ),
             content: const Text(
                 'Are you sure you want to sign out of your account?'),
             actions: <Widget>[
               TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: colorScheme.onSurface.withValues(alpha: 0.8),
+                ),
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text('No, Cancel'),
               ),
-              TextButton(
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.primary,
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
                 ),
                 onPressed: () => Navigator.of(context).pop(true),
                 child: const Text('Yes, Sign Out'),
               ),
             ],
+            actionsPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           );
         },
       ) ??
@@ -928,30 +837,43 @@ Future<bool> showSignOutConfirmationDialog(BuildContext context) async {
 }
 
 Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
+  final colorScheme = Theme.of(context).colorScheme;
   return await showDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: const Text('Confirm Email Update'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.email_outlined, color: colorScheme.primary),
+                const SizedBox(width: 12),
+                const Text('Confirm Email Update'),
+              ],
+            ),
             content: const Text(
                 'After updating your email, you will need to verify the new email address and sign in again. You will be signed out after this operation. Continue?'),
             actions: <Widget>[
               TextButton(
                 style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: colorScheme.onSurface.withValues(alpha: 0.8),
                 ),
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text('Cancel'),
               ),
-              TextButton(
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.primary,
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
                 ),
                 onPressed: () => Navigator.of(context).pop(true),
                 child: const Text('Continue'),
               ),
             ],
+            actionsPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           );
         },
       ) ??
@@ -959,50 +881,79 @@ Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
 }
 
 Future<void> showEmailUpdateCompletedDialog(BuildContext context) async {
+  final colorScheme = Theme.of(context).colorScheme;
   return showDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (BuildContext context) {
       return AlertDialog(
-        title: const Text('Email Update Initiated'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.mark_email_read_outlined, color: colorScheme.primary),
+            const SizedBox(width: 12),
+            const Text('Email Update Initiated'),
+          ],
+        ),
         content: const Text(
             'A verification email has been sent to your new email address. Please check your inbox and verify your email. You will be signed out now and need to sign in again after verification.'),
         actions: <Widget>[
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.primary,
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
             ),
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('OK'),
           ),
         ],
+        actionsPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       );
     },
   );
 }
 
 Future<bool> showDeleteConfirmationDialog(BuildContext context) async {
+  final colorScheme = Theme.of(context).colorScheme;
   return await showDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: const Text('Confirm Account Deletion'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.delete_forever_outlined, color: colorScheme.error),
+                const SizedBox(width: 12),
+                const Text('Confirm Account Deletion'),
+              ],
+            ),
             content: const Text(
                 'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.'),
             actions: <Widget>[
               TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: colorScheme.onSurface.withValues(alpha: 0.8),
+                ),
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text('Cancel'),
               ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.primary,
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.error,
+                  foregroundColor: colorScheme.onError,
                 ),
+                onPressed: () => Navigator.of(context).pop(true),
                 child: const Text('Delete Account'),
               ),
             ],
+            actionsPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           );
         },
       ) ??
@@ -1011,30 +962,43 @@ Future<bool> showDeleteConfirmationDialog(BuildContext context) async {
 
 Future<bool> showReauthRequiredDialog(BuildContext context,
     {bool isForDeletion = true}) async {
+  final colorScheme = Theme.of(context).colorScheme;
   return await showDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: const Text('Authentication Required'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.security_outlined, color: colorScheme.primary),
+                const SizedBox(width: 12),
+                const Text('Authentication Required'),
+              ],
+            ),
             content: Text(
                 'For security reasons, you need to re-authenticate before ${isForDeletion ? 'deleting your account' : 'updating your email'}.'),
             actions: <Widget>[
               TextButton(
                 style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: colorScheme.onSurface.withValues(alpha: 0.8),
                 ),
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text('Cancel'),
               ),
-              TextButton(
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.primary,
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
                 ),
                 onPressed: () => Navigator.of(context).pop(true),
                 child: const Text('Continue'),
               ),
             ],
+            actionsPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           );
         },
       ) ??

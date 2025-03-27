@@ -39,12 +39,14 @@ class AppTheme {
     final colorScheme = ColorScheme.light(
       primary: color,
       onPrimary: _getTextColorForBackground(color),
-      primaryContainer: color.withAlpha(204), // 0.8 * 255 = 204
-      onPrimaryContainer: _getTextColorForBackground(color.withAlpha(204)),
+      primaryContainer: color.withValues(alpha: 0.8), // 0.8 * 255 = 204
+      onPrimaryContainer:
+          _getTextColorForBackground(color.withValues(alpha: 0.8)),
       secondary: color,
       onSecondary: _getTextColorForBackground(color),
-      secondaryContainer: color.withAlpha(204), // 0.8 * 255 = 204
-      onSecondaryContainer: _getTextColorForBackground(color.withAlpha(204)),
+      secondaryContainer: color.withValues(alpha: 0.8), // 0.8 * 255 = 204
+      onSecondaryContainer:
+          _getTextColorForBackground(color.withValues(alpha: 0.8)),
       brightness: Brightness.light,
     );
 
@@ -58,12 +60,14 @@ class AppTheme {
     final colorScheme = ColorScheme.dark(
       primary: color,
       onPrimary: _getTextColorForBackground(color),
-      primaryContainer: color.withAlpha(204), // 0.8 * 255 = 204
-      onPrimaryContainer: _getTextColorForBackground(color.withAlpha(204)),
+      primaryContainer: color.withValues(alpha: 0.8), // 0.8 * 255 = 204
+      onPrimaryContainer:
+          _getTextColorForBackground(color.withValues(alpha: 0.8)),
       secondary: color,
       onSecondary: _getTextColorForBackground(color),
-      secondaryContainer: color.withAlpha(204), // 0.8 * 255 = 204
-      onSecondaryContainer: _getTextColorForBackground(color.withAlpha(204)),
+      secondaryContainer: color.withValues(alpha: 0.8), // 0.8 * 255 = 204
+      onSecondaryContainer:
+          _getTextColorForBackground(color.withValues(alpha: 0.8)),
       brightness: Brightness.dark,
     );
 
@@ -99,20 +103,23 @@ class AppTheme {
       // Navigation bar theme
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: colorScheme.primary,
-        indicatorColor: colorScheme.onPrimary.withAlpha(51), // 0.2 * 255 = 51
+        indicatorColor:
+            colorScheme.onPrimary.withValues(alpha: 0.2), // 0.2 * 255 = 51
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return IconThemeData(color: colorScheme.onPrimary);
           }
           return IconThemeData(
-              color: colorScheme.onPrimary.withAlpha(179)); // 0.7 * 255 = 179
+              color: colorScheme.onPrimary
+                  .withValues(alpha: 0.7)); // 0.7 * 255 = 179
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return TextStyle(color: colorScheme.onPrimary);
           }
           return TextStyle(
-              color: colorScheme.onPrimary.withAlpha(179)); // 0.7 * 255 = 179
+              color: colorScheme.onPrimary
+                  .withValues(alpha: 0.7)); // 0.7 * 255 = 179
         }),
       ),
 
@@ -222,7 +229,8 @@ class AppTheme {
         ),
         modalBackgroundColor: colorScheme.surface,
         modalElevation: 4,
-        modalBarrierColor: Colors.black.withAlpha(153), // 0.6 * 255 = 153
+        modalBarrierColor:
+            Colors.black.withValues(alpha: 0.6), // 0.6 * 255 = 153
       ),
 
       // Tooltip theme

@@ -123,8 +123,10 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
                       padding: const EdgeInsets.all(16),
                       margin: const EdgeInsets.only(bottom: 24),
                       decoration: BoxDecoration(
-                        color:
-                            Theme.of(context).colorScheme.primary.withAlpha(25),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(

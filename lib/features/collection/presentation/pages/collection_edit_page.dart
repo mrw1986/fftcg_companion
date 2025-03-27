@@ -194,7 +194,7 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
           Icon(
             Icons.search,
             size: 64,
-            color: Theme.of(context).colorScheme.primary.withAlpha(128),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(

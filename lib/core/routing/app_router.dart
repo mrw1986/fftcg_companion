@@ -188,7 +188,8 @@ class NavigationDestinationItem {
     return NavigationDestination(
       key: key,
       icon: IconTheme(
-        data: IconThemeData(color: textColor.withAlpha(179)), // 0.7 * 255 = 179
+        data: IconThemeData(
+            color: textColor.withValues(alpha: 0.7)), // 0.7 * 255 = 179
         child: icon,
       ),
       selectedIcon: IconTheme(
@@ -389,7 +390,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
         body: widget.child,
         bottomNavigationBar: NavigationBar(
           backgroundColor: themeColor,
-          indicatorColor: textColor.withAlpha(51), // 0.2 * 255 = 51
+          indicatorColor: textColor.withValues(alpha: 0.2), // 0.2 * 255 = 51
           elevation: 1,
           height: 65,
           labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -397,7 +398,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
               return TextStyle(color: textColor);
             }
             return TextStyle(
-                color: textColor.withAlpha(179)); // 0.7 * 255 = 179
+                color: textColor.withValues(alpha: 0.7)); // 0.7 * 255 = 179
           }),
           labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
           destinations: _destinations

@@ -39,7 +39,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
         curve: Curves.easeInOut,
         child: Container(
           color: Color.alphaBlend(
-            colorScheme.surface.withAlpha((0.95 * 255).round()),
+            colorScheme.surface.withValues(alpha: 0.95),
             Colors.transparent,
           ),
           child: Center(

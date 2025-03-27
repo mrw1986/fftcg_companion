@@ -277,13 +277,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           color: Theme.of(context)
                               .colorScheme
                               .primary
-                              .withAlpha(51), // 0.2 * 255 = 51
+                              .withValues(alpha: 0.2), // 0.2 * 255 = 51
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: Theme.of(context)
                                 .colorScheme
                                 .primary
-                                .withAlpha(128),
+                                .withValues(alpha: 0.5),
                             width: 1,
                           ),
                         ),

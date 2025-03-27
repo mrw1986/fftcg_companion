@@ -517,7 +517,8 @@ class CardMetadataChips extends StatelessWidget {
                   // Add a subtle shadow for better visibility on light colors
                   shadows: [
                     Shadow(
-                      color: Colors.black.withAlpha(77), // 0.3 * 255 = 77
+                      color:
+                          Colors.black.withValues(alpha: 0.3), // 0.3 * 255 = 77
                       offset: const Offset(0.5, 0.5),
                       blurRadius: 1.0,
                     ),

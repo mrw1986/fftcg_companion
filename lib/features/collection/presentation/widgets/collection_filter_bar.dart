@@ -19,7 +19,7 @@ class CollectionFilterBar extends ConsumerWidget {
 
     return Card(
       elevation: 0,
-      color: colorScheme.surfaceContainerHighest.withAlpha(128),
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),

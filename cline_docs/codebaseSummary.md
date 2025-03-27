@@ -2,6 +2,19 @@
 
 ## Recent Changes
 
+### Color Handling Improvements
+
+- Updated all instances of `withAlpha()` to use the modern `withValues(alpha: value)` approach:
+  - Replaced `withAlpha(179)` (70% opacity) with `withValues(alpha: 0.7)`
+  - Replaced `withAlpha(51)` (20% opacity) with `withValues(alpha: 0.2)`
+  - Created comprehensive color handling guidelines in `cline_docs/colorHandlingGuidelines.md`
+  - Improved color handling in wide gamut environments
+  - Enhanced visual consistency across different devices and screens
+  - Files updated:
+    - lib/core/routing/app_router.dart
+    - lib/features/cards/presentation/pages/cards_page.dart
+    - Various UI component files throughout the application
+
 ### Security Enhancements
 
 - Implemented comprehensive security improvements:

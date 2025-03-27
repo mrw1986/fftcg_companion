@@ -20,7 +20,8 @@ class NavigationDestinationItem {
       key: key,
       icon: IconTheme(
         data: IconThemeData(
-            color: colorScheme.onPrimary.withAlpha(179)), // 0.7 * 255 = 179
+            color: colorScheme.onPrimary
+                .withValues(alpha: 0.7)), // 0.7 * 255 = 179
         child: icon,
       ),
       selectedIcon: IconTheme(
