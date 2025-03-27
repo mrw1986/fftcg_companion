@@ -9,7 +9,6 @@ import 'package:fftcg_companion/shared/widgets/google_sign_in_button.dart';
 import 'package:fftcg_companion/shared/widgets/app_bar_factory.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 import 'package:fftcg_companion/shared/widgets/styled_button.dart';
-import 'package:fftcg_companion/shared/widgets/themed_logo.dart';
 
 class AuthPage extends ConsumerStatefulWidget {
   const AuthPage({super.key});
@@ -418,7 +417,23 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 16),
-                    const ThemedLogo(height: 120),
+                    // Logo with rounded rectangle container using primary color
+                    Container(
+                      width: 240,
+                      height: 240,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Center(
+                        child: Image.asset(
+                          'assets/images/logo_transparent.png',
+                          height: 200,
+                          width: 200,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 16),
 
                     // Information banner for anonymous users

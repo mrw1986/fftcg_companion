@@ -69,71 +69,7 @@ class AccountInfoCard extends StatelessWidget {
             ),
             const Divider(height: 24),
 
-            // Email with verification status
-            ListTile(
-              leading: Icon(
-                Icons.email_outlined,
-                color: colorScheme.secondary,
-              ),
-              title: const Text('Email'),
-              subtitle: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      user!.email ?? 'No email',
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  if (isEmailNotVerified)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Unverified',
-                        style: TextStyle(
-                          color: colorScheme.onErrorContainer,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              trailing: user!.email != null &&
-                      !user!.isAnonymous &&
-                      !isEmailNotVerified &&
-                      hasPassword
-                  ? TextButton.icon(
-                      onPressed: onToggleChangeEmail,
-                      icon: Icon(
-                        showChangeEmail ? Icons.close : Icons.edit,
-                        size: 16,
-                      ),
-                      label: Text(
-                        showChangeEmail ? 'Cancel' : 'Change',
-                        style: TextStyle(
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      style: TextButton.styleFrom(
-                        foregroundColor: colorScheme.primary,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
-
             if (showChangeEmail) ...[
-              const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: ProfileEmailUpdate(
@@ -142,9 +78,8 @@ class AccountInfoCard extends StatelessWidget {
                   isLoading: isLoading,
                 ),
               ),
+              const SizedBox(height: 16),
             ],
-
-            const SizedBox(height: 16),
 
             // Authentication Methods section
             Row(
@@ -174,6 +109,9 @@ class AccountInfoCard extends StatelessWidget {
               onLinkWithGoogle: onLinkWithGoogle,
               onLinkWithEmailPassword: onLinkWithEmailPassword,
               onShowLinkEmailPasswordDialog: onToggleChangeEmail,
+              showChangeEmail: showChangeEmail,
+              onToggleChangeEmail: onToggleChangeEmail,
+              isEmailNotVerified: isEmailNotVerified,
             ),
 
             // Reset password option for password users

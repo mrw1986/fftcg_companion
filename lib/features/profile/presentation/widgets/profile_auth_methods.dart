@@ -15,6 +15,9 @@ class ProfileAuthMethods extends ConsumerWidget {
     required this.onLinkWithGoogle,
     required this.onLinkWithEmailPassword,
     required this.onShowLinkEmailPasswordDialog,
+    this.showChangeEmail = false,
+    required this.onToggleChangeEmail,
+    required this.isEmailNotVerified,
   });
 
   final User? user;
@@ -22,6 +25,9 @@ class ProfileAuthMethods extends ConsumerWidget {
   final Future<void> Function() onLinkWithGoogle;
   final Function(String, String) onLinkWithEmailPassword;
   final VoidCallback onShowLinkEmailPasswordDialog;
+  final bool showChangeEmail;
+  final VoidCallback onToggleChangeEmail;
+  final bool isEmailNotVerified;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -95,17 +101,51 @@ class ProfileAuthMethods extends ConsumerWidget {
                                 color: colorScheme.onSurface,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Password authentication is enabled',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: colorScheme.onSurfaceVariant,
+                            if (isEmailNotVerified)
+                              Container(
+                                margin: const EdgeInsets.only(top: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.errorContainer,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'Unverified',
+                                  style: TextStyle(
+                                    color: colorScheme.onErrorContainer,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),
+                      if (user!.email != null &&
+                          !user!.isAnonymous &&
+                          !isEmailNotVerified &&
+                          hasPassword)
+                        TextButton.icon(
+                          onPressed: onToggleChangeEmail,
+                          icon: Icon(
+                            showChangeEmail ? Icons.close : Icons.edit,
+                            size: 16,
+                          ),
+                          label: Text(
+                            showChangeEmail ? 'Cancel' : 'Change',
+                            style: TextStyle(
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor: colorScheme.primary,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                          ),
+                        ),
                       if (providers.length > 1)
                         IconButton(
                           icon: Icon(
@@ -136,25 +176,12 @@ class ProfileAuthMethods extends ConsumerWidget {
                   padding: const EdgeInsets.all(12.0),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 2,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        child: SvgPicture.asset(
-                          Theme.of(context).brightness == Brightness.dark
-                              ? 'assets/images/google_branding/signin-assets/android_dark_rd_na.svg'
-                              : 'assets/images/google_branding/signin-assets/android_neutral_rd_na.svg',
-                          height: 20,
-                        ),
+                      SvgPicture.asset(
+                        Theme.of(context).brightness == Brightness.dark
+                            ? 'assets/images/google_branding/signin-assets/android_dark_rd_na.svg'
+                            : 'assets/images/google_branding/signin-assets/android_neutral_rd_na.svg',
+                        height: 36,
+                        width: 36,
                       ),
                       const SizedBox(width: 16),
                       Expanded(

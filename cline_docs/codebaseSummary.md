@@ -2,6 +2,39 @@
 
 ## Recent Changes
 
+### UI Improvements for Authentication
+
+- Updated logo display in authentication screens:
+  - Added a primary color container with rounded corners for the logo
+  - Improved visibility in both light and dark modes
+  - Removed the need for color inversion filters in light mode
+  - Enhanced visual consistency across the app
+  - Files updated:
+    - lib/features/profile/presentation/pages/login_page.dart
+    - lib/features/profile/presentation/pages/register_page.dart
+    - lib/features/profile/presentation/pages/auth_page.dart
+
+### Authentication Methods UI Improvements
+
+- Updated Google authentication icon in profile page:
+  - Improved compliance with Google's branding guidelines
+  - Used official SVG assets for the Google icon
+  - Increased icon size for better visibility (36x36)
+  - Removed unnecessary container and shadow effects
+  - Simplified the UI while maintaining brand compliance
+  - Files updated:
+    - lib/features/profile/presentation/widgets/profile_auth_methods.dart
+
+### Email Display Simplification
+
+- Removed redundant email display under "Account Information":
+  - Simplified UI by removing duplicate email information
+  - Kept email display only under "Authentication Methods"
+  - Improved visual hierarchy and reduced clutter
+  - Files updated:
+    - lib/features/profile/presentation/widgets/account_info_card.dart
+    - lib/features/profile/presentation/widgets/profile_auth_methods.dart
+
 ### Color Handling Improvements
 
 - Updated all instances of `withAlpha()` to use the modern `withValues(alpha: value)` approach:
@@ -209,12 +242,14 @@
   - Now properly links anonymous accounts using linkWithCredential
   - Provides error handling for existing accounts
   - Handles 'provider-already-linked' error case
+  - Features improved logo display with primary color container
 
 - **RegisterPage** (lib/features/profile/presentation/pages/register_page.dart)
   - Handles user registration with email/password and Google
   - Now properly links anonymous accounts using linkWithEmailAndPassword and linkWithGoogle
   - Provides consistent UI text for account linking
   - Properly navigates to profile page after successful Google sign-in
+  - Features improved logo display with primary color container
 
 - **ResetPasswordPage** (lib/features/profile/presentation/pages/reset_password_page.dart)
   - Handles password reset requests
@@ -225,6 +260,7 @@
   - Manages user account settings
   - Handles account deletion with proper state reset
   - Now properly signs out and navigates back to profile page after account deletion
+  - Features improved authentication methods display with proper Google branding
 
 ### Data Flow
 
@@ -294,7 +330,16 @@
 
 ### Recent Significant Changes
 
-1. Security Enhancements
+1. UI Improvements for Authentication
+   - Added primary color container with rounded corners for the logo in authentication screens
+   - Improved logo visibility in both light and dark modes
+   - Removed color inversion filters in light mode
+   - Enhanced visual consistency across the app
+   - Updated Google authentication icon in profile page to comply with Google's branding guidelines
+   - Simplified the authentication methods UI while maintaining brand compliance
+   - Removed redundant email display under "Account Information"
+
+2. Security Enhancements
    - Replaced hard-coded admin emails with a role-based access control system
    - Enhanced data validation in Firestore security rules
    - Added protection against data manipulation in deck and collection rules
@@ -306,21 +351,21 @@
    - Created migration script for setting up the admin collection
    - Updated user model to include collection count tracking
 
-2. Google Authentication Flow Improvements
+3. Google Authentication Flow Improvements
    - Fixed issues with Google authentication flow:
      - Updated register_page.dart to properly navigate to the profile page after successful Google sign-in
      - Modified auth_service.dart to sign out and sign in with Google when encountering the 'provider-already-linked' error
      - Updated login_page.dart to handle the 'provider-already-linked' error case
      - This ensures users are properly logged in after creating an account with Google and can sign in with Google after creating an account
 
-3. Account Deletion Flow Improvements
+4. Account Deletion Flow Improvements
    - Fixed issue where users still saw their display name and sign out option after account deletion:
      - Modified the _deleteAccount method in account_settings_page.dart to sign out the user after successful account deletion
      - Added navigation back to the profile page after account deletion
      - Updated the _reauthenticateAndDeleteAccount method to do the same for cases where re-authentication is required
      - This ensures that after account deletion, the user's state is reset to a blank slate and they are redirected to the default Profile screen
 
-4. Anonymous User Authentication Flow Improvements
+5. Anonymous User Authentication Flow Improvements
    - Fixed Forgot Password flow for anonymous users:
      - Modified reset_password_page.dart to only sign out authenticated users who are not anonymous
      - Changed the condition from `isUserAuthenticated = authState.isAuthenticated || authState.isAnonymous` to `isUserAuthenticated = authState.isAuthenticated && !authState.isAnonymous`
@@ -332,7 +377,7 @@
      - This preserves user data when an anonymous user converts to a permanent account
      - Updated UI text to be consistent with the account linking approach
 
-5. Dialog Button Readability Improvements
+6. Dialog Button Readability Improvements
    - Updated all dialog buttons to use theme's primary color for better readability
    - Added `style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.primary)` to all dialog buttons
    - Replaced ElevatedButton instances with TextButton where appropriate for consistency
@@ -345,7 +390,7 @@
    - Replaced hardcoded red color for delete confirmation with theme-based primary color
    - Improved contrast and readability across different theme settings
 
-6. Email Update Authentication Fix
+7. Email Update Authentication Fix
    - Fixed issue where users would see their old email after changing email and restarting the app
    - Modified `verifyBeforeUpdateEmail` method in `AuthService` to:
      - Store the user ID before updating email
@@ -354,7 +399,7 @@
    - Ensured consistent state between authentication and database during email updates
    - Improved user experience by maintaining email consistency across app restarts
 
-7. SnackBar Theming Consistency
+8. SnackBar Theming Consistency
    - Created centralized SnackBarHelper utility class
    - Implemented consistent Material 3 container colors:
      - primaryContainer/onPrimaryContainer for standard/success messages
@@ -366,7 +411,7 @@
      - All profile-related pages
      - Theme settings page
 
-8. AppBar and Navigation Bar Theming Consistency
+9. AppBar and Navigation Bar Theming Consistency
    - Created AppBarFactory utility class for consistent AppBar creation
    - Updated AppBar theme to use primary color consistently across the app
    - Enhanced NavigationBar theming with proper color scheme integration
@@ -378,28 +423,28 @@
      - All profile-related pages
      - Added new utility: app_bar_factory.dart
 
-9. Theme System Simplification
-   - Removed ContrastExtension dependency to simplify theme management
-   - Updated all UI components to use standard Material ColorScheme
-   - Improved theme consistency across the application
-   - Enhanced theme settings page with interactive color selection
-   - Fixed theme mode selection to properly use the selected theme color
-   - Made theme changes apply immediately throughout the app
+10. Theme System Simplification
+    - Removed ContrastExtension dependency to simplify theme management
+    - Updated all UI components to use standard Material ColorScheme
+    - Improved theme consistency across the application
+    - Enhanced theme settings page with interactive color selection
+    - Fixed theme mode selection to properly use the selected theme color
+    - Made theme changes apply immediately throughout the app
 
-10. Profile and Account Settings Consolidation
+11. Profile and Account Settings Consolidation
     - Consolidated Profile and Account Settings pages into a single page
     - Removed redundant UI elements while maintaining all functionality
     - Updated navigation to remove the separate account page route
     - Improved user experience by having all settings in one place
     - Fixed related issues to ensure a seamless experience
 
-11. Email Verification
+12. Email Verification
     - Added proper token refresh
     - Improved UI updates
     - Enhanced error handling
     - Better user feedback
 
-12. Account Management
+13. Account Management
     - Added confirmation dialogs
     - Improved re-authentication flow:
       - Added dedicated re-authentication dialog with clear explanations
@@ -415,22 +460,22 @@
       - Added `updateUserEmail` method to `UserRepository`.
       - Called `updateUserEmail` in `AuthService.verifyBeforeUpdateEmail` after successful verification.
 
-13. UI Improvements
+14. UI Improvements
     - Consistent dialog styling
     - Better error presentation with specific messages
     - Improved loading states
     - Enhanced user feedback throughout sensitive operations
 
-14. Fixed Multiple UI Refreshes
+15. Fixed Multiple UI Refreshes
     - Removed redundant navigation calls in `email_verification_checker.dart` to prevent multiple UI refreshes after email verification.
 
-15. Code Organization
+16. Code Organization
     - Refactored profile page into smaller, more focused components
     - Improved separation of concerns
     - Enhanced maintainability with smaller files
     - Better state management between components
 
-16. Profile UI Cleanup
+17. Profile UI Cleanup
     - Removed "Continue with Google" button from the Profile page for anonymous users
     - Simplified the UI for anonymous users
     - Reduced redundancy as users can still sign in with Google from the login page

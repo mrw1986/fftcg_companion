@@ -95,9 +95,9 @@ flutter:
     - assets/images/google_branding/signin-assets/
 
 flutter_launcher_icons:
-  android: "ic_launcher"
+  android: false
   ios: true
-  image_path: "assets/images/logo_transparent.png"
+  image_path: "assets/images/logo_transparent_black.png"
   min_sdk_android: 21
   remove_alpha_ios: true
   web:

@@ -6,7 +6,7 @@ import 'package:fftcg_companion/core/utils/logger.dart';
 /// See: https://developers.google.com/identity/branding-guidelines
 class GoogleSignInButton extends StatelessWidget {
   /// The callback when the button is pressed
-  final Future<void> Function() onPressed;
+  final Future<void> Function()? onPressed;
 
   /// The text to display on the button
   final String text;
@@ -33,7 +33,7 @@ class GoogleSignInButton extends StatelessWidget {
 }
 
 class _GoogleSignInButtonState extends StatefulWidget {
-  final Future<void> Function() onPressed;
+  final Future<void> Function()? onPressed;
   final String text;
   final Function(Exception)? onError;
 
@@ -58,10 +58,10 @@ class _GoogleSignInButtonStateState extends State<_GoogleSignInButtonState> {
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    // Use the specified Google logo assets
+    // Use the specified Google logo assets (contained version)
     final String logoAssetPath = isDark
-        ? 'assets/images/google_branding/signin-assets/android_dark_rd_na.svg'
-        : 'assets/images/google_branding/signin-assets/android_neutral_rd_na.svg';
+        ? 'assets/images/google_branding/signin-assets/android_dark_rd_ctn.svg'
+        : 'assets/images/google_branding/signin-assets/android_neutral_rd_ctn.svg';
 
     if (_isLoading) {
       return Center(
@@ -107,7 +107,9 @@ class _GoogleSignInButtonStateState extends State<_GoogleSignInButtonState> {
 
               try {
                 talker.debug('Google Sign-In button pressed');
-                await widget.onPressed();
+                if (widget.onPressed != null) {
+                  await widget.onPressed!();
+                }
               } catch (e) {
                 talker.error('Error in Google Sign-In button: $e');
                 setState(() {
@@ -125,56 +127,9 @@ class _GoogleSignInButtonStateState extends State<_GoogleSignInButtonState> {
               }
             },
             borderRadius: BorderRadius.circular(8),
-            child: Container(
-              width: double.infinity,
-              height: 48,
-              decoration: BoxDecoration(
-                color: isDark ? colorScheme.surface : Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 1,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: SvgPicture.asset(
-                      logoAssetPath,
-                      height: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    widget.text,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
+            child: SvgPicture.asset(
+              logoAssetPath,
+              height: 48, // Increased size for better visibility
             ),
           ),
         ),

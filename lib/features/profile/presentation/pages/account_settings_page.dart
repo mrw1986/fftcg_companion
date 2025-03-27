@@ -414,6 +414,59 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     }
   }
 
+  Future<void> _reauthenticateWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Re-authenticate with Google
+      await ref.read(authServiceProvider).reauthenticateWithGoogle();
+
+      talker.debug('Google re-authentication successful');
+
+      // Close the re-auth dialog
+      setState(() {
+        _isLoading = false;
+        _showReauthDialog = false;
+      });
+
+      // If this was for account deletion, proceed with deletion
+      if (_isAccountDeletion) {
+        await _deleteAccount();
+      }
+      // If this was for email update, proceed with email update
+      else if (_showChangeEmail) {
+        await _updateEmail();
+      }
+      // Otherwise just show a success message
+      else {
+        if (mounted) {
+          display_name.showThemedSnackBar(
+            context: context,
+            message: 'Authentication successful',
+            isError: false,
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      // Show error message
+      if (mounted) {
+        display_name.showThemedSnackBar(
+          context: context,
+          message: e is FirebaseAuthException
+              ? ref.read(authServiceProvider).getReadableAuthError(e)
+              : e.toString(),
+          isError: true,
+        );
+      }
+    }
+  }
+
   Future<void> _reauthenticateAndDeleteAccount() async {
     if (_reauthEmailController.text.isEmpty ||
         _reauthPasswordController.text.isEmpty) {
@@ -726,6 +779,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           onAuthenticate: _isAccountDeletion
               ? _reauthenticateAndDeleteAccount
               : _reauthenticateAndContinue,
+          onGoogleAuthenticate: _reauthenticateWithGoogle,
         ),
       );
     }
