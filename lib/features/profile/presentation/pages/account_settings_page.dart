@@ -10,6 +10,7 @@ import 'package:fftcg_companion/features/profile/presentation/pages/profile_emai
 import 'package:fftcg_companion/shared/widgets/app_bar_factory.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_reauth_dialog.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
+import 'package:fftcg_companion/features/profile/presentation/widgets/profile_auth_methods.dart';
 
 class AccountSettingsPage extends ConsumerStatefulWidget {
   const AccountSettingsPage({super.key});
@@ -658,28 +659,6 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     }
   }
 
-  IconData _getProviderIcon(String providerId) {
-    switch (providerId) {
-      case 'google.com':
-        return Icons.g_mobiledata;
-      case 'password':
-        return Icons.email_outlined;
-      default:
-        return Icons.account_circle_outlined;
-    }
-  }
-
-  Color _getProviderColor(String providerId) {
-    switch (providerId) {
-      case 'google.com':
-        return Colors.blue;
-      case 'password':
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
-  }
-
   Widget _buildProfileHeader(User? user, ColorScheme colorScheme) {
     if (user == null) return const SizedBox.shrink();
 
@@ -711,7 +690,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
     final providers = user.providerData.map((e) => e.providerId).toList();
     final hasPassword = providers.contains('password');
-    final hasGoogle = providers.contains('google.com');
+    providers.contains('google.com');
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -788,37 +767,22 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
             ),
             const SizedBox(height: 8),
 
-            // Show current providers
-            ...user.providerData.map((provider) {
-              return ListTile(
-                title: Text(_getProviderDisplayName(provider.providerId)),
-                subtitle: Text(provider.email ?? 'No email'),
-                leading: Icon(
-                  _getProviderIcon(provider.providerId),
-                  color: _getProviderColor(provider.providerId),
-                ),
-                trailing: user.providerData.length > 1
-                    ? IconButton(
-                        icon: const Icon(Icons.link_off),
-                        onPressed: () => _unlinkProvider(provider.providerId),
-                        tooltip: 'Unlink provider',
-                      )
-                    : null,
-              );
-            }),
-
-            // Add option to link Google if only using password
-            if (!user.isAnonymous &&
-                hasPassword &&
-                !hasGoogle &&
-                user.providerData.length == 1)
-              ListTile(
-                title: const Text('Link Google Account'),
-                subtitle: const Text('Add an alternative sign-in method'),
-                leading: const Icon(Icons.g_mobiledata, color: Colors.blue),
-                trailing: const Icon(Icons.add_circle_outline),
-                onTap: _linkWithGoogle,
-              ),
+            // Use ProfileAuthMethods instead of duplicating authentication logic
+            ProfileAuthMethods(
+              user: user,
+              onUnlinkProvider: _unlinkProvider,
+              onLinkWithGoogle: _linkWithGoogle,
+              onLinkWithEmailPassword: (email, password) {
+                ref
+                    .read(authServiceProvider)
+                    .linkWithEmailAndPassword(email, password);
+              },
+              onShowLinkEmailPasswordDialog: () {
+                setState(() {
+                  _showChangeEmail = !_showChangeEmail;
+                });
+              },
+            ),
 
             // Reset password option for password users
             if (!user.isAnonymous && hasPassword)

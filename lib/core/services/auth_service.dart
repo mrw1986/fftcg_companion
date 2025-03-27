@@ -135,6 +135,7 @@ class AuthService {
   Future<UserCredential> linkWithGoogle() async {
     try {
       // Trigger the authentication flow
+      late AuthCredential credential;
       try {
         final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
         if (googleUser == null) {
@@ -149,7 +150,7 @@ class AuthService {
             await googleUser.authentication;
 
         // Create a new credential
-        final credential = GoogleAuthProvider.credential(
+        credential = GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
@@ -168,11 +169,14 @@ class AuthService {
             await signOut();
             return await signInWithGoogle();
           } else if (linkError.code == 'credential-already-in-use') {
-            // If the credential is already in use by another account, sign out and sign in with that account
+            // If the credential is already in use by another account, retrieve the existing user and sign in
             talker.debug(
-                'Credential already in use by another account, signing out and signing in with that account');
-            await signOut();
-            return await signInWithGoogle();
+                'Credential already in use by another account, retrieving existing user and signing in');
+            final existingUserCredential =
+                await _auth.signInWithCredential(credential);
+            await _userRepository
+                .createUserFromAuth(existingUserCredential.user!);
+            return existingUserCredential;
           }
         }
         rethrow;

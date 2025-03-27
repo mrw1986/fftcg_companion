@@ -206,7 +206,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         }
       } else {
         // Otherwise sign in with Google
-        talker.debug('Register page: Creating new account with Google');
+        talker.debug(
+            'Register page: Checking if user already exists before Google Sign-In');
+        final wasAuthenticated = authState.isAuthenticated;
+
         await authService.signInWithGoogle();
         talker.debug('Register page: Google Sign-In successful');
 
@@ -214,16 +217,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         if (mounted) {
           context.go('/profile');
         }
-      }
 
-      if (mounted) {
-        // Show success message with action button
-        showThemedSnackBar(
-          context: context,
-          message: 'Account created successfully with Google',
-          isError: false,
-          duration: const Duration(seconds: 5),
-        );
+        // Show success message only if the user was not previously authenticated
+        if (mounted && !wasAuthenticated) {
+          showThemedSnackBar(
+            context: context,
+            message: 'Account created successfully with Google',
+            isError: false,
+            duration: const Duration(seconds: 5),
+          );
+        }
       }
     } catch (e) {
       setState(() {
