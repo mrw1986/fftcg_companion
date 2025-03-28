@@ -4,10 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
+// Removed unused import: import 'package:fftcg_companion/features/profile/presentation/widgets/link_accounts_dialog.dart';
 import 'package:fftcg_companion/shared/widgets/google_sign_in_button.dart';
 import 'package:fftcg_companion/shared/widgets/app_bar_factory.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 import 'package:fftcg_companion/shared/widgets/styled_button.dart';
+// Import AuthException and skipAutoAuthProvider
+import 'package:fftcg_companion/core/services/auth_service.dart';
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
@@ -23,6 +26,9 @@ void showThemedSnackBar({
   required bool isError,
   Duration duration = const Duration(seconds: 4),
 }) {
+  // Ensure context is still valid before showing snackbar
+  if (!context.mounted) return;
+
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
 
@@ -45,7 +51,10 @@ void showThemedSnackBar({
             ? colorScheme.onErrorContainer
             : colorScheme.onPrimaryContainer,
         onPressed: () {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          // Ensure context is still valid before hiding snackbar
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          }
         },
       ),
     ),
@@ -105,7 +114,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       if (authState.isAnonymous) {
         talker.debug(
             'Register page: Linking anonymous account with email/password');
-        await authService.linkWithEmailAndPassword(
+        // Corrected method call
+        await authService.linkEmailAndPasswordToAnonymous(
           _emailController.text.trim(),
           _passwordController.text,
         );
@@ -136,30 +146,32 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
       // Show user-friendly error message as SnackBar
       if (mounted) {
-        String errorMessage = 'Failed to create account';
+        String errorMessage = 'Failed to create account'; // Default message
+        bool showErrorSnackbar =
+            true; // Flag to control showing the final snackbar
 
-        if (e is FirebaseAuthException) {
-          final authService = ref.read(authServiceProvider);
-          errorMessage = authService.getReadableAuthError(e);
-
+        if (e is AuthException) {
+          // Catch custom AuthException first
+          errorMessage = e.message; // Use the message from AuthException
           talker.error('Error creating account: ${e.code} - ${e.message}');
 
           // Special handling for email-already-in-use error
           if (e.code == 'email-already-in-use') {
-            // Set a more specific error message
-            errorMessage =
-                'An account with this email address already exists. Please sign in instead.';
+            // Overwrite message for this specific case (though not strictly needed as dialog shows info)
+            // errorMessage =
+            //     'An account with this email address already exists. Please sign in instead.';
 
-            // Show the snackbar first
-            showThemedSnackBar(
-              context: context,
-              message: errorMessage,
-              isError: true,
-              duration: const Duration(seconds: 5),
-            );
+            // Don't show the snackbar, just show the dialog
+            // showThemedSnackBar(
+            //   context: context,
+            //   message: errorMessage,
+            //   isError: true,
+            //   duration: const Duration(seconds: 5),
+            // );
 
-            // Then show a dialog with options
-            Future.delayed(const Duration(milliseconds: 500), () {
+            // Show a dialog with options
+            Future.delayed(const Duration(milliseconds: 100), () {
+              // Reduced delay slightly
               if (mounted) {
                 showDialog(
                   context: context,
@@ -201,19 +213,24 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               }
             });
 
-            // Return early to avoid showing the snackbar twice
-            return;
+            showErrorSnackbar =
+                false; // Don't show the final snackbar for this case
           }
         } else {
+          // Handle non-AuthException errors
           talker.error('Error creating account: $e');
+          errorMessage = 'An unexpected error occurred. Please try again.';
         }
 
-        showThemedSnackBar(
-          context: context,
-          message: errorMessage,
-          isError: true,
-          duration: const Duration(seconds: 5),
-        );
+        // Show snackbar only if it wasn't handled by the special 'email-already-in-use' case
+        if (showErrorSnackbar) {
+          showThemedSnackBar(
+            context: context,
+            message: errorMessage,
+            isError: true,
+            duration: const Duration(seconds: 5),
+          );
+        }
       }
     }
   }
@@ -232,34 +249,58 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       if (authState.isAnonymous) {
         talker.debug('Register page: Linking anonymous account with Google');
         try {
-          await authService.linkWithGoogle();
+          // Corrected method call
+          await authService.linkGoogleToAnonymous();
           talker.debug('Register page: Google linking successful');
 
           // Navigate to profile page after successful linking
-          // if (mounted) {
-          //   context.go('/profile'); // Rely on router redirect via authStateProvider
-          // }
+          if (mounted) {
+            context.go('/profile'); // Navigate after successful link
+          }
         } catch (linkError) {
-          // If the credential is already linked to another account, sign out and sign in with Google
-          if (linkError is FirebaseAuthException &&
-              (linkError.code == 'credential-already-in-use' ||
-                  linkError.code == 'provider-already-linked')) {
-            talker.debug(
-                'Register page: Google account exists, signing out anonymous user and signing in with existing Google account');
-            await authService.signOut();
-            await authService.signInWithGoogle();
-
-            // Navigate to profile page after successful sign-in
-            // if (mounted) {
-            //   context.go('/profile'); // Rely on router redirect via authStateProvider
-            // }
+          // Catch AuthException specifically for linking errors handled by AuthService
+          if (linkError is AuthException) {
+            talker.warning(
+                'Register page: Google link failed - ${linkError.code}: ${linkError.message}');
+            if (mounted) {
+              // Show specific message from AuthException
+              showThemedSnackBar(
+                context: context,
+                message: linkError.message,
+                isError: true,
+                duration: const Duration(seconds: 8),
+              );
+              setState(() {
+                _isLoading = false;
+              });
+              return; // Stop further processing
+            }
+          }
+          // Catch potential FirebaseAuthException if not handled by AuthService (less likely now)
+          else if (linkError is FirebaseAuthException) {
+            talker.error(
+                'FirebaseAuthException during Google link: ${linkError.code}');
+            if (mounted) {
+              final authService = ref.read(authServiceProvider);
+              showThemedSnackBar(
+                context: context,
+                message: authService.getReadableAuthError(
+                    linkError.code, linkError.message),
+                isError: true,
+                duration: const Duration(seconds: 8),
+              );
+              setState(() {
+                _isLoading = false;
+              });
+              return;
+            }
           } else {
-            // Rethrow other errors
+            // Rethrow other non-FirebaseAuthException errors
             rethrow;
           }
         }
       } else {
-        // Otherwise sign in with Google
+        // Otherwise (not anonymous), sign in/register with Google
         talker.debug(
             'Register page: Checking if user already exists before Google Sign-In');
         final wasAuthenticated = authState.isAuthenticated;
@@ -280,7 +321,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
           // Navigate to profile page after successful sign-in
           if (mounted) {
-            // context.go('/profile'); // Rely on router redirect via authStateProvider
+            context.go(
+                '/profile'); // Navigate after successful sign-in/registration
 
             // Only show success message if this appears to be a new account
             if (isNewAccount) {
@@ -293,21 +335,57 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             }
           }
         } catch (signInError) {
-          if (signInError is FirebaseAuthException) {
-            if (signInError.code == 'credential-already-in-use' ||
-                signInError.code ==
-                    'account-exists-with-different-credential') {
-              // This is an existing account, just navigate to profile page
-              talker.debug(
-                  'Register page: Existing Google account detected, signing in');
+          // Handle conflict where Google email belongs to existing Email/Password account
+          if (signInError is AuthException && // Catch AuthException
+              (signInError.code == 'account-exists-with-different-credential' ||
+                  signInError.code == 'email-already-in-use')) {
+            talker.debug(
+                'Register page: Google Sign-In failed - Email already exists with Email/Password.');
 
-              // Navigate to profile page after successful sign-in
-              // if (mounted) {
-              //   context.go('/profile'); // Rely on router redirect via authStateProvider
-              // }
-            } else {
-              // Rethrow other errors to be caught by the outer catch block
-              rethrow;
+            if (mounted) {
+              // Show a dialog explaining the situation and guiding user to sign in
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  final theme = Theme.of(context);
+                  final colorScheme = theme.colorScheme;
+
+                  return AlertDialog(
+                    title: Text(
+                      'Account Already Exists',
+                      style: TextStyle(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    // Use the specific message from the exception
+                    content: Text(signInError.message),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: colorScheme.primary,
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          context.go('/profile/auth'); // Go to Sign In page
+                        },
+                        child: const Text('Sign In'),
+                      ),
+                    ],
+                  );
+                },
+              );
+              // Stop loading
+              setState(() {
+                _isLoading = false;
+              });
+              return; // Stop further processing
             }
           } else {
             // Rethrow other errors to be caught by the outer catch block
@@ -323,18 +401,28 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       // Show user-friendly error message as SnackBar
       if (mounted) {
         String errorMessage = 'Failed to sign in with Google';
+        bool isError = true; // Default to error
 
-        if (e is FirebaseAuthException) {
+        if (e is AuthException) {
+          // Catch AuthException first
+          errorMessage = e.message;
+          isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled';
+        } else if (e is FirebaseAuthException) {
+          // Fallback for direct FirebaseAuthException
           final authService = ref.read(authServiceProvider);
-          errorMessage = authService.getReadableAuthError(e);
+          errorMessage = authService.getReadableAuthError(e.code, e.message);
+          isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled';
         } else if (e.toString().contains('sign in was cancelled')) {
           errorMessage = 'Google sign-in was cancelled';
+          isError = false; // Not an error
+        } else {
+          errorMessage = e.toString(); // Fallback for other errors
         }
 
         showThemedSnackBar(
           context: context,
           message: errorMessage,
-          isError: true,
+          isError: isError, // Use the flag determined above
           duration: const Duration(seconds: 10),
         );
       }
@@ -644,11 +732,38 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           onError: (e) {
                             talker.error(
                                 'Google Sign-In error in register page: $e');
-                            // Show a more detailed error message
+
+                            // Show a user-friendly error message
+                            String errorMessage =
+                                'Failed to sign in with Google';
+                            bool isError = true; // Default to error
+
+                            if (e is AuthException) {
+                              // Catch AuthException first
+                              errorMessage = e.message;
+                              isError = e.code != 'cancelled' &&
+                                  e.code != 'sign-in-cancelled';
+                            } else if (e is FirebaseAuthException) {
+                              // Fallback for direct FirebaseAuthException
+                              final authService = ref.read(authServiceProvider);
+                              errorMessage = authService.getReadableAuthError(
+                                  e.code, e.message);
+                              isError = e.code != 'cancelled' &&
+                                  e.code != 'sign-in-cancelled';
+                            } else if (e
+                                .toString()
+                                .contains('sign in was cancelled')) {
+                              errorMessage = 'Google sign-in was cancelled';
+                              isError = false; // Not an error
+                            } else {
+                              errorMessage =
+                                  e.toString(); // Fallback for other errors
+                            }
+
                             showThemedSnackBar(
                               context: context,
-                              message: 'Google Sign-In failed: ${e.toString()}',
-                              isError: true,
+                              message: errorMessage,
+                              isError: isError, // Use the flag determined above
                               duration: const Duration(seconds: 10),
                             );
                           },

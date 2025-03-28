@@ -62,10 +62,10 @@ class ProfileAuthSection extends ConsumerWidget {
               margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: colorScheme.errorContainer,
+                color: colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: colorScheme.error,
+                  color: colorScheme.primary,
                   width: 1,
                 ),
               ),
@@ -74,14 +74,13 @@ class ProfileAuthSection extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded,
-                          color: colorScheme.error),
+                      Icon(Icons.mark_email_read, color: colorScheme.primary),
                       const SizedBox(width: 8),
                       Text(
-                        'Email Not Verified',
+                        'Verification Email Sent',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: colorScheme.error,
+                          color: colorScheme.primary,
                         ),
                       ),
                     ],
@@ -89,22 +88,18 @@ class ProfileAuthSection extends ConsumerWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Please check your email and verify your account. A verification email has been sent to ${user.email}. You will be signed out until you verify your email.',
-                    style: TextStyle(color: colorScheme.onErrorContainer),
+                    style: TextStyle(color: colorScheme.onPrimaryContainer),
                   ),
                   const SizedBox(height: 16),
                   Center(
                     child: StyledButton(
                       onPressed: () async {
                         // Resend verification email
-
-                        // Show loading indicator
                         final scaffoldMessenger = ScaffoldMessenger.of(context);
-                        scaffoldMessenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('Sending verification email...'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
+                        // Clear any previous snackbars immediately
+                        scaffoldMessenger.clearSnackBars();
+
+                        // Removed the initial "Sending..." snackbar
 
                         try {
                           await ref
@@ -148,9 +143,9 @@ class ProfileAuthSection extends ConsumerWidget {
                         }
                       },
                       text: 'Resend Verification Email',
-                      // Use a fixed color that works well with the red background
-                      backgroundColor: colorScheme.surface,
-                      textColor: colorScheme.error,
+                      // Use colors that match the primary container
+                      backgroundColor: colorScheme.primary,
+                      textColor: colorScheme.onPrimary,
                     ),
                   ),
                 ],

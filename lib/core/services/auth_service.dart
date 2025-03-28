@@ -1,26 +1,19 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:fftcg_companion/features/profile/data/repositories/user_repository.dart';
+import 'package:flutter/foundation.dart'; // Required for kReleaseMode
 
 /// Enum for categorizing authentication errors
 enum AuthErrorCategory {
-  /// Authentication errors (wrong password, user not found, etc.)
-  authentication,
-
-  /// Network errors (timeout, no internet, etc.)
-  network,
-
-  /// Permission errors (insufficient permissions, etc.)
-  permission,
-
-  /// Validation errors (invalid email, weak password, etc.)
-  validation,
-
-  /// Unknown errors
-  unknown
+  authentication, // Wrong password, user not found, requires-recent-login
+  network, // Timeout, network request failed
+  permission, // Operation not allowed, user disabled
+  validation, // Invalid email, weak password, email-already-in-use
+  conflict, // Credential already in use, provider already linked
+  cancelled, // Sign in cancelled by user
+  unknown, // Other errors
 }
 
 /// Custom exception for authentication errors
@@ -38,562 +31,782 @@ class AuthException implements Exception {
   });
 
   @override
-  String toString() => 'AuthException: [$code] $message';
+  String toString() => message; // User-facing message
 }
 
-/// Service for handling Firebase Authentication operations
+/// Service for handling Firebase Authentication operations, rebuilt for simplicity.
 class AuthService {
   final FirebaseAuth _auth;
   final GoogleSignIn _googleSignIn;
   final UserRepository _userRepository;
-  final talker = Talker();
+  final Talker talker;
   final Duration _timeout = const Duration(seconds: 30);
 
   AuthService()
       : _auth = FirebaseAuth.instance,
         _googleSignIn = GoogleSignIn(),
-        _userRepository = UserRepository();
+        _userRepository = UserRepository(),
+        talker = Talker();
 
-  /// Get the current user
+  /// Get the current authenticated user.
   User? get currentUser => _auth.currentUser;
 
-  /// Stream of auth state changes
+  /// Stream of authentication state changes.
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  //
-  // Core Authentication Methods
-  //
+  // --- Core Sign-in/Registration Methods ---
 
-  /// Sign in with email and password
+  /// Signs in a user anonymously. Creates a corresponding Firestore document.
+  Future<UserCredential> signInAnonymously() async {
+    talker.info('Attempting anonymous sign-in...');
+    try {
+      final userCredential = await _auth.signInAnonymously().timeout(_timeout);
+      talker.info('Anonymous sign-in successful: ${userCredential.user?.uid}');
+      if (userCredential.user != null) {
+        await _userRepository.createUserFromAuth(userCredential.user!);
+      }
+      return userCredential;
+    } catch (e) {
+      talker.error('Anonymous sign-in failed: $e');
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Signs in a user with email and password. Updates Firestore document on success.
   Future<UserCredential> signInWithEmailAndPassword(
       String email, String password) async {
+    talker.info('Attempting email/password sign-in for: $email');
     try {
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      await _userRepository.createUserFromAuth(userCredential.user!);
+      final userCredential = await _auth
+          .signInWithEmailAndPassword(email: email, password: password)
+          .timeout(_timeout);
+      talker.info(
+          'Email/password sign-in successful: ${userCredential.user?.uid}');
+      // Reload to ensure latest state (e.g., emailVerified) is fetched
+      await userCredential.user?.reload();
+      final refreshedUser = _auth.currentUser;
+      if (refreshedUser != null) {
+        await _userRepository.createUserFromAuth(refreshedUser);
+      }
+      // Return the original credential as it contains the user object
       return userCredential;
     } catch (e) {
+      talker.error('Email/password sign-in failed: $e');
       throw _handleAuthException(e);
     }
   }
 
-  /// Create a new user with email and password
+  /// Creates a new user with email and password, sends verification email, and creates Firestore document.
   Future<UserCredential> createUserWithEmailAndPassword(
       String email, String password) async {
+    talker.info('Attempting to create email/password user for: $email');
     try {
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password)
+          .timeout(_timeout);
+      talker.info(
+          'Email/password user creation successful: ${userCredential.user?.uid}');
 
-      // Send verification email
+      // Send verification email (best effort)
       try {
-        await userCredential.user!.sendEmailVerification().timeout(_timeout);
-        talker.info('Verification email sent to ${userCredential.user!.email}');
+        await userCredential.user?.sendEmailVerification().timeout(_timeout);
+        talker.info('Verification email sent to: $email');
       } catch (verificationError) {
-        talker.error('Error sending verification email: $verificationError');
-        // Continue with account creation but log the error
+        talker.error(
+            'Failed to send verification email (non-fatal): $verificationError');
+        // Proceed even if email sending fails
       }
 
-      await _userRepository.createUserFromAuth(userCredential.user!);
+      if (userCredential.user != null) {
+        await _userRepository.createUserFromAuth(userCredential.user!);
+      }
       return userCredential;
     } catch (e) {
+      talker.error('Email/password user creation failed: $e');
       throw _handleAuthException(e);
     }
   }
 
-  /// Sign in with Google
+  /// Signs in or registers a user with Google. Creates/updates Firestore document.
   Future<UserCredential> signInWithGoogle() async {
+    talker.info('Attempting Google sign-in...');
     try {
-      // Trigger the authentication flow
+      // Start Google sign-in flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        throw FirebaseAuthException(
-          code: 'sign-in-cancelled',
-          message: 'Google sign in was cancelled.',
-        );
+        talker.info('Google sign-in cancelled by user.');
+        throw AuthException(
+            code: 'cancelled',
+            message: 'Google sign-in was cancelled.',
+            category: AuthErrorCategory.cancelled);
       }
+      talker.debug('Google user obtained: ${googleUser.email}');
 
-      // Obtain the auth details from the request
+      // Obtain Google auth details
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
-
-      // Create a new credential
-      final credential = GoogleAuthProvider.credential(
+      final AuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
+      talker.debug('Google credential created.');
 
-      // Sign in to Firebase with the credential
-      final userCredential = await _auth.signInWithCredential(credential);
-      await _userRepository.createUserFromAuth(userCredential.user!);
+      // Sign in to Firebase with Google credential
+      final userCredential =
+          await _auth.signInWithCredential(credential).timeout(_timeout);
+      talker.info(
+          'Firebase sign-in with Google successful: ${userCredential.user?.uid}');
+
+      // Reload to ensure latest state is fetched
+      await userCredential.user?.reload();
+      final refreshedUser = _auth.currentUser;
+      if (refreshedUser != null) {
+        await _userRepository.createUserFromAuth(refreshedUser);
+      }
       return userCredential;
     } catch (e) {
+      // Handle potential conflict where Google email matches existing Email/Password account
+      if (e is FirebaseAuthException &&
+          (e.code == 'account-exists-with-different-credential' ||
+              e.code == 'email-already-in-use')) {
+        talker.warning(
+            'Google sign-in conflict: Email exists with different credential. $e');
+        // Sign out from Google to allow potential linking later if needed
+        await _googleSignIn.signOut();
+        // Rethrow a specific error for the UI to handle (e.g., prompt user to sign in with email/pass first)
+        throw AuthException(
+          code: e.code, // Keep original code for potential UI logic
+          message:
+              'An account already exists with this email using a different sign-in method. Please sign in with your original method first.',
+          category: AuthErrorCategory.conflict,
+          originalException: e,
+        );
+      }
+      talker.error('Google sign-in failed: $e');
       throw _handleAuthException(e);
     }
   }
 
-  /// Sign in anonymously
-  Future<UserCredential> signInAnonymously() async {
-    try {
-      final userCredential = await _auth.signInAnonymously();
-      await _userRepository.createUserFromAuth(userCredential.user!);
-      return userCredential;
-    } catch (e) {
-      throw _handleAuthException(e);
-    }
-  }
+  // --- Account Linking Methods ---
 
-  /// Sign out
-  Future<void> signOut() async {
-    try {
-      await _googleSignIn.signOut();
-      await _auth.signOut();
-    } catch (e) {
-      throw _handleAuthException(e);
-    }
-  }
-
-  //
-  // Account Linking Methods
-  //
-
-  /// Link anonymous account with email and password
-  Future<UserCredential> linkWithEmailAndPassword(
+  /// Links Email/Password credentials to the currently signed-in anonymous user.
+  Future<UserCredential> linkEmailAndPasswordToAnonymous(
       String email, String password) async {
+    talker.info('Attempting to link Email/Password to anonymous user...');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || !currentUser.isAnonymous) {
+      talker.error('Link failed: No anonymous user is signed in.');
+      throw AuthException(
+          code: 'not-anonymous',
+          message: 'No anonymous user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
+
     try {
-      talker.debug('Linking anonymous account with email/password');
+      final credential =
+          EmailAuthProvider.credential(email: email, password: password);
+      final userCredential =
+          await currentUser.linkWithCredential(credential).timeout(_timeout);
+      talker.info(
+          'Successfully linked Email/Password to anonymous user: ${userCredential.user?.uid}');
 
-      // Store the current displayName before linking
-      final currentUser = _auth.currentUser;
-      final currentDisplayName = currentUser?.displayName;
-
-      final credential = EmailAuthProvider.credential(
-        email: email,
-        password: password,
-      );
-
-      // Try to link the account
-      UserCredential userCredential;
+      // Send verification email (best effort)
       try {
-        // Try to link directly - if the email exists, we'll get an error
-        userCredential =
-            await _auth.currentUser!.linkWithCredential(credential);
-      } catch (linkError) {
-        talker.error('Error linking with email/password: $linkError');
-
-        if (linkError is FirebaseAuthException) {
-          switch (linkError.code) {
-            case 'provider-already-linked':
-              throw FirebaseAuthException(
-                code: 'provider-already-linked',
-                message: 'This email is already linked to your account.',
-              );
-            case 'invalid-credential':
-              throw FirebaseAuthException(
-                code: 'invalid-credential',
-                message:
-                    'The email/password combination is invalid. Please try again.',
-              );
-            case 'credential-already-in-use':
-            case 'email-already-in-use':
-              // Try to sign in with the existing account
-              try {
-                await signOut();
-                return await signInWithEmailAndPassword(email, password);
-              } catch (signInError) {
-                if (signInError is FirebaseAuthException &&
-                    signInError.code == 'wrong-password') {
-                  throw FirebaseAuthException(
-                    code: 'account-exists',
-                    message:
-                        'An account already exists with this email. Please sign in with your existing password.',
-                  );
-                }
-                rethrow;
-              }
-            case 'operation-not-allowed':
-              throw FirebaseAuthException(
-                code: 'operation-not-allowed',
-                message:
-                    'Email/password accounts are not enabled. Please contact support.',
-              );
-            case 'too-many-requests':
-              throw FirebaseAuthException(
-                code: 'too-many-requests',
-                message: 'Too many attempts. Please try again later.',
-              );
-            default:
-              rethrow;
-          }
-        }
-        rethrow;
-      }
-
-      // If the user had a displayName before linking, preserve it
-      if (currentDisplayName != null && currentDisplayName.isNotEmpty) {
-        await userCredential.user!.updateDisplayName(currentDisplayName);
-      }
-
-      // Send verification email
-      try {
-        await userCredential.user!.sendEmailVerification().timeout(_timeout);
-        talker.info('Verification email sent to ${userCredential.user!.email}');
+        await userCredential.user?.sendEmailVerification().timeout(_timeout);
+        talker.info('Verification email sent after linking: $email');
       } catch (verificationError) {
         talker.error(
-            'Error sending verification email after linking: $verificationError');
-        // Continue with account linking but log the error
+            'Failed to send verification email after linking (non-fatal): $verificationError');
       }
 
-      // Update user in Firestore
-      await _userRepository.createUserFromAuth(userCredential.user!);
-
-      return userCredential;
-    } catch (e) {
-      throw _handleAuthException(e);
-    }
-  }
-
-  /// Link with Google
-  Future<UserCredential> linkWithGoogle() async {
-    try {
-      // Trigger the authentication flow
-      late AuthCredential credential;
-      try {
-        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-        if (googleUser == null) {
-          throw FirebaseAuthException(
-            code: 'sign-in-cancelled',
-            message: 'Google sign in was cancelled.',
-          );
-        }
-
-        // Obtain the auth details from the request
-        final GoogleSignInAuthentication googleAuth =
-            await googleUser.authentication;
-
-        // Create a new credential
-        credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-
-        // Link the credential to the current user
-        final userCredential =
-            await _auth.currentUser!.linkWithCredential(credential);
+      if (userCredential.user != null) {
         await _userRepository.createUserFromAuth(userCredential.user!);
-        return userCredential;
-      } catch (linkError) {
-        if (linkError is FirebaseAuthException) {
-          if (linkError.code == 'provider-already-linked') {
-            // If the provider is already linked, just return the current user credential
-            talker.debug(
-                'Provider already linked to this account, signing out and signing in with Google');
-            await signOut();
-            return await signInWithGoogle();
-          } else if (linkError.code == 'credential-already-in-use') {
-            // If the credential is already in use by another account, retrieve the existing user and sign in
-            talker.debug(
-                'Credential already in use by another account, retrieving existing user and signing in');
-            final existingUserCredential =
-                await _auth.signInWithCredential(credential);
-            await _userRepository
-                .createUserFromAuth(existingUserCredential.user!);
-            return existingUserCredential;
-          }
-        }
-        rethrow;
       }
-    } catch (e) {
-      throw _handleAuthException(e);
-    }
-  }
-
-  /// Link Email/Password to an existing Google-authenticated account
-  Future<UserCredential> linkEmailPasswordToGoogleAccount(
-      String email, String password) async {
-    try {
-      talker.debug('Linking Email/Password to Google account');
-
-      // Check if the current user is authenticated with Google
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw FirebaseAuthException(
-          code: 'no-current-user',
-          message: 'No user is currently signed in.',
-        );
-      }
-
-      // Check if the user is already using Email/Password
-      final isUsingEmailPassword = currentUser.providerData
-          .any((element) => element.providerId == 'password');
-      if (isUsingEmailPassword) {
-        throw FirebaseAuthException(
-          code: 'provider-already-linked',
-          message: 'Email/Password is already linked to your account.',
-        );
-      }
-
-      // Create Email/Password credential
-      final credential = EmailAuthProvider.credential(
-        email: email,
-        password: password,
-      );
-
-      // Link the credential to the current user
-      final userCredential = await currentUser.linkWithCredential(credential);
-
-      // Update user in Firestore
-      await _userRepository.createUserFromAuth(userCredential.user!);
-
       return userCredential;
     } catch (e) {
-      throw _handleAuthException(e);
-    }
-  }
-
-  /// Unlink provider
-  Future<User> unlinkProvider(String providerId) async {
-    try {
-      final user = await _auth.currentUser?.unlink(providerId);
-      if (user == null) {
-        throw FirebaseAuthException(
-          code: 'no-current-user',
-          message: 'No user is currently signed in.',
+      // Handle case where email is already in use by another account
+      if (e is FirebaseAuthException &&
+          (e.code == 'credential-already-in-use' ||
+              e.code == 'email-already-in-use')) {
+        talker.warning('Link failed: Email/credential already in use. $e');
+        // Suggest signing in directly
+        throw AuthException(
+          code: e.code, // Keep original code
+          message:
+              'This email is already associated with another account. Please sign in directly.',
+          category: AuthErrorCategory.conflict,
+          originalException: e,
         );
       }
-      await _userRepository.createUserFromAuth(user);
-      return user;
-    } catch (e) {
+      talker.error('Failed to link Email/Password to anonymous user: $e');
       throw _handleAuthException(e);
     }
   }
 
-  //
-  // Email and Password Management
-  //
+  /// Links Google credentials to the currently signed-in anonymous user.
+  Future<UserCredential> linkGoogleToAnonymous() async {
+    talker.info('Attempting to link Google to anonymous user...');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || !currentUser.isAnonymous) {
+      talker.error('Link failed: No anonymous user is signed in.');
+      throw AuthException(
+          code: 'not-anonymous',
+          message: 'No anonymous user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
 
-  /// Send email verification
-  Future<void> sendEmailVerification() async {
     try {
-      await _auth.currentUser?.sendEmailVerification().timeout(_timeout);
+      // Start Google sign-in flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        talker.info('Google sign-in cancelled during linking.');
+        throw AuthException(
+            code: 'cancelled',
+            message: 'Google sign-in was cancelled.',
+            category: AuthErrorCategory.cancelled);
+      }
+      talker.debug('Google user obtained for linking: ${googleUser.email}');
+
+      // Obtain Google auth details
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      talker.debug('Google credential created for linking.');
+
+      // Link credential
+      final userCredential =
+          await currentUser.linkWithCredential(credential).timeout(_timeout);
+      talker.info(
+          'Successfully linked Google to anonymous user: ${userCredential.user?.uid}');
+
+      if (userCredential.user != null) {
+        await _userRepository.createUserFromAuth(userCredential.user!);
+      }
+      return userCredential;
     } catch (e) {
+      // Handle specific conflict: Anonymous user tries to link Google, but Google email belongs to existing Email/Password account
+      if (e is FirebaseAuthException &&
+          (e.code == 'credential-already-in-use' ||
+              e.code == 'email-already-in-use')) {
+        talker.warning(
+            'Link failed: Google email already associated with another account (likely Email/Password). $e');
+        // Throw a specific error code for the UI to handle
+        throw AuthException(
+          code:
+              'account-exists-with-different-credential', // Use this specific code
+          message:
+              'An account already exists with this email using Email/Password. Please sign in with Email/Password first, then link Google in settings.',
+          category: AuthErrorCategory.conflict,
+          originalException: e,
+        );
+      }
+      // Handle other linking errors
+      talker.error('Failed to link Google to anonymous user: $e');
+      throw _handleAuthException(e); // Handle other errors generically
+    }
+  }
+
+  /// Links Email/Password credentials to an existing Google-authenticated user.
+  Future<UserCredential> linkEmailPasswordToGoogle(
+      String email, String password) async {
+    talker.info('Attempting to link Email/Password to Google user...');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || currentUser.isAnonymous) {
+      talker.error(
+          'Link failed: No authenticated (non-anonymous) user is signed in.');
+      throw AuthException(
+          code: 'not-authenticated',
+          message: 'No authenticated user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
+    if (!currentUser.providerData
+        .any((p) => p.providerId == GoogleAuthProvider.PROVIDER_ID)) {
+      talker.error('Link failed: Current user is not signed in with Google.');
+      throw AuthException(
+          code: 'not-google-user',
+          message: 'Current user is not signed in with Google.',
+          category: AuthErrorCategory.authentication);
+    }
+
+    try {
+      final credential =
+          EmailAuthProvider.credential(email: email, password: password);
+      final userCredential =
+          await currentUser.linkWithCredential(credential).timeout(_timeout);
+      talker.info(
+          'Successfully linked Email/Password to Google user: ${userCredential.user?.uid}');
+
+      // Send verification email (best effort)
+      try {
+        await userCredential.user?.sendEmailVerification().timeout(_timeout);
+        talker.info('Verification email sent after linking to Google: $email');
+      } catch (verificationError) {
+        talker.error(
+            'Failed to send verification email after linking to Google (non-fatal): $verificationError');
+      }
+
+      if (userCredential.user != null) {
+        await _userRepository.createUserFromAuth(userCredential.user!);
+      }
+      return userCredential;
+    } catch (e) {
+      if (e is FirebaseAuthException) {
+        if (e.code == 'provider-already-linked') {
+          talker.warning(
+              'Link failed: Email/Password provider already linked. $e');
+          throw AuthException(
+              code: e.code,
+              message: 'Email/Password is already linked to this account.',
+              category: AuthErrorCategory.conflict,
+              originalException: e);
+        } else if (e.code == 'email-already-in-use' ||
+            e.code == 'credential-already-in-use') {
+          talker.warning(
+              'Link failed: Email/credential already in use by another account. $e');
+          throw AuthException(
+              code: e.code,
+              message: 'This email is already associated with another account.',
+              category: AuthErrorCategory.conflict,
+              originalException: e);
+        }
+      }
+      talker.error('Failed to link Email/Password to Google user: $e');
       throw _handleAuthException(e);
     }
   }
 
-  /// Send password reset email
+  /// Links Google credentials to an existing Email/Password-authenticated user.
+  Future<UserCredential> linkGoogleToEmailPassword() async {
+    talker.info('Attempting to link Google to Email/Password user...');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || currentUser.isAnonymous) {
+      talker.error(
+          'Link failed: No authenticated (non-anonymous) user is signed in.');
+      throw AuthException(
+          code: 'not-authenticated',
+          message: 'No authenticated user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
+    if (!currentUser.providerData
+        .any((p) => p.providerId == EmailAuthProvider.PROVIDER_ID)) {
+      talker.error(
+          'Link failed: Current user is not signed in with Email/Password.');
+      throw AuthException(
+          code: 'not-email-user',
+          message: 'Current user is not signed in with Email/Password.',
+          category: AuthErrorCategory.authentication);
+    }
+
+    try {
+      // Start Google sign-in flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        talker.info('Google sign-in cancelled during linking.');
+        throw AuthException(
+            code: 'cancelled',
+            message: 'Google sign-in was cancelled.',
+            category: AuthErrorCategory.cancelled);
+      }
+      talker.debug('Google user obtained for linking: ${googleUser.email}');
+
+      // Obtain Google auth details
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      talker.debug('Google credential created for linking.');
+
+      // Link credential
+      final userCredential =
+          await currentUser.linkWithCredential(credential).timeout(_timeout);
+      talker.info(
+          'Successfully linked Google to Email/Password user: ${userCredential.user?.uid}');
+
+      if (userCredential.user != null) {
+        await _userRepository.createUserFromAuth(userCredential.user!);
+      }
+      return userCredential;
+    } catch (e) {
+      if (e is FirebaseAuthException) {
+        if (e.code == 'provider-already-linked') {
+          talker.warning('Link failed: Google provider already linked. $e');
+          throw AuthException(
+              code: e.code,
+              message: 'Google is already linked to this account.',
+              category: AuthErrorCategory.conflict,
+              originalException: e);
+        } else if (e.code == 'credential-already-in-use') {
+          talker.warning(
+              'Link failed: Google credential already in use by another account. $e');
+          throw AuthException(
+              code: e.code,
+              message:
+                  'This Google account is already associated with another user.',
+              category: AuthErrorCategory.conflict,
+              originalException: e);
+        }
+      }
+      talker.error('Failed to link Google to Email/Password user: $e');
+      throw _handleAuthException(e);
+    }
+  }
+
+  // --- Account Management Methods ---
+
+  /// Sends a password reset email to the specified email address.
   Future<void> sendPasswordResetEmail(String email) async {
+    talker.info('Sending password reset email to: $email');
     try {
       await _auth.sendPasswordResetEmail(email: email).timeout(_timeout);
+      talker.info('Password reset email sent successfully.');
     } catch (e) {
+      talker.error('Failed to send password reset email: $e');
       throw _handleAuthException(e);
     }
   }
 
-  /// Update email
+  /// Sends a verification link to the user's current email to allow updating it.
+  /// Also updates the email in Firestore upon successful verification by Firebase Auth.
   Future<void> verifyBeforeUpdateEmail(String newEmail) async {
+    talker
+        .info('Attempting to send verification for email update to: $newEmail');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      talker.error('Email update failed: No user signed in.');
+      throw AuthException(
+          code: 'not-authenticated',
+          message: 'No user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
+
     try {
-      // Store the user ID before updating email
-      final userId = _auth.currentUser?.uid;
+      await currentUser.verifyBeforeUpdateEmail(newEmail).timeout(_timeout);
+      talker.info('Verification email sent for email update.');
 
-      // Update the email in Firebase Auth
-      await _auth.currentUser?.verifyBeforeUpdateEmail(newEmail);
-
-      // Update the email in Firestore as well
-      // This ensures that when the user logs back in, the email in Firestore matches
-      if (userId != null) {
-        await _userRepository.updateUserEmail(userId, newEmail);
-      }
+      // Note: Firebase handles the actual email update after the user clicks the link.
+      // Firestore will be updated automatically when the auth state changes reflect the new email.
+      // No need for optimistic update here.
     } catch (e) {
+      talker.error('Failed to send verification for email update: $e');
       throw _handleAuthException(e);
     }
   }
 
-  /// Update password
+  /// Updates the current user's password. Requires recent login.
   Future<void> updatePassword(String newPassword) async {
+    talker.info('Attempting to update password...');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      talker.error('Password update failed: No user signed in.');
+      throw AuthException(
+          code: 'not-authenticated',
+          message: 'No user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
+
     try {
-      await _auth.currentUser?.updatePassword(newPassword);
+      await currentUser.updatePassword(newPassword);
+      talker.info('Password updated successfully.');
     } catch (e) {
+      talker.error('Failed to update password: $e');
       throw _handleAuthException(e);
     }
   }
 
-  //
-  // Profile Management
-  //
-
-  /// Update user profile
-  Future<void> updateProfile({String? displayName, String? photoURL}) async {
+  /// Signs out the current user from Firebase and Google (if applicable).
+  Future<void> signOut() async {
+    talker.info('Attempting sign out...');
     try {
-      await _auth.currentUser?.updateDisplayName(displayName);
-      await _auth.currentUser?.updatePhotoURL(photoURL);
-      if (_auth.currentUser != null) {
-        await _userRepository.createUserFromAuth(_auth.currentUser!);
+      // Check which providers are linked to sign out appropriately
+      final providers =
+          _auth.currentUser?.providerData.map((p) => p.providerId).toList() ??
+              [];
+      if (providers.contains(GoogleAuthProvider.PROVIDER_ID)) {
+        await _googleSignIn.signOut();
+        talker.debug('Signed out from Google.');
       }
+      await _auth.signOut();
+      talker.info('Signed out from Firebase.');
     } catch (e) {
+      talker.error('Sign out failed: $e');
       throw _handleAuthException(e);
     }
   }
 
-  /// Delete user
+  /// Deletes the current user's account from Firebase Auth and Firestore. Requires recent login.
   Future<void> deleteUser() async {
+    talker.warning('Attempting to delete user account...');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      talker.error('Account deletion failed: No user signed in.');
+      throw AuthException(
+          code: 'not-authenticated',
+          message: 'No user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
+    final userId = currentUser.uid;
+
     try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        await _userRepository.deleteUser(user.uid);
-        await user.delete();
-      }
+      // Delete Firestore data first
+      await _userRepository.deleteUser(userId);
+      talker.debug('Firestore data deleted for user: $userId');
+
+      // Delete Firebase Auth user
+      await currentUser.delete();
+      talker.warning('Firebase Auth user deleted: $userId');
     } catch (e) {
+      talker.error('Account deletion failed: $e');
       throw _handleAuthException(e);
     }
   }
 
-  //
-  // Re-authentication Methods
-  //
+  // --- Re-authentication Methods ---
 
-  /// Re-authenticate with email and password
+  /// Re-authenticates the current user with their email and password.
   Future<UserCredential> reauthenticateWithEmailAndPassword(
       String email, String password) async {
+    talker.info('Attempting Email/Password re-authentication...');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      talker.error('Re-authentication failed: No user signed in.');
+      throw AuthException(
+          code: 'not-authenticated',
+          message: 'No user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
+
     try {
-      final credential = EmailAuthProvider.credential(
-        email: email,
-        password: password,
-      );
-      final userCredential =
-          await _auth.currentUser!.reauthenticateWithCredential(credential);
+      final credential =
+          EmailAuthProvider.credential(email: email, password: password);
+      final userCredential = await currentUser
+          .reauthenticateWithCredential(credential)
+          .timeout(_timeout);
+      talker.info('Email/Password re-authentication successful.');
       return userCredential;
     } catch (e) {
+      talker.error('Email/Password re-authentication failed: $e');
       throw _handleAuthException(e);
     }
   }
 
-  /// Re-authenticate with Google
+  /// Re-authenticates the current user with Google.
+  /// Uses a sign-out/sign-in approach for simplicity and robustness against token issues.
   Future<UserCredential> reauthenticateWithGoogle() async {
+    talker.info(
+        'Attempting Google re-authentication (sign-out/sign-in approach)...');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      talker.error('Re-authentication failed: No user signed in.');
+      throw AuthException(
+          code: 'not-authenticated',
+          message: 'No user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
+    final originalEmail =
+        currentUser.email; // Store original email for verification
+
     try {
-      talker.debug('Starting Google re-authentication');
+      // Sign out from Google first to force a fresh login prompt
+      await _googleSignIn.signOut();
+      talker.debug('Signed out from Google for re-authentication.');
 
-      // Store the current user's email for verification later
-      final currentEmail = _auth.currentUser?.email;
+      // Start Google sign-in flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        talker.info('Google sign-in cancelled during re-authentication.');
+        throw AuthException(
+            code: 'cancelled',
+            message: 'Google sign-in was cancelled.',
+            category: AuthErrorCategory.cancelled);
+      }
+      talker.debug(
+          'Google user obtained for re-authentication: ${googleUser.email}');
 
-      // First approach: Try to use the standard reauthentication flow
-      try {
-        // Sign out from Google (but not Firebase) to ensure a fresh authentication
-        await _googleSignIn.signOut();
-
-        // Trigger the authentication flow
-        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-        if (googleUser == null) {
-          throw FirebaseAuthException(
-            code: 'sign-in-cancelled',
-            message: 'Google sign in was cancelled.',
-          );
-        }
-
-        // Verify it's the same email
-        if (googleUser.email != currentEmail) {
-          talker.warning(
-              'User tried to reauthenticate with a different Google account');
-          throw FirebaseAuthException(
+      // Verify it's the same Google account
+      if (googleUser.email != originalEmail) {
+        talker.warning(
+            'Re-authentication failed: Different Google account used.');
+        // Sign the user out completely as they used the wrong account
+        await signOut();
+        throw AuthException(
             code: 'wrong-account',
             message:
                 'Please use the same Google account you originally signed in with.',
-          );
-        }
-
-        // Obtain the auth details from the request
-        final GoogleSignInAuthentication googleAuth =
-            await googleUser.authentication;
-
-        // Create a new credential
-        final credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-
-        // Try to reauthenticate with the credential
-        final userCredential =
-            await _auth.currentUser!.reauthenticateWithCredential(credential);
-        talker.debug('Standard Google reauthentication successful');
-        return userCredential;
-      } catch (reauthError) {
-        // If the standard approach fails, log the error and try the alternative approach
-        talker.error('Standard Google reauthentication failed: $reauthError');
-
-        if (reauthError is FirebaseAuthException) {
-          // If it's a token issue or requires recent login, try the alternative approach
-          if (reauthError.code == 'user-token-expired' ||
-              reauthError.code == 'requires-recent-login' ||
-              reauthError.message?.contains('token') == true ||
-              reauthError.message?.contains('BAD_REQUEST') == true) {
-            talker.debug('Trying alternative Google reauthentication approach');
-
-            // Alternative approach: Sign out completely and sign in again
-            try {
-              // Sign out from both Google and Firebase
-              await signOut();
-
-              // Sign in with Google again
-              final newCredential = await signInWithGoogle();
-
-              // Verify it's the same user (by email)
-              if (newCredential.user?.email != currentEmail) {
-                talker.warning(
-                    'User signed in with a different Google account during reauthentication');
-                throw FirebaseAuthException(
-                  code: 'wrong-account',
-                  message:
-                      'You signed in with a different Google account. Please use your original account.',
-                );
-              }
-
-              talker.debug('Alternative Google reauthentication successful');
-              return newCredential;
-            } catch (alternativeError) {
-              talker.error(
-                  'Alternative Google reauthentication failed: $alternativeError');
-              rethrow;
-            }
-          }
-        }
-
-        // If it's not a token issue or the alternative approach failed, rethrow the original error
-        rethrow;
+            category: AuthErrorCategory.authentication);
       }
+
+      // Obtain Google auth details
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      talker.debug('Google credential created for re-authentication.');
+
+      // Re-authenticate with Firebase
+      final userCredential = await currentUser
+          .reauthenticateWithCredential(credential)
+          .timeout(_timeout);
+      talker.info('Google re-authentication successful.');
+      return userCredential;
     } catch (e) {
+      talker.error('Google re-authentication failed: $e');
+      // If re-auth fails, sign the user out for security
+      await signOut().catchError((signOutError) {
+        talker.error(
+            'Error signing out after failed re-authentication: $signOutError');
+      });
       throw _handleAuthException(e);
     }
   }
 
-  //
-  // Email Verification and Status Methods
-  //
+  // --- Email Verification Status ---
 
-  /// Handle email verification completion
-  Future<void> handleEmailVerificationComplete() async {
+  /// Sends an email verification link to the current user.
+  Future<void> sendEmailVerification() async {
+    talker.info('Attempting to send email verification...');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      talker.error('Send verification failed: No user signed in.');
+      throw AuthException(
+          code: 'not-authenticated',
+          message: 'No user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
+    if (currentUser.emailVerified) {
+      talker.info('Email already verified.');
+      return; // Don't send if already verified
+    }
+
     try {
-      await _auth.currentUser?.reload();
-      final user = _auth.currentUser;
-      if (user != null && user.emailVerified) {
-        await _userRepository.createUserFromAuth(user);
-      }
+      await currentUser.sendEmailVerification().timeout(_timeout);
+      talker.info('Email verification sent successfully.');
     } catch (e) {
+      talker.error('Failed to send email verification: $e');
       throw _handleAuthException(e);
     }
   }
 
-  /// Check if a user's email is verified
+  /// Checks if the current user's email is verified. Reloads user data first.
   Future<bool> isEmailVerified() async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return false;
     try {
-      // Reload the user to get the latest email verification status
-      await _auth.currentUser?.reload();
-      return _auth.currentUser?.emailVerified ?? false;
+      await currentUser.reload();
+      // Need to get the user again after reload
+      final refreshedUser = _auth.currentUser;
+      final verified = refreshedUser?.emailVerified ?? false;
+      talker.debug('Email verification status: $verified');
+      return verified;
     } catch (e) {
-      talker.error('Error checking email verification status: $e');
+      talker.error('Failed to check email verification status: $e');
+      // Assume not verified if reload fails
       return false;
+    }
+  }
+
+  /// Checks if the current user is anonymous.
+  bool isAnonymous() {
+    return _auth.currentUser?.isAnonymous ?? false;
+  }
+
+  /// Unlink a provider (e.g., 'google.com', 'password') from the current user.
+  Future<User?> unlinkProvider(String providerId) async {
+    talker.info('Attempting to unlink provider: $providerId');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      talker.error('Unlink failed: No user signed in.');
+      throw AuthException(
+          code: 'not-authenticated',
+          message: 'No user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
+    // Prevent unlinking the last provider if it's not anonymous
+    if (currentUser.providerData.length <= 1 && !currentUser.isAnonymous) {
+      talker.error(
+          'Unlink failed: Cannot unlink the last sign-in method for a non-anonymous account.');
+      throw AuthException(
+          code: 'cannot-unlink-last-provider',
+          message: 'You cannot remove your only sign-in method.',
+          category: AuthErrorCategory.permission);
+    }
+
+    try {
+      final updatedUser =
+          await currentUser.unlink(providerId).timeout(_timeout);
+      talker.info('Successfully unlinked provider: $providerId');
+      // Update Firestore user data if needed (optional, depends on requirements)
+      await _userRepository.createUserFromAuth(updatedUser);
+      return updatedUser;
+    } catch (e) {
+      talker.error('Failed to unlink provider $providerId: $e');
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Update user profile (displayName, photoURL).
+  Future<void> updateProfile({String? displayName, String? photoURL}) async {
+    talker.info('Attempting to update profile...');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      talker.error('Profile update failed: No user signed in.');
+      throw AuthException(
+          code: 'not-authenticated',
+          message: 'No user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
+
+    try {
+      if (displayName != null) {
+        await currentUser.updateDisplayName(displayName);
+        talker.debug('Display name updated.');
+      }
+      if (photoURL != null) {
+        await currentUser.updatePhotoURL(photoURL);
+        talker.debug('Photo URL updated.');
+      }
+
+      // Update Firestore user data
+      await _userRepository.createUserFromAuth(currentUser);
+      talker.info('Profile updated successfully.');
+    } catch (e) {
+      talker.error('Failed to update profile: $e');
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Called when email verification is likely complete (e.g., after user returns to app).
+  /// Reloads the user and updates Firestore if verified.
+  Future<void> handleEmailVerificationComplete() async {
+    talker.info('Handling potential email verification completion...');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || currentUser.emailVerified) {
+      talker.debug(
+          'No user or email already verified, skipping Firestore update.');
+      return; // No action needed if no user or already verified
+    }
+
+    try {
+      await currentUser.reload();
+      final refreshedUser = _auth.currentUser; // Get user again after reload
+      if (refreshedUser != null && refreshedUser.emailVerified) {
+        talker.info(
+            'Email verification confirmed for user: ${refreshedUser.uid}');
+        // Update Firestore to reflect verified status
+        await _userRepository.createUserFromAuth(refreshedUser);
+        talker.debug('Firestore updated with verified status.');
+      } else {
+        talker.debug('Email still not verified after reload.');
+      }
+    } catch (e) {
+      talker.error('Error during email verification handling: $e');
+      // Don't throw, as this is often called passively
     }
   }
 
@@ -610,169 +823,193 @@ class AuthService {
       final now = DateTime.now();
       final difference = now.difference(creationTime);
 
-      return difference.inDays > days;
+      final isOlder = difference.inDays > days;
+      talker.debug(
+          'Account age check: ${difference.inDays} days old. Older than $days days? $isOlder');
+      return isOlder;
     } catch (e) {
       talker.error('Error checking account age: $e');
-      return false;
+      return false; // Default to false on error
     }
   }
 
-  /// Check if the current user is anonymous
-  bool isAnonymous() {
-    return _auth.currentUser?.isAnonymous ?? false;
-  }
+  // --- Error Handling ---
 
-  //
-  // Error Handling
-  //
+  /// Handles various exceptions and converts them into a structured AuthException.
+  AuthException _handleAuthException(dynamic e) {
+    talker.error('Handling Auth Exception: ${e.runtimeType} - $e');
 
-  /// Get readable auth error message
-  String getReadableAuthError(FirebaseAuthException e) {
-    // In production, use more generic error messages for security
-    if (kReleaseMode) {
-      return _getSecureErrorMessage(e);
+    if (e is AuthException) {
+      // If it's already an AuthException, just return it
+      return e;
     }
 
-    // In development, provide detailed error messages
-    switch (e.code) {
-      case 'user-not-found':
-        return 'No user found with this email.';
-      case 'wrong-password':
-        return 'Wrong password provided.';
-      case 'weak-password':
-        return 'The password provided is too weak.';
-      case 'email-already-in-use':
-        return 'An account already exists with this email.';
-      case 'invalid-email':
-        return 'The email address is not valid.';
-      case 'operation-not-allowed':
-        return 'This operation is not allowed.';
-      case 'user-disabled':
-        return 'This user account has been disabled.';
-      case 'too-many-requests':
-        return 'Too many attempts. Please try again later.';
-      case 'requires-recent-login':
-        return 'This operation requires recent authentication. Please log in again.';
-      case 'provider-already-linked':
-        return 'This provider is already linked to your account.';
-      case 'credential-already-in-use':
-        return 'This credential is already associated with a different user account.';
-      case 'invalid-credential':
-        return 'The provided credential is invalid.';
-      case 'account-exists':
-        return 'An account already exists with this email. Please sign in with your existing password.';
-      case 'verification-throttled':
-        return 'Too many verification emails sent. Please try again later.';
-      default:
-        return e.message ?? 'An unknown error occurred.';
-    }
-  }
-
-  /// Get secure error message for production
-  String _getSecureErrorMessage(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'user-not-found':
-      case 'wrong-password':
-      case 'invalid-credential':
-        return 'Invalid email or password. Please try again.';
-
-      case 'email-already-in-use':
-      case 'account-exists':
-      case 'credential-already-in-use':
-        return 'An account already exists with this email.';
-
-      case 'weak-password':
-      case 'invalid-email':
-        return 'Please provide a valid email and a strong password.';
-
-      case 'user-disabled':
-        return 'This account has been disabled. Please contact support.';
-
-      case 'too-many-requests':
-      case 'verification-throttled':
-        return 'Too many attempts. Please try again later.';
-
-      case 'requires-recent-login':
-        return 'This operation requires recent authentication. Please log in again.';
-
-      case 'provider-already-linked':
-        return 'This provider is already linked to your account.';
-
-      case 'operation-not-allowed':
-        return 'This operation is not allowed. Please contact support.';
-
-      default:
-        return 'An error occurred. Please try again later.';
-    }
-  }
-
-  /// Categorize authentication error
-  AuthErrorCategory _categorizeError(dynamic e) {
     if (e is FirebaseAuthException) {
-      switch (e.code) {
-        case 'user-not-found':
-        case 'wrong-password':
-        case 'user-disabled':
-        case 'requires-recent-login':
-        case 'provider-already-linked':
-          return AuthErrorCategory.authentication;
-
-        case 'network-request-failed':
-        case 'timeout':
-          return AuthErrorCategory.network;
-
-        case 'operation-not-allowed':
-          return AuthErrorCategory.permission;
-
-        case 'weak-password':
-        case 'invalid-email':
-        case 'email-already-in-use':
-        case 'invalid-credential':
-          return AuthErrorCategory.validation;
-
-        default:
-          return AuthErrorCategory.unknown;
-      }
-    } else if (e is TimeoutException) {
-      return AuthErrorCategory.network;
+      final category = _categorizeFirebaseError(e.code);
+      final message =
+          getReadableAuthError(e.code, e.message); // Use public method
+      talker.debug(
+          'FirebaseAuthException: Code=${e.code}, Msg=${e.message}, Category=$category');
+      return AuthException(
+          code: e.code,
+          message: message,
+          category: category,
+          originalException: e);
     }
 
-    return AuthErrorCategory.unknown;
-  }
-
-  /// Handle authentication exceptions
-  Exception _handleAuthException(dynamic e) {
-    if (e is FirebaseAuthException) {
-      final category = _categorizeError(e);
-      final message = getReadableAuthError(e);
-
-      talker.error(
-          'Firebase Auth Exception: [${e.code}] ${e.message ?? "No message"} - Category: $category');
-
+    if (e is TimeoutException) {
+      talker.debug('TimeoutException');
       return AuthException(
-        code: e.code,
-        message: message,
-        category: category,
-        originalException: e,
-      );
-    } else if (e is TimeoutException) {
-      talker.error('Timeout Exception: ${e.message ?? "No message"}');
+          code: 'timeout',
+          message:
+              'The operation timed out. Please check your connection and try again.',
+          category: AuthErrorCategory.network,
+          originalException: e);
+    }
 
+    // Handle potential GoogleSignIn errors (though most should bubble up as FirebaseAuthExceptions)
+    // Example: PlatformException from GoogleSignIn
+    if (e.toString().contains('PlatformException')) {
+      // Basic check
+      talker.debug('Potential PlatformException (possibly GoogleSignIn): $e');
+      // Treat as network or unknown, depending on details if available
       return AuthException(
-        code: 'timeout',
-        message: 'The operation timed out. Please try again.',
-        category: AuthErrorCategory.network,
-        originalException: e,
-      );
-    } else {
-      talker.error('Unknown Exception: ${e.toString()}');
+          code: 'platform-error',
+          message: 'An external sign-in error occurred. Please try again.',
+          category: AuthErrorCategory.network, // Or unknown
+          originalException: e);
+    }
 
-      return AuthException(
+    talker.debug('Unknown error type: ${e.runtimeType}');
+    return AuthException(
         code: 'unknown',
         message: 'An unexpected error occurred. Please try again.',
         category: AuthErrorCategory.unknown,
-        originalException: e,
-      );
+        originalException: e);
+  }
+
+  /// Categorizes FirebaseAuthException codes into AuthErrorCategory.
+  AuthErrorCategory _categorizeFirebaseError(String code) {
+    switch (code) {
+      // Authentication Issues
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential': // Can be auth or validation
+      case 'user-mismatch':
+      case 'requires-recent-login':
+      case 'invalid-user-token':
+      case 'user-token-expired':
+      case 'web-context-cancelled':
+      case 'wrong-account': // Custom code added in reauth
+        return AuthErrorCategory.authentication;
+
+      // Network Issues
+      case 'network-request-failed':
+      case 'timeout': // Firebase might use this code too
+      case 'web-network-request-failed':
+      case 'app-not-authorized': // Can indicate network/config issues
+        return AuthErrorCategory.network;
+
+      // Permission Issues
+      case 'operation-not-allowed':
+      case 'user-disabled':
+      case 'web-context-unsupported':
+        return AuthErrorCategory.permission;
+
+      // Validation Issues
+      case 'invalid-email':
+      case 'weak-password':
+      case 'missing-password':
+      case 'missing-email':
+        return AuthErrorCategory.validation;
+
+      // Conflict Issues
+      case 'email-already-in-use':
+      case 'credential-already-in-use':
+      case 'account-exists-with-different-credential':
+      case 'provider-already-linked':
+        return AuthErrorCategory.conflict;
+
+      // Cancellation
+      case 'cancelled': // Custom code
+      case 'sign-in-cancelled': // Custom code
+        return AuthErrorCategory.cancelled;
+
+      // Other/Unknown
+      case 'too-many-requests': // Could be auth/network/permission
+      case 'internal-error':
+      case 'invalid-api-key':
+      case 'app-deleted':
+      case 'invalid-app-credential':
+      case 'invalid-verification-code':
+      case 'invalid-verification-id':
+      case 'captcha-check-failed':
+      case 'web-storage-unsupported':
+      default:
+        return AuthErrorCategory.unknown;
+    }
+  }
+
+  /// Provides user-friendly error messages based on the error code.
+  /// Excludes error codes from the final message for better UX.
+  String getReadableAuthError(String code, String? originalMessage) {
+    // Determine the user-friendly message based on the code
+    switch (code) {
+      // Authentication
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential': // Group these common sign-in errors
+        return 'Incorrect email or password. Please try again.';
+      case 'requires-recent-login':
+        return 'For security, please sign in again to continue.';
+      case 'user-disabled':
+        return 'This account has been disabled. Please contact support.';
+      case 'user-mismatch':
+      case 'invalid-user-token':
+      case 'user-token-expired':
+        return 'Your session has expired. Please sign in again.';
+      case 'wrong-account': // Custom code
+        return 'Please use the same account you originally signed in with.';
+
+      // Validation
+      case 'invalid-email':
+        return 'Please enter a valid email address.';
+      case 'weak-password':
+        return 'Password is too weak. Please use a stronger one.';
+      case 'missing-password':
+      case 'missing-email':
+        return 'Please enter both email and password.';
+
+      // Conflict
+      case 'email-already-in-use':
+      case 'account-exists-with-different-credential':
+        // Provide specific guidance based on the context where this error is handled (sign-in vs linking)
+        // The AuthService methods throw more specific AuthExceptions for these cases now.
+        // This generic message serves as a fallback if the specific exception isn't caught.
+        return 'An account already exists with this email using a different sign-in method.';
+      case 'credential-already-in-use':
+        return 'This sign-in method is already associated with another account.';
+      case 'provider-already-linked':
+        return 'This sign-in method is already linked to your account.';
+
+      // Network & Other
+      case 'network-request-failed':
+      case 'timeout':
+        return 'Network error. Please check your connection and try again.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please try again later.';
+      case 'operation-not-allowed':
+        return 'This operation is not currently allowed. Please contact support.';
+      case 'cancelled':
+      case 'sign-in-cancelled':
+        return 'Sign-in process was cancelled.';
+
+      // Default for unhandled codes
+      default:
+        // In release mode, show a generic message. In debug, include the original message if available.
+        return kReleaseMode
+            ? 'An unexpected error occurred. Please try again.'
+            : 'An unexpected error occurred. ${originalMessage ?? ""}';
     }
   }
 }

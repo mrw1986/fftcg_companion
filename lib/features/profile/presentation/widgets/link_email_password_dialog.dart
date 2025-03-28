@@ -99,7 +99,8 @@ class _LinkEmailPasswordDialogState
             .future);
       } else {
         // Use the standard method for anonymous users
-        await ref.read(authServiceProvider).linkWithEmailAndPassword(
+        // Corrected method call
+        await ref.read(authServiceProvider).linkEmailAndPasswordToAnonymous(
               email,
               password,
             );

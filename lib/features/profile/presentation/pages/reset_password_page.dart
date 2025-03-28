@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
+import 'package:fftcg_companion/core/utils/logger.dart'; // Import logger
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 
 class ResetPasswordPage extends ConsumerStatefulWidget {
@@ -17,6 +18,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
   final _emailController = TextEditingController();
   bool _isLoading = false;
   bool _resetEmailSent = false;
+  // final talker = Talker(); // Remove incorrect instantiation
 
   @override
   void initState() {
@@ -40,6 +42,9 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
     setState(() {
       _isLoading = true;
     });
+
+    talker.debug(
+        'Attempting to send password reset email to: ${_emailController.text.trim()}'); // Add log
 
     try {
       // Check if user is authenticated before attempting to sign out
@@ -76,6 +81,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
         );
       }
     } catch (e) {
+      talker.error('Error sending password reset email: $e'); // Add log
       setState(() {
         _isLoading = false;
       });
@@ -86,7 +92,8 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
 
         if (e is FirebaseAuthException) {
           final authService = ref.read(authServiceProvider);
-          errorMessage = authService.getReadableAuthError(e);
+          // Corrected call to getReadableAuthError
+          errorMessage = authService.getReadableAuthError(e.code, e.message);
         }
 
         showThemedSnackBar(

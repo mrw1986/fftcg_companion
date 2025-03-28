@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
-import 'package:fftcg_companion/shared/widgets/google_sign_in_button.dart';
 import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -268,17 +267,47 @@ class ProfileAuthMethods extends ConsumerWidget {
 
             // Add Google
             if (!hasGoogle)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: GoogleSignInButton(
-                  onPressed: onLinkWithGoogle,
-                  onError: (e) {
-                    SnackBarHelper.showErrorSnackBar(
-                      context: context,
-                      message: 'Error linking Google: ${e.toString()}',
-                    );
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.2),
+                    width: 1,
+                  ),
+                ),
+                child: ListTile(
+                  leading: SvgPicture.asset(
+                    Theme.of(context).brightness == Brightness.dark
+                        ? 'assets/images/google_branding/signin-assets/android_dark_rd_na.svg'
+                        : 'assets/images/google_branding/signin-assets/android_neutral_rd_na.svg',
+                    height: 36,
+                    width: 36,
+                  ),
+                  title: const Text('Add Google'),
+                  subtitle: const Text('Link your Google account'),
+                  trailing: Icon(
+                    Icons.add_circle_outline,
+                    color: colorScheme.primary,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  onTap: () {
+                    // Store the current context
+                    final currentContext = context;
+
+                    onLinkWithGoogle().catchError((e) {
+                      // Check if the widget is still mounted before using the context
+                      if (currentContext.mounted) {
+                        SnackBarHelper.showErrorSnackBar(
+                          context: currentContext,
+                          message: 'Error linking Google: ${e.toString()}',
+                        );
+                      }
+                    });
                   },
-                  text: 'Link with Google',
                 ),
               ),
           ],

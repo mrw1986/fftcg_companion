@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fftcg_companion/core/services/auth_service.dart';
+import 'package:fftcg_companion/core/providers/auth_provider.dart'; // Import authServiceProvider
 
 /// Provider for checking if email verification is required for sensitive operations
 final emailVerificationRequiredProvider = Provider<bool>((ref) {
@@ -21,19 +21,19 @@ final anonymousCollectionLimitProvider = Provider<int>((ref) {
 
 /// Provider for checking if a user's email is verified
 final isEmailVerifiedProvider = FutureProvider<bool>((ref) async {
-  final authService = AuthService();
+  final authService = ref.watch(authServiceProvider); // Use shared instance
   return await authService.isEmailVerified();
 });
 
 /// Provider for checking if a user's account is older than the grace period
 final isAccountOlderThanGracePeriodProvider = FutureProvider<bool>((ref) async {
-  final authService = AuthService();
+  final authService = ref.watch(authServiceProvider); // Use shared instance
   final gracePeriod = ref.watch(accountGracePeriodProvider);
   return await authService.isAccountOlderThan(gracePeriod);
 });
 
 /// Provider for checking if a user is anonymous
 final isAnonymousProvider = Provider<bool>((ref) {
-  final authService = AuthService();
+  final authService = ref.watch(authServiceProvider); // Use shared instance
   return authService.isAnonymous();
 });

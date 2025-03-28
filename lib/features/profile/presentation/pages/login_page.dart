@@ -72,19 +72,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           talker.debug(
               'Login page: Linking anonymous account with email/password');
 
-          // Create the credential for linking
-          final credential =
-              EmailAuthProvider.credential(email: email, password: password);
+          // Use the correct linking method for anonymous users
+          await authService.linkEmailAndPasswordToAnonymous(email, password);
 
-          // Attempt to link the account
-          final currentUser = FirebaseAuth.instance.currentUser;
-          if (currentUser == null) {
-            throw FirebaseAuthException(
-                code: 'no-current-user',
-                message: 'No user is currently signed in.');
-          }
-
-          await currentUser.linkWithCredential(credential);
           talker.debug('Login page: Email/password linking successful');
           _navigateToProfile();
           return;
@@ -153,10 +143,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
       if (e is FirebaseAuthException) {
         final authService = ref.read(authServiceProvider);
-        errorMessage = authService.getReadableAuthError(e);
+        // Corrected call to getReadableAuthError
+        errorMessage = authService.getReadableAuthError(e.code, e.message);
 
         // Don't show cancellation as an error
-        if (e.code == 'cancelled-by-user') {
+        if (e.code == 'cancelled-by-user' || e.code == 'cancelled') {
           isError = false;
         }
 
@@ -187,7 +178,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           // Link the anonymous account with Google
           // This preserves the user's data since the user ID remains the same
           talker.debug('Login page: Linking anonymous account with Google');
-          await authService.linkWithGoogle();
+          // Corrected method call
+          await authService.linkGoogleToAnonymous();
 
           talker.debug('Login page: Google linking successful');
           _navigateToProfile();
@@ -226,10 +218,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
       if (e is FirebaseAuthException) {
         final authService = ref.read(authServiceProvider);
-        errorMessage = authService.getReadableAuthError(e);
+        // Corrected call to getReadableAuthError
+        errorMessage = authService.getReadableAuthError(e.code, e.message);
 
         // Don't show cancellation as an error
-        if (e.code == 'cancelled-by-user') {
+        if (e.code == 'cancelled-by-user' || e.code == 'cancelled') {
           isError = false;
         }
 

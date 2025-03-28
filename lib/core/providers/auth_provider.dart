@@ -25,13 +25,33 @@ final authStateProvider = Provider.autoDispose<AuthState>((ref) {
       } else if (user.isAnonymous) {
         return AuthState.anonymous(user);
       } else {
-        // Check if the user's email is verified if they're using email/password auth
-        if (user.providerData
-                .any((element) => element.providerId == 'password') &&
-            !user.emailVerified) {
-          // If email is not verified, return emailNotVerified state
+        // Check if the user has at least one verified authentication method.
+        // Google is considered verified by default.
+        // Email/Password is verified only if user.emailVerified is true.
+        bool hasVerifiedProvider = user.providerData.any((userInfo) {
+          if (userInfo.providerId == 'google.com') {
+            return true; // Google is always considered verified
+          }
+          if (userInfo.providerId == 'password' && user.emailVerified) {
+            return true; // Verified Email/Password
+          }
+          // Add checks for other providers if needed (e.g., Apple, Facebook)
+          return false;
+        });
+
+        // Check if the user has an email/password provider linked
+        bool hasPasswordProvider = user.providerData
+            .any((userInfo) => userInfo.providerId == 'password');
+
+        if (hasVerifiedProvider) {
+          // If any provider is verified, the user is fully authenticated
+          // We still pass the user object so UI can check user.emailVerified if needed
+          return AuthState.authenticated(user);
+        } else if (hasPasswordProvider && !user.emailVerified) {
+          // If the *only* provider is an unverified email/password, then state is emailNotVerified
           return AuthState.emailNotVerified(user);
         } else {
+          // Fallback: Should not happen with current providers, but treat as authenticated
           return AuthState.authenticated(user);
         }
       }
@@ -46,6 +66,9 @@ class AuthState {
   final AuthStatus status;
   final User? user;
   final String? errorMessage;
+  // This flag now primarily indicates if the user object itself reports
+  // emailVerified as false, useful for UI hints, but the main state logic
+  // is handled in the authStateProvider above.
   final bool emailNotVerified;
 
   const AuthState({
@@ -66,14 +89,19 @@ class AuthState {
         emailNotVerified = false,
         errorMessage = null;
 
-  const AuthState.authenticated(this.user)
+  // Removed const keyword as initializers are not constant
+  AuthState.authenticated(this.user)
       : status = AuthStatus.authenticated,
-        emailNotVerified = false,
+        // Determine emailNotVerified based on user object if needed for UI hints
+        emailNotVerified =
+            (user?.providerData.any((p) => p.providerId == 'password') ??
+                    false) &&
+                !(user?.emailVerified ?? true),
         errorMessage = null;
 
   const AuthState.emailNotVerified(this.user)
       : status = AuthStatus.emailNotVerified,
-        emailNotVerified = true,
+        emailNotVerified = true, // Explicitly true for this state
         errorMessage = null;
 
   const AuthState.loading()
@@ -88,7 +116,11 @@ class AuthState {
         emailNotVerified = false;
 
   bool get isAuthenticated => status == AuthStatus.authenticated;
-  bool get isEmailNotVerified => status == AuthStatus.emailNotVerified;
+  // Use this getter to check the specific state if needed
+  bool get isEmailNotVerifiedState => status == AuthStatus.emailNotVerified;
+  // Keep the original getter name for compatibility, but its meaning is now
+  // tied to the user object's status, not the overall AuthState status.
+  bool get isEmailNotVerified => emailNotVerified;
   bool get isAnonymous => status == AuthStatus.anonymous;
   bool get isUnauthenticated => status == AuthStatus.unauthenticated;
   bool get isLoading => status == AuthStatus.loading;
@@ -99,7 +131,7 @@ class AuthState {
 enum AuthStatus {
   unauthenticated,
   anonymous,
-  emailNotVerified,
+  emailNotVerified, // Represents state where ONLY unverified email/pass exists
   authenticated,
   loading,
   error,
@@ -132,10 +164,14 @@ final reauthWithGoogleProvider = FutureProvider.autoDispose<UserCredential>(
 );
 
 /// Provider for unlinking an authentication provider
-final unlinkProviderProvider = FutureProvider.autoDispose.family<User, String>(
+// Changed return type to void as the primary goal is the side effect
+final unlinkProviderProvider = FutureProvider.autoDispose.family<void, String>(
   (ref, providerId) async {
     final authService = ref.watch(authServiceProvider);
-    return await authService.unlinkProvider(providerId);
+    // Call the service method but don't need to return the User? object
+    await authService.unlinkProvider(providerId);
+    // Invalidate the auth state to trigger UI updates if necessary
+    ref.invalidate(authStateProvider);
   },
 );
 
@@ -144,7 +180,8 @@ final linkEmailPasswordToGoogleProvider =
     FutureProvider.autoDispose.family<UserCredential, EmailPasswordCredentials>(
   (ref, credentials) async {
     final authService = ref.watch(authServiceProvider);
-    return await authService.linkEmailPasswordToGoogleAccount(
+    // Corrected method name
+    return await authService.linkEmailPasswordToGoogle(
       credentials.email,
       credentials.password,
     );
@@ -189,19 +226,31 @@ void showThemedSnackBar({
         message,
         style: TextStyle(
           color: isError
-              ? Theme.of(context).colorScheme.onError
-              : Theme.of(context).colorScheme.onPrimary,
+              ? Theme.of(context)
+                  .colorScheme
+                  .onErrorContainer // Use onErrorContainer for errors
+              : Theme.of(context)
+                  .colorScheme
+                  .onPrimaryContainer, // Use onPrimaryContainer for success
         ),
       ),
       backgroundColor: isError
-          ? Theme.of(context).colorScheme.error
-          : Theme.of(context).colorScheme.primary,
+          ? Theme.of(context)
+              .colorScheme
+              .errorContainer // Use errorContainer for errors
+          : Theme.of(context)
+              .colorScheme
+              .primaryContainer, // Use primaryContainer for success
       duration: duration,
       action: SnackBarAction(
         label: 'OK',
         textColor: isError
-            ? Theme.of(context).colorScheme.onError
-            : Theme.of(context).colorScheme.onPrimary,
+            ? Theme.of(context)
+                .colorScheme
+                .onErrorContainer // Use onErrorContainer for errors
+            : Theme.of(context)
+                .colorScheme
+                .onPrimaryContainer, // Use onPrimaryContainer for success
         onPressed: () => scaffoldMessenger.hideCurrentSnackBar(),
       ),
     ),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_display_name.dart'
@@ -14,6 +13,9 @@ import 'package:fftcg_companion/features/profile/presentation/widgets/account_in
 import 'package:fftcg_companion/features/profile/presentation/widgets/account_actions_card.dart';
 // import 'package:fftcg_companion/features/profile/presentation/widgets/link_email_password_dialog.dart'; // No longer needed here
 import 'package:fftcg_companion/features/profile/presentation/widgets/update_password_dialog.dart';
+// Import AuthException and skipAutoAuthProvider
+import 'package:fftcg_companion/core/services/auth_service.dart';
+import 'package:fftcg_companion/core/providers/auto_auth_provider.dart';
 
 class AccountSettingsPage extends ConsumerStatefulWidget {
   const AccountSettingsPage({super.key});
@@ -94,8 +96,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       if (mounted) {
         display_name.showThemedSnackBar(
             context: context,
-            message: e is FirebaseAuthException
-                ? ref.read(authServiceProvider).getReadableAuthError(e)
+            message: e is AuthException // Catch custom AuthException
+                ? e.message // Use message from AuthException
                 : e.toString(),
             isError: true);
       }
@@ -111,7 +113,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       return;
     }
 
-    // Show confirmation dialog to inform user they'll be logged out
+    // Show confirmation dialog (updated message)
     final shouldProceed = await showEmailUpdateConfirmationDialog(context);
 
     if (!shouldProceed) return;
@@ -126,22 +128,23 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           );
       setState(() {
         _isLoading = false;
-        _showChangeEmail = false;
+        _showChangeEmail = false; // Hide the input field after initiating
       });
 
-      // Show final logout confirmation dialog
+      // Show confirmation dialog (updated message)
       if (mounted) {
-        await showEmailUpdateCompletedDialog(context);
-
-        // Log out the user and redirect to profile page without confirmation
-        await _signOutWithoutConfirmation();
+        await showEmailUpdateInitiatedDialog(
+            context, _emailController.text.trim());
+        // DO NOT SIGN OUT HERE - User remains logged in
+        // await _signOutWithoutConfirmation(); // Removed this line
       }
-    } on FirebaseAuthException catch (e) {
+    } on AuthException catch (e) {
+      // Catch custom AuthException
       setState(() {
         _isLoading = false;
       });
 
-      talker.debug('Caught FirebaseAuthException with code: ${e.code}');
+      talker.debug('Caught AuthException with code: ${e.code}');
       if (e.code == 'requires-recent-login') {
         talker.debug('Email update requires re-authentication');
         if (mounted) {
@@ -158,24 +161,24 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
         return;
       } else {
         talker.error('Error updating email: $e');
-
-        // Show error message
+        // Show error message from AuthException
         if (mounted) {
           display_name.showThemedSnackBar(
             context: context,
-            message: ref.read(authServiceProvider).getReadableAuthError(e),
+            message: e.message,
             isError: true,
           );
         }
       }
     } catch (e) {
+      // Catch other potential errors
       setState(() {
         _isLoading = false;
       });
 
       talker.error('Unexpected error during email update: $e');
 
-      // Check if the error message contains "requires-recent-login" or "recent authentication"
+      // Check if the error message indicates re-authentication needed (less reliable)
       if (e.toString().contains('requires-recent-login') ||
           e.toString().contains('recent authentication')) {
         talker.debug(
@@ -186,36 +189,37 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           if (shouldReauth) {
             setState(() {
               _showReauthDialog = true;
-              _isAccountDeletion = false; // Ensure deletion flag is false
-              _isPasswordChange = false; // Ensure password change flag is false
+              _isAccountDeletion = false;
+              _isPasswordChange = false;
             });
           }
         }
         return;
       }
 
-      // Show error message
+      // Show generic error message
       if (mounted) {
         display_name.showThemedSnackBar(
           context: context,
-          message: e.toString(),
+          message: 'An unexpected error occurred while updating email.',
           isError: true,
         );
       }
     }
   }
 
-  // Sign out without showing confirmation dialog
+  // Sign out without showing confirmation dialog (kept for potential other uses)
   Future<void> _signOutWithoutConfirmation() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
+      // Set skip flag before signing out
+      ref.read(skipAutoAuthProvider.notifier).state = true;
       await ref.read(authServiceProvider).signOut();
       // The UI will automatically update due to the authStateProvider
 
-      // Set loading to false after successful sign-out
       setState(() {
         _isLoading = false;
       });
@@ -259,6 +263,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
       await ref.read(authServiceProvider).deleteUser();
 
+      // Set skip flag before signing out
+      ref.read(skipAutoAuthProvider.notifier).state = true;
       // Sign out to reset the authentication state
       await ref.read(authServiceProvider).signOut();
 
@@ -271,12 +277,13 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       if (mounted) {
         context.go('/profile');
       }
-    } on FirebaseAuthException catch (e) {
+    } on AuthException catch (e) {
+      // Catch custom AuthException
       setState(() {
         _isLoading = false;
       });
 
-      talker.debug('Caught FirebaseAuthException with code: ${e.code}');
+      talker.debug('Caught AuthException with code: ${e.code}');
 
       // Handle specific error codes
       if (e.code == 'requires-recent-login' || e.code == 'user-token-expired') {
@@ -302,10 +309,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
             context: context,
             builder: (BuildContext context) {
               final colorScheme = Theme.of(context).colorScheme;
-              String errorMessage =
-                  ref.read(authServiceProvider).getReadableAuthError(e);
+              String errorMessage = e.message; // Use message from AuthException
 
-              // Make the error message more user-friendly
+              // Make the error message more user-friendly if needed
               if (errorMessage.contains('An unexpected error occurred')) {
                 errorMessage =
                     'An error occurred while deleting your account. Please try again or contact support if the problem persists.';
@@ -344,13 +350,14 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
         }
       }
     } catch (e) {
+      // Catch other unexpected errors
       setState(() {
         _isLoading = false;
       });
 
       talker.error('Unexpected error during account deletion: $e');
 
-      // Check if the error message contains "requires-recent-login", "user-token-expired", or "recent authentication"
+      // Check if the error message indicates re-authentication needed
       if (e.toString().contains('requires-recent-login') ||
           e.toString().contains('user-token-expired') ||
           e.toString().contains('recent authentication') ||
@@ -362,8 +369,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           if (shouldReauth) {
             setState(() {
               _showReauthDialog = true;
-              _isAccountDeletion = true; // Set deletion flag
-              _isPasswordChange = false; // Ensure password change flag is false
+              _isAccountDeletion = true;
+              _isPasswordChange = false;
             });
           }
         }
@@ -378,15 +385,6 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
             final colorScheme = Theme.of(context).colorScheme;
             String errorMessage =
                 'An unexpected error occurred. Please try again or contact support if the problem persists.';
-
-            // Try to provide a more specific error message if possible
-            if (e.toString().contains('requires-recent-login') ||
-                e.toString().contains('user-token-expired') ||
-                e.toString().contains('recent authentication') ||
-                e.toString().contains('session has expired')) {
-              errorMessage =
-                  'For security reasons, this operation requires recent authentication. Please sign in again to continue.';
-            }
 
             return AlertDialog(
               shape: RoundedRectangleBorder(
@@ -477,14 +475,14 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       });
 
       // Handle specific error cases
-      if (e is FirebaseAuthException) {
+      if (e is AuthException) {
+        // Catch custom AuthException
         if (e.code == 'wrong-account') {
           // Special handling for wrong Google account
           if (mounted) {
             display_name.showThemedSnackBar(
               context: context,
-              message:
-                  'Please use the same Google account you originally signed in with.',
+              message: e.message, // Use message from AuthException
               isError: true,
               duration: const Duration(seconds: 5),
             );
@@ -497,9 +495,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       if (mounted) {
         display_name.showThemedSnackBar(
           context: context,
-          message: e is FirebaseAuthException
-              ? ref.read(authServiceProvider).getReadableAuthError(e)
-              : e.toString(),
+          message: e is AuthException
+              ? e.message
+              : e.toString(), // Use message from AuthException
           isError: true,
         );
       }
@@ -534,6 +532,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       // Now try to delete the account again
       await ref.read(authServiceProvider).deleteUser();
 
+      // Set skip flag before signing out
+      ref.read(skipAutoAuthProvider.notifier).state = true;
       // Sign out to reset the authentication state
       await ref.read(authServiceProvider).signOut();
 
@@ -573,8 +573,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                   ],
                 ),
                 content: Text(
-                  e is FirebaseAuthException
-                      ? ref.read(authServiceProvider).getReadableAuthError(e)
+                  e is AuthException // Catch custom AuthException
+                      ? e.message // Use message from AuthException
                       : 'An error occurred during authentication. Please check your credentials and try again.',
                   style: TextStyle(color: colorScheme.onSurface),
                 ),
@@ -645,12 +645,12 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
             _showChangeEmail = false;
           });
 
-          // Show final logout confirmation dialog
+          // Show confirmation dialog (updated message)
           if (mounted) {
-            await showEmailUpdateCompletedDialog(context);
-
-            // Log out the user without confirmation
-            await _signOutWithoutConfirmation();
+            await showEmailUpdateInitiatedDialog(
+                context, _emailController.text.trim());
+            // DO NOT SIGN OUT
+            // await _signOutWithoutConfirmation();
           }
         } catch (emailError) {
           setState(() {
@@ -661,11 +661,10 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           if (mounted) {
             display_name.showThemedSnackBar(
                 context: context,
-                message: emailError is FirebaseAuthException
-                    ? ref
-                        .read(authServiceProvider)
-                        .getReadableAuthError(emailError)
-                    : emailError.toString(),
+                message:
+                    emailError is AuthException // Catch custom AuthException
+                        ? emailError.message // Use message from AuthException
+                        : emailError.toString(),
                 isError: true);
           }
         }
@@ -695,8 +694,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       if (mounted) {
         display_name.showThemedSnackBar(
             context: context,
-            message: e is FirebaseAuthException
-                ? ref.read(authServiceProvider).getReadableAuthError(e)
+            message: e is AuthException // Catch custom AuthException
+                ? e.message // Use message from AuthException
                 : e.toString(),
             isError: true);
       }
@@ -732,8 +731,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       if (mounted) {
         display_name.showThemedSnackBar(
             context: context,
-            message: e is FirebaseAuthException
-                ? ref.read(authServiceProvider).getReadableAuthError(e)
+            message: e is AuthException // Catch custom AuthException
+                ? e.message // Use message from AuthException
                 : e.toString(),
             isError: true);
       }
@@ -747,7 +746,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     });
 
     try {
-      await ref.read(authServiceProvider).linkWithGoogle();
+      // Corrected method call: link Google to existing Email/Password account
+      await ref.read(authServiceProvider).linkGoogleToEmailPassword();
 
       setState(() {
         _isLoading = false;
@@ -770,8 +770,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       if (mounted) {
         display_name.showThemedSnackBar(
           context: context,
-          message: e is FirebaseAuthException
-              ? ref.read(authServiceProvider).getReadableAuthError(e)
+          message: e is AuthException // Catch custom AuthException
+              ? e.message // Use message from AuthException
               : e.toString(),
           isError: true,
         );
@@ -796,12 +796,14 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
       if (hasGoogleProvider && !user!.isAnonymous) {
         // Use the new method for Google users
+        // Corrected method call: link Email/Password to existing Google account
         await ref.read(linkEmailPasswordToGoogleProvider(
                 EmailPasswordCredentials(email: email, password: password))
             .future);
       } else {
         // Use the standard method for anonymous users
-        await ref.read(authServiceProvider).linkWithEmailAndPassword(
+        // Corrected method call: link Email/Password to anonymous user
+        await ref.read(authServiceProvider).linkEmailAndPasswordToAnonymous(
               email,
               password,
             );
@@ -828,8 +830,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       if (mounted) {
         display_name.showThemedSnackBar(
           context: context,
-          message: e is FirebaseAuthException
-              ? ref.read(authServiceProvider).getReadableAuthError(e)
+          message: e is AuthException // Catch custom AuthException
+              ? e.message // Use message from AuthException
               : e.toString(),
           isError: true,
         );
@@ -876,8 +878,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       if (mounted) {
         display_name.showThemedSnackBar(
             context: context,
-            message: e is FirebaseAuthException
-                ? ref.read(authServiceProvider).getReadableAuthError(e)
+            message: e is AuthException // Catch custom AuthException
+                ? e.message // Use message from AuthException
                 : 'Failed to update password.',
             isError: true);
       }
@@ -1008,55 +1010,12 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   }
 }
 
-Future<bool> showSignOutConfirmationDialog(BuildContext context) async {
-  final colorScheme = Theme.of(context).colorScheme;
-  return await showDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: [
-                Icon(Icons.logout_outlined, color: colorScheme.primary),
-                const SizedBox(width: 12),
-                const Text('Sign Out'),
-              ],
-            ),
-            content: const Text(
-                'Are you sure you want to sign out of your account?'),
-            actions: <Widget>[
-              TextButton(
-                style: TextButton.styleFrom(
-                  foregroundColor: colorScheme.onSurface.withValues(alpha: 0.8),
-                ),
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('No, Cancel'),
-              ),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                ),
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Yes, Sign Out'),
-              ),
-            ],
-            actionsPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          );
-        },
-      ) ??
-      false;
-}
-
+// Updated Dialog: User stays logged in
 Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
   final colorScheme = Theme.of(context).colorScheme;
   return await showDialog<bool>(
         context: context,
-        barrierDismissible: false,
+        barrierDismissible: false, // Prevent dismissing by tapping outside
         builder: (BuildContext context) {
           return AlertDialog(
             shape: RoundedRectangleBorder(
@@ -1070,7 +1029,7 @@ Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
               ],
             ),
             content: const Text(
-                'After updating your email, you will need to verify the new email address and sign in again. You will be signed out after this operation. Continue?'),
+                'A verification link will be sent to your new email address. Please click the link to confirm the change. You will remain logged in.'), // Updated message
             actions: <Widget>[
               TextButton(
                 style: TextButton.styleFrom(
@@ -1085,7 +1044,8 @@ Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
                   foregroundColor: colorScheme.onPrimary,
                 ),
                 onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Continue'),
+                child: const Text(
+                    'Send Verification Email'), // Updated button text
               ),
             ],
             actionsPadding:
@@ -1096,11 +1056,13 @@ Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
       false;
 }
 
-Future<void> showEmailUpdateCompletedDialog(BuildContext context) async {
+// Renamed Dialog: Confirms email *sending*, not completion/logout
+Future<void> showEmailUpdateInitiatedDialog(
+    BuildContext context, String newEmail) async {
   final colorScheme = Theme.of(context).colorScheme;
   return showDialog<void>(
     context: context,
-    barrierDismissible: false,
+    barrierDismissible: false, // Prevent dismissing
     builder: (BuildContext context) {
       return AlertDialog(
         shape: RoundedRectangleBorder(
@@ -1110,11 +1072,11 @@ Future<void> showEmailUpdateCompletedDialog(BuildContext context) async {
           children: [
             Icon(Icons.mark_email_read_outlined, color: colorScheme.primary),
             const SizedBox(width: 12),
-            const Text('Email Update Initiated'),
+            const Text('Verification Email Sent'), // Updated title
           ],
         ),
-        content: const Text(
-            'A verification email has been sent to your new email address. Please check your inbox and verify your email. You will be signed out now and need to sign in again after verification.'),
+        content: Text(
+            'A verification email has been sent to $newEmail. Please check your inbox and click the link to finalize the email change. You remain logged in.'), // Updated message
         actions: <Widget>[
           FilledButton(
             style: FilledButton.styleFrom(
@@ -1221,4 +1183,49 @@ Future<bool> showReauthRequiredDialog(BuildContext context,
         },
       ) ??
       false;
+}
+
+// Helper function to show sign-out confirmation dialog
+Future<bool> showSignOutConfirmationDialog(BuildContext context) async {
+  final colorScheme = Theme.of(context).colorScheme;
+  return await showDialog<bool>(
+        context: context,
+        barrierDismissible: true, // Allow dismissing by tapping outside
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.logout_outlined, color: colorScheme.primary),
+                const SizedBox(width: 12),
+                const Text('Sign Out'),
+              ],
+            ),
+            content: const Text(
+                'Are you sure you want to sign out of your account?'),
+            actions: <Widget>[
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: colorScheme.onSurface.withValues(alpha: 0.8),
+                ),
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('No, Cancel'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                ),
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Yes, Sign Out'),
+              ),
+            ],
+            actionsPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          );
+        },
+      ) ??
+      false; // Return false if dialog is dismissed
 }

@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart'; // Import GoRouter
+import 'package:fftcg_companion/core/utils/logger.dart'; // Import logger
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_email_update.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/profile_auth_methods.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/link_email_password_dialog.dart';
@@ -157,8 +159,13 @@ class AccountInfoCard extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
-                onTap: () =>
-                    Navigator.of(context).pushNamed('/profile/reset-password'),
+                onTap: () {
+                  // Add logging
+                  talker.debug(
+                      'Reset Password tapped, navigating to /profile/reset-password');
+                  // Use context.push instead of Navigator.pushNamed with GoRouter
+                  context.push('/profile/reset-password');
+                },
               ),
             ],
 
