@@ -60,6 +60,10 @@ class AuthService {
   /// Stream of auth state changes
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  //
+  // Core Authentication Methods
+  //
+
   /// Sign in with email and password
   Future<UserCredential> signInWithEmailAndPassword(
       String email, String password) async {
@@ -131,60 +135,30 @@ class AuthService {
     }
   }
 
-  /// Link with Google
-  Future<UserCredential> linkWithGoogle() async {
+  /// Sign in anonymously
+  Future<UserCredential> signInAnonymously() async {
     try {
-      // Trigger the authentication flow
-      late AuthCredential credential;
-      try {
-        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-        if (googleUser == null) {
-          throw FirebaseAuthException(
-            code: 'sign-in-cancelled',
-            message: 'Google sign in was cancelled.',
-          );
-        }
-
-        // Obtain the auth details from the request
-        final GoogleSignInAuthentication googleAuth =
-            await googleUser.authentication;
-
-        // Create a new credential
-        credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-
-        // Link the credential to the current user
-        final userCredential =
-            await _auth.currentUser!.linkWithCredential(credential);
-        await _userRepository.createUserFromAuth(userCredential.user!);
-        return userCredential;
-      } catch (linkError) {
-        if (linkError is FirebaseAuthException) {
-          if (linkError.code == 'provider-already-linked') {
-            // If the provider is already linked, just return the current user credential
-            talker.debug(
-                'Provider already linked to this account, signing out and signing in with Google');
-            await signOut();
-            return await signInWithGoogle();
-          } else if (linkError.code == 'credential-already-in-use') {
-            // If the credential is already in use by another account, retrieve the existing user and sign in
-            talker.debug(
-                'Credential already in use by another account, retrieving existing user and signing in');
-            final existingUserCredential =
-                await _auth.signInWithCredential(credential);
-            await _userRepository
-                .createUserFromAuth(existingUserCredential.user!);
-            return existingUserCredential;
-          }
-        }
-        rethrow;
-      }
+      final userCredential = await _auth.signInAnonymously();
+      await _userRepository.createUserFromAuth(userCredential.user!);
+      return userCredential;
     } catch (e) {
       throw _handleAuthException(e);
     }
   }
+
+  /// Sign out
+  Future<void> signOut() async {
+    try {
+      await _googleSignIn.signOut();
+      await _auth.signOut();
+    } catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  //
+  // Account Linking Methods
+  //
 
   /// Link anonymous account with email and password
   Future<UserCredential> linkWithEmailAndPassword(
@@ -270,16 +244,6 @@ class AuthService {
       } catch (verificationError) {
         talker.error(
             'Error sending verification email after linking: $verificationError');
-
-        if (verificationError is FirebaseAuthException) {
-          if (verificationError.code == 'too-many-requests') {
-            throw FirebaseAuthException(
-              code: 'verification-throttled',
-              message:
-                  'Too many verification emails sent. Please try again later.',
-            );
-          }
-        }
         // Continue with account linking but log the error
       }
 
@@ -292,16 +256,124 @@ class AuthService {
     }
   }
 
-  /// Sign in anonymously
-  Future<UserCredential> signInAnonymously() async {
+  /// Link with Google
+  Future<UserCredential> linkWithGoogle() async {
     try {
-      final userCredential = await _auth.signInAnonymously();
+      // Trigger the authentication flow
+      late AuthCredential credential;
+      try {
+        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+        if (googleUser == null) {
+          throw FirebaseAuthException(
+            code: 'sign-in-cancelled',
+            message: 'Google sign in was cancelled.',
+          );
+        }
+
+        // Obtain the auth details from the request
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+
+        // Create a new credential
+        credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        // Link the credential to the current user
+        final userCredential =
+            await _auth.currentUser!.linkWithCredential(credential);
+        await _userRepository.createUserFromAuth(userCredential.user!);
+        return userCredential;
+      } catch (linkError) {
+        if (linkError is FirebaseAuthException) {
+          if (linkError.code == 'provider-already-linked') {
+            // If the provider is already linked, just return the current user credential
+            talker.debug(
+                'Provider already linked to this account, signing out and signing in with Google');
+            await signOut();
+            return await signInWithGoogle();
+          } else if (linkError.code == 'credential-already-in-use') {
+            // If the credential is already in use by another account, retrieve the existing user and sign in
+            talker.debug(
+                'Credential already in use by another account, retrieving existing user and signing in');
+            final existingUserCredential =
+                await _auth.signInWithCredential(credential);
+            await _userRepository
+                .createUserFromAuth(existingUserCredential.user!);
+            return existingUserCredential;
+          }
+        }
+        rethrow;
+      }
+    } catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Link Email/Password to an existing Google-authenticated account
+  Future<UserCredential> linkEmailPasswordToGoogleAccount(
+      String email, String password) async {
+    try {
+      talker.debug('Linking Email/Password to Google account');
+
+      // Check if the current user is authenticated with Google
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        throw FirebaseAuthException(
+          code: 'no-current-user',
+          message: 'No user is currently signed in.',
+        );
+      }
+
+      // Check if the user is already using Email/Password
+      final isUsingEmailPassword = currentUser.providerData
+          .any((element) => element.providerId == 'password');
+      if (isUsingEmailPassword) {
+        throw FirebaseAuthException(
+          code: 'provider-already-linked',
+          message: 'Email/Password is already linked to your account.',
+        );
+      }
+
+      // Create Email/Password credential
+      final credential = EmailAuthProvider.credential(
+        email: email,
+        password: password,
+      );
+
+      // Link the credential to the current user
+      final userCredential = await currentUser.linkWithCredential(credential);
+
+      // Update user in Firestore
       await _userRepository.createUserFromAuth(userCredential.user!);
+
       return userCredential;
     } catch (e) {
       throw _handleAuthException(e);
     }
   }
+
+  /// Unlink provider
+  Future<User> unlinkProvider(String providerId) async {
+    try {
+      final user = await _auth.currentUser?.unlink(providerId);
+      if (user == null) {
+        throw FirebaseAuthException(
+          code: 'no-current-user',
+          message: 'No user is currently signed in.',
+        );
+      }
+      await _userRepository.createUserFromAuth(user);
+      return user;
+    } catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  //
+  // Email and Password Management
+  //
 
   /// Send email verification
   Future<void> sendEmailVerification() async {
@@ -316,19 +388,6 @@ class AuthService {
   Future<void> sendPasswordResetEmail(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email).timeout(_timeout);
-    } catch (e) {
-      throw _handleAuthException(e);
-    }
-  }
-
-  /// Update user profile
-  Future<void> updateProfile({String? displayName, String? photoURL}) async {
-    try {
-      await _auth.currentUser?.updateDisplayName(displayName);
-      await _auth.currentUser?.updatePhotoURL(photoURL);
-      if (_auth.currentUser != null) {
-        await _userRepository.createUserFromAuth(_auth.currentUser!);
-      }
     } catch (e) {
       throw _handleAuthException(e);
     }
@@ -352,6 +411,49 @@ class AuthService {
       throw _handleAuthException(e);
     }
   }
+
+  /// Update password
+  Future<void> updatePassword(String newPassword) async {
+    try {
+      await _auth.currentUser?.updatePassword(newPassword);
+    } catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  //
+  // Profile Management
+  //
+
+  /// Update user profile
+  Future<void> updateProfile({String? displayName, String? photoURL}) async {
+    try {
+      await _auth.currentUser?.updateDisplayName(displayName);
+      await _auth.currentUser?.updatePhotoURL(photoURL);
+      if (_auth.currentUser != null) {
+        await _userRepository.createUserFromAuth(_auth.currentUser!);
+      }
+    } catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Delete user
+  Future<void> deleteUser() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _userRepository.deleteUser(user.uid);
+        await user.delete();
+      }
+    } catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  //
+  // Re-authentication Methods
+  //
 
   /// Re-authenticate with email and password
   Future<UserCredential> reauthenticateWithEmailAndPassword(
@@ -466,45 +568,9 @@ class AuthService {
     }
   }
 
-  /// Unlink provider
-  Future<User> unlinkProvider(String providerId) async {
-    try {
-      final user = await _auth.currentUser?.unlink(providerId);
-      if (user == null) {
-        throw FirebaseAuthException(
-          code: 'no-current-user',
-          message: 'No user is currently signed in.',
-        );
-      }
-      await _userRepository.createUserFromAuth(user);
-      return user;
-    } catch (e) {
-      throw _handleAuthException(e);
-    }
-  }
-
-  /// Delete user
-  Future<void> deleteUser() async {
-    try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        await _userRepository.deleteUser(user.uid);
-        await user.delete();
-      }
-    } catch (e) {
-      throw _handleAuthException(e);
-    }
-  }
-
-  /// Sign out
-  Future<void> signOut() async {
-    try {
-      await _googleSignIn.signOut();
-      await _auth.signOut();
-    } catch (e) {
-      throw _handleAuthException(e);
-    }
-  }
+  //
+  // Email Verification and Status Methods
+  //
 
   /// Handle email verification completion
   Future<void> handleEmailVerificationComplete() async {
@@ -518,6 +584,47 @@ class AuthService {
       throw _handleAuthException(e);
     }
   }
+
+  /// Check if a user's email is verified
+  Future<bool> isEmailVerified() async {
+    try {
+      // Reload the user to get the latest email verification status
+      await _auth.currentUser?.reload();
+      return _auth.currentUser?.emailVerified ?? false;
+    } catch (e) {
+      talker.error('Error checking email verification status: $e');
+      return false;
+    }
+  }
+
+  /// Check if a user's account is older than the specified number of days
+  Future<bool> isAccountOlderThan(int days) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      final metadata = user.metadata;
+      final creationTime = metadata.creationTime;
+      if (creationTime == null) return false;
+
+      final now = DateTime.now();
+      final difference = now.difference(creationTime);
+
+      return difference.inDays > days;
+    } catch (e) {
+      talker.error('Error checking account age: $e');
+      return false;
+    }
+  }
+
+  /// Check if the current user is anonymous
+  bool isAnonymous() {
+    return _auth.currentUser?.isAnonymous ?? false;
+  }
+
+  //
+  // Error Handling
+  //
 
   /// Get readable auth error message
   String getReadableAuthError(FirebaseAuthException e) {
@@ -667,44 +774,5 @@ class AuthService {
         originalException: e,
       );
     }
-  }
-
-  /// Check if a user's email is verified
-  /// This is used to enforce email verification for sensitive operations
-  Future<bool> isEmailVerified() async {
-    try {
-      // Reload the user to get the latest email verification status
-      await _auth.currentUser?.reload();
-      return _auth.currentUser?.emailVerified ?? false;
-    } catch (e) {
-      talker.error('Error checking email verification status: $e');
-      return false;
-    }
-  }
-
-  /// Check if a user's account is older than the specified number of days
-  /// This is used to implement progressive security based on account age
-  Future<bool> isAccountOlderThan(int days) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) return false;
-
-      final metadata = user.metadata;
-      final creationTime = metadata.creationTime;
-      if (creationTime == null) return false;
-
-      final now = DateTime.now();
-      final difference = now.difference(creationTime);
-
-      return difference.inDays > days;
-    } catch (e) {
-      talker.error('Error checking account age: $e');
-      return false;
-    }
-  }
-
-  /// Check if the current user is anonymous
-  bool isAnonymous() {
-    return _auth.currentUser?.isAnonymous ?? false;
   }
 }

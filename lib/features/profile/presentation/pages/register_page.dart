@@ -16,23 +16,78 @@ class RegisterPage extends ConsumerStatefulWidget {
   ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
 
+/// Shows a snackbar with a message
+void showThemedSnackBar({
+  required BuildContext context,
+  required String message,
+  required bool isError,
+  Duration duration = const Duration(seconds: 4),
+}) {
+  final theme = Theme.of(context);
+  final colorScheme = theme.colorScheme;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        message,
+        style: TextStyle(
+          color: isError
+              ? colorScheme.onErrorContainer
+              : colorScheme.onPrimaryContainer,
+        ),
+      ),
+      backgroundColor:
+          isError ? colorScheme.errorContainer : colorScheme.primaryContainer,
+      duration: duration,
+      action: SnackBarAction(
+        label: 'OK',
+        textColor: isError
+            ? colorScheme.onErrorContainer
+            : colorScheme.onPrimaryContainer,
+        onPressed: () {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        },
+      ),
+    ),
+  );
+}
+
 class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
-  bool _showPasswordRequirements = false;
+  // bool _showPasswordRequirements = false; // Replaced by FocusNode listener
   bool _showPassword = false;
   bool _registrationComplete = false;
   bool _showConfirmPassword = false;
+  final FocusNode _passwordFocusNode = FocusNode(); // Add FocusNode
+  bool _isPasswordFocused = false; // State to track focus
+
+  @override
+  void initState() {
+    super.initState();
+    // Add listener to FocusNode
+    _passwordFocusNode.addListener(_onPasswordFocusChange);
+  }
 
   @override
   void dispose() {
+    _passwordFocusNode
+        .removeListener(_onPasswordFocusChange); // Remove listener
+    _passwordFocusNode.dispose(); // Dispose FocusNode
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  // Listener for focus changes
+  void _onPasswordFocusChange() {
+    setState(() {
+      _isPasswordFocused = _passwordFocusNode.hasFocus;
+    });
   }
 
   Future<void> _registerWithEmailAndPassword() async {
@@ -181,9 +236,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           talker.debug('Register page: Google linking successful');
 
           // Navigate to profile page after successful linking
-          if (mounted) {
-            context.go('/profile');
-          }
+          // if (mounted) {
+          //   context.go('/profile'); // Rely on router redirect via authStateProvider
+          // }
         } catch (linkError) {
           // If the credential is already linked to another account, sign out and sign in with Google
           if (linkError is FirebaseAuthException &&
@@ -195,9 +250,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             await authService.signInWithGoogle();
 
             // Navigate to profile page after successful sign-in
-            if (mounted) {
-              context.go('/profile');
-            }
+            // if (mounted) {
+            //   context.go('/profile'); // Rely on router redirect via authStateProvider
+            // }
           } else {
             // Rethrow other errors
             rethrow;
@@ -209,22 +264,55 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             'Register page: Checking if user already exists before Google Sign-In');
         final wasAuthenticated = authState.isAuthenticated;
 
-        await authService.signInWithGoogle();
-        talker.debug('Register page: Google Sign-In successful');
+        try {
+          // Get the current user ID before sign-in to check if this is a new account
+          final beforeUserId = FirebaseAuth.instance.currentUser?.uid;
 
-        // Navigate to profile page after successful sign-in
-        if (mounted) {
-          context.go('/profile');
-        }
+          await authService.signInWithGoogle();
+          talker.debug('Register page: Google Sign-In successful');
 
-        // Show success message only if the user was not previously authenticated
-        if (mounted && !wasAuthenticated) {
-          showThemedSnackBar(
-            context: context,
-            message: 'Account created successfully with Google',
-            isError: false,
-            duration: const Duration(seconds: 5),
-          );
+          // Get the user ID after sign-in
+          final afterUserId = FirebaseAuth.instance.currentUser?.uid;
+
+          // If the user ID changed and the user wasn't authenticated before,
+          // this is likely a new account creation rather than signing in to an existing account
+          final isNewAccount = !wasAuthenticated && beforeUserId != afterUserId;
+
+          // Navigate to profile page after successful sign-in
+          if (mounted) {
+            // context.go('/profile'); // Rely on router redirect via authStateProvider
+
+            // Only show success message if this appears to be a new account
+            if (isNewAccount) {
+              showThemedSnackBar(
+                context: context,
+                message: 'Account created successfully with Google',
+                isError: false,
+                duration: const Duration(seconds: 5),
+              );
+            }
+          }
+        } catch (signInError) {
+          if (signInError is FirebaseAuthException) {
+            if (signInError.code == 'credential-already-in-use' ||
+                signInError.code ==
+                    'account-exists-with-different-credential') {
+              // This is an existing account, just navigate to profile page
+              talker.debug(
+                  'Register page: Existing Google account detected, signing in');
+
+              // Navigate to profile page after successful sign-in
+              // if (mounted) {
+              //   context.go('/profile'); // Rely on router redirect via authStateProvider
+              // }
+            } else {
+              // Rethrow other errors to be caught by the outer catch block
+              rethrow;
+            }
+          } else {
+            // Rethrow other errors to be caught by the outer catch block
+            rethrow;
+          }
         }
       }
     } catch (e) {
@@ -431,39 +519,38 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                   ),
                                 ),
                                 obscureText: !_showPassword,
-                                onTap: () {
-                                  setState(() {
-                                    _showPasswordRequirements = true;
-                                  });
-                                },
+                                focusNode:
+                                    _passwordFocusNode, // Assign FocusNode
+                                // onTap removed, focus handled by FocusNode listener
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'Please enter a password';
                                   }
                                   if (value.length < 8) {
-                                    return 'Password must be at least 8 characters';
+                                    return 'Password must be at least 8 characters long.';
                                   }
-                                  // Check for uppercase
-                                  if (!RegExp(r'[A-Z]').hasMatch(value)) {
-                                    return 'Password must include an uppercase letter';
+                                  // Check for uppercase letter
+                                  if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
+                                    return 'Password must contain an uppercase letter.';
                                   }
-                                  // Check for lowercase
-                                  if (!RegExp(r'[a-z]').hasMatch(value)) {
-                                    return 'Password must include a lowercase letter';
+                                  // Check for lowercase letter
+                                  if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
+                                    return 'Password must contain a lowercase letter.';
                                   }
-                                  // Check for number
-                                  if (!RegExp(r'[0-9]').hasMatch(value)) {
-                                    return 'Password must include a number';
+                                  // Check for numeric character
+                                  if (!RegExp(r'(?=.*[0-9])').hasMatch(value)) {
+                                    return 'Password must contain a number.';
                                   }
                                   // Check for special character
-                                  if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]')
+                                  if (!RegExp(r'(?=.*[!@#$%^&*(),.?":{}|<>])')
                                       .hasMatch(value)) {
-                                    return 'Password must include a special character';
+                                    return 'Password must contain a special character.';
                                   }
-                                  return null;
+                                  return null; // Password is valid
                                 },
                               ),
-                              if (_showPasswordRequirements) ...[
+                              // Conditionally show requirements based on focus state
+                              if (_isPasswordFocused) ...[
                                 const SizedBox(height: 8),
                                 Container(
                                   padding: const EdgeInsets.all(12),

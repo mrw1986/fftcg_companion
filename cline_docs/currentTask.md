@@ -429,9 +429,209 @@ The app was using older color opacity methods that could cause inconsistent visu
 
 The app now uses modern color handling methods throughout the codebase, ensuring consistent visual appearance and better support for wide gamut environments. The comprehensive documentation will guide future development to maintain this consistency.
 
+## Current Objective 25 (Completed)
+
+Fix Firebase Authentication Issues
+
+### Context of the Authentication Issues
+
+Several issues were identified in the Firebase Authentication flows:
+
+1. When a user tried to create an account with Google credentials that were already linked to an existing account, they incorrectly received a success message
+2. The re-authentication flow for Google Sign-In was not handling token refreshing and "requires-recent-login" errors properly
+3. The linking of email/password to an existing account authenticated with Google was failing with authentication errors
+4. Error handling in the Google Sign-In button wasn't properly categorizing and displaying Firebase Authentication errors
+
+### Implementation Plan
+
+1. Fix Google Authentication in Register Flow:
+   - Update register_page.dart to properly detect when a user is signing in with an existing Google account
+   - Implement a secure approach that doesn't use the deprecated fetchSignInMethodsForEmail method
+   - Eliminate the misleading "Account created successfully with Google" message for existing accounts
+
+2. Improve Re-authentication Handling:
+   - Enhance the reauthenticateWithGoogle method in auth_service.dart to better handle token refreshing
+   - Add proper error handling for "requires-recent-login" errors
+   - Implement a fallback mechanism for token issues
+
+3. Enhance Error Handling:
+   - Update error handling in link_email_password_dialog.dart for re-authentication requirements
+   - Improve error handling in google_sign_in_button.dart for specific Firebase Authentication errors
+   - Add more descriptive error messages for better user experience
+
+### Implementation Results
+
+#### Completed Tasks
+
+1. Fixed Google Authentication in Register Flow:
+   - Modified register_page.dart to compare user IDs before and after sign-in to detect existing accounts
+   - Implemented a secure approach that doesn't use fetchSignInMethodsForEmail
+   - Only shows the success message when a new account is actually created
+   - Added proper error handling for credential-already-in-use and account-exists-with-different-credential errors
+
+2. Improved Re-authentication Handling:
+   - Enhanced reauthenticateWithGoogle method in auth_service.dart with better token refreshing
+   - Added a fallback mechanism that signs out and signs back in when token issues are detected
+   - Improved error detection for requires-recent-login, user-token-expired, and BAD_REQUEST errors
+   - Added proper error categorization for better user feedback
+
+3. Enhanced Error Handling:
+   - Updated link_email_password_dialog.dart to provide clearer messages for re-authentication requirements
+   - Improved error handling in google_sign_in_button.dart for specific Firebase Authentication errors
+   - Added more descriptive error messages for wrong-account, user-token-expired, and BAD_REQUEST errors
+   - Ensured consistent error presentation across the authentication flows
+
+4. Fixed Code Structure:
+   - Added the showThemedSnackBar function to register_page.dart for proper error message display
+   - Ensured consistent error handling across all authentication flows
+   - Improved code organization for better maintainability
+
+5. Testing:
+   - Verified that users don't receive misleading success messages when using existing credentials
+   - Confirmed that re-authentication flows work correctly for sensitive operations
+   - Tested error handling for various authentication scenarios
+   - Ensured authentication state is properly maintained throughout the application
+
+The application now handles all authentication flows correctly, including new account creation, login, linking email/password to existing accounts, and re-authentication for sensitive operations. Users receive clear and accurate feedback throughout the authentication process.
+
 ## Next Steps
 
 1. Implement comprehensive security enhancements (in progress)
+2. Implement deck builder feature
+3. Add card scanner functionality
+4. Develop price tracking system
+5. Add collection import/export
+6. Implement collection sharing
+7. Add favorites and wishlist
+8. Enhance filtering options
+9. Add batch operations
+
+## Current Objective 26 (In Progress)
+
+Rebuild Authentication System for Simplicity and Robustness
+
+### Context
+
+Despite previous attempts to fix and enhance the Firebase Authentication system, ongoing issues and perceived over-engineering necessitate a rebuild. The goal is to create a simpler, more robust system from scratch while preserving the existing UI/UX.
+
+### Goal
+
+Implement a robust and simplified authentication system using Firebase Authentication (Email/Password, Anonymous, Google) covering all essential user flows.
+
+### Core Authentication Flows to Implement
+
+1. **Anonymous:**
+    - Automatic sign-in on app start if no user is logged in.
+    - Upgrade/Link anonymous account to Email/Password.
+    - Upgrade/Link anonymous account to Google.
+2. **Email/Password:**
+    - Register new account + Email Verification initiation.
+    - Sign in.
+    - Password Reset (Forgot Password).
+    - Update Email (requires re-authentication).
+    - Update Password (requires re-authentication).
+    - Link Email/Password to an existing Google-authenticated account.
+3. **Google:**
+    - Register/Sign in with Google.
+    - Link Google to an existing Email/Password account.
+4. **General:**
+    - Sign out.
+    - Account Deletion (requires re-authentication).
+    - Re-authentication flow (triggered by sensitive operations).
+    - Handling Email Verification status changes.
+    - Graceful error handling for common scenarios (e.g., `account-exists-with-different-credential`, `requires-recent-login`, network errors).
+
+### Proposed Implementation Plan
+
+1. **Refactor `AuthService` (`lib/core/services/auth_service.dart`):**
+    - Significantly refactor or rewrite the service.
+    - Focus on direct, clear calls to the `FirebaseAuth.instance` SDK for each flow.
+    - Implement straightforward error handling, catching Firebase exceptions and re-throwing simplified errors.
+    - Maintain necessary interactions with `UserRepository` for Firestore data consistency.
+2. **Review/Update State Management (Riverpod Providers):**
+    - Examine `auth_provider.dart`, `auto_auth_provider.dart`, and `email_verification_checker.dart`.
+    - Ensure `AuthState` correctly reflects user status.
+    - Adjust providers to integrate with the new `AuthService`.
+3. **UI Integration (No Visual Changes):**
+    - Update UI pages/widgets (`login_page.dart`, `register_page.dart`, `account_settings_page.dart`, etc.) to call the refactored `AuthService` via providers.
+    - Update UI handling of loading states and errors. Visual presentation remains the same.
+4. **Firestore Security Rules:**
+    - Review `firestore.rules` to align with the simplified authentication logic.
+5. **Testing:**
+    - Perform thorough manual testing of *every* authentication flow.
+6. **Documentation Update:**
+    - Update `currentTask.md` (this file).
+    - Update `projectRoadmap.md` (mark Authentication as In Progress).
+    - Update `codebaseSummary.md` (reflect the rebuild).
+
+### Authentication Flow Diagram
+
+```mermaid
+graph TD
+    subgraph Entry Points
+        A[App Start] --> B{User Signed In?};
+        C[Login/Register Page] --> D{Choose Method};
+    end
+
+    subgraph Anonymous Flow
+        B -- No --> AnonSignIn[Sign In Anonymously];
+        AnonSignIn --> AuthState;
+        Anon[Anonymous User] -- Link --> LinkChoice{Link Email/Pass or Google?};
+        LinkChoice -- Email/Pass --> LinkEmailPass[Link Email/Pass Credential];
+        LinkChoice -- Google --> LinkGoogle[Link Google Credential];
+        LinkEmailPass --> AuthState;
+        LinkGoogle --> AuthState;
+    end
+
+    subgraph Email/Password Flow
+        D -- Email/Pass --> EmailChoice{Register or Login?};
+        EmailChoice -- Register --> RegisterEmail[Register + Send Verification];
+        EmailChoice -- Login --> LoginEmail[Login Email/Pass];
+        RegisterEmail --> AuthState;
+        LoginEmail --> AuthState;
+        EmailUser[Email/Pass User] -- Forgot Password --> ResetPass[Password Reset Flow];
+        EmailUser -- Update Email --> ReAuth1[Re-auth Needed];
+        ReAuth1 -- Success --> UpdateEmail[Update Email Flow];
+        EmailUser -- Update Password --> ReAuth2[Re-auth Needed];
+        ReAuth2 -- Success --> UpdatePass[Update Password Flow];
+        EmailUser -- Link Google --> LinkGoogle2[Link Google Credential];
+        LinkGoogle2 --> AuthState;
+        ResetPass --> LoginEmail;
+        UpdateEmail --> AuthState;
+        UpdatePass --> AuthState;
+    end
+
+    subgraph Google Flow
+        D -- Google --> LoginGoogle[Login/Register with Google];
+        LoginGoogle --> AuthState;
+        GoogleUser[Google User] -- Link Email/Pass --> LinkEmailPass2[Link Email/Pass Credential];
+        LinkEmailPass2 --> AuthState;
+    end
+
+    subgraph Common Actions
+        B -- Yes --> SignedInUser;
+        SignedInUser --> ActionChoice{Choose Action};
+        ActionChoice -- Sign Out --> SignOut[Sign Out Flow];
+        ActionChoice -- Delete Account --> ReAuth3[Re-auth Needed];
+        ReAuth3 -- Success --> DeleteAcct[Delete Account Flow];
+        SignOut --> B;
+        DeleteAcct --> B;
+    end
+
+    subgraph State & UI
+        AuthState[Update Auth State] --> UpdateUI[Update UI];
+    end
+
+    style AnonSignIn fill:#f9f,stroke:#333,stroke-width:2px
+    style AuthState fill:#ccf,stroke:#333,stroke-width:2px
+    style ReAuth1 fill:#fdc,stroke:#333,stroke-width:1px
+    style ReAuth2 fill:#fdc,stroke:#333,stroke-width:1px
+    style ReAuth3 fill:#fdc,stroke:#333,stroke-width:1px
+```
+
+## Next Steps
+
+1. **Implement Authentication Rebuild (Current Objective 26)**
 2. Implement deck builder feature
 3. Add card scanner functionality
 4. Develop price tracking system

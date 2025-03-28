@@ -12,6 +12,8 @@ import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/profile_header_card.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/account_info_card.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/account_actions_card.dart';
+// import 'package:fftcg_companion/features/profile/presentation/widgets/link_email_password_dialog.dart'; // No longer needed here
+import 'package:fftcg_companion/features/profile/presentation/widgets/update_password_dialog.dart';
 
 class AccountSettingsPage extends ConsumerStatefulWidget {
   const AccountSettingsPage({super.key});
@@ -27,7 +29,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   bool _isLoading = false;
   bool _showChangeEmail = false;
   bool _showReauthDialog = false;
-  bool _isAccountDeletion = false;
+  bool _isAccountDeletion = false; // Flag for deletion re-auth
+  bool _isPasswordChange = false; // Flag for password change re-auth
   final _reauthEmailController = TextEditingController();
   bool _showReauthPassword = false;
   final _reauthPasswordController = TextEditingController();
@@ -39,6 +42,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   }
 
   void _initializeUserData() {
+    // Use context.read for initState
     final user = ref.read(authStateProvider).user;
     if (user != null) {
       if (user.displayName != null) {
@@ -146,7 +150,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           if (shouldReauth) {
             setState(() {
               _showReauthDialog = true;
-              _isAccountDeletion = false;
+              _isAccountDeletion = false; // Ensure deletion flag is false
+              _isPasswordChange = false; // Ensure password change flag is false
             });
           }
         }
@@ -181,7 +186,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           if (shouldReauth) {
             setState(() {
               _showReauthDialog = true;
-              _isAccountDeletion = false;
+              _isAccountDeletion = false; // Ensure deletion flag is false
+              _isPasswordChange = false; // Ensure password change flag is false
             });
           }
         }
@@ -280,7 +286,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           if (shouldReauth) {
             setState(() {
               _showReauthDialog = true;
-              _isAccountDeletion = true;
+              _isAccountDeletion = true; // Set deletion flag
+              _isPasswordChange = false; // Ensure password change flag is false
             });
           }
         }
@@ -355,7 +362,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           if (shouldReauth) {
             setState(() {
               _showReauthDialog = true;
-              _isAccountDeletion = true;
+              _isAccountDeletion = true; // Set deletion flag
+              _isPasswordChange = false; // Ensure password change flag is false
             });
           }
         }
@@ -444,7 +452,14 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
         talker.debug('Proceeding with email update after re-authentication');
         await _updateEmail();
       }
-      // Otherwise just show a success message
+      // If this was for password change, show the update password dialog
+      else if (_isPasswordChange) {
+        talker.debug('Proceeding with password change after re-authentication');
+        if (mounted) {
+          _showUpdatePasswordDialog(); // Show dialog to enter new password
+        }
+      }
+      // Otherwise just show a success message (e.g., re-auth without specific action)
       else {
         if (mounted) {
           display_name.showThemedSnackBar(
@@ -612,7 +627,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       });
 
       // If this was for email update, try to update the email now
-      if (!_isAccountDeletion && _showChangeEmail) {
+      if (!_isAccountDeletion && !_isPasswordChange && _showChangeEmail) {
         talker.debug('Proceeding with email update after re-authentication');
 
         // Show a loading indicator while updating email
@@ -654,8 +669,15 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                 isError: true);
           }
         }
+      }
+      // If this was for password change, show the update password dialog
+      else if (_isPasswordChange) {
+        talker.debug('Proceeding with password change after re-authentication');
+        if (mounted) {
+          _showUpdatePasswordDialog(); // Show dialog to enter new password
+        }
       } else {
-        // Just show a general success message
+        // Just show a general success message (e.g., re-auth without specific action)
         if (mounted) {
           display_name.showThemedSnackBar(
               context: context,
@@ -757,6 +779,111 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     }
   }
 
+  /// Link the current account with Email/Password
+  Future<void> _linkWithEmailPassword(String email, String password) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final user = ref.read(authStateProvider).user;
+
+      // Check if user is signed in with Google
+      final hasGoogleProvider = user?.providerData.any(
+            (element) => element.providerId == 'google.com',
+          ) ??
+          false;
+
+      if (hasGoogleProvider && !user!.isAnonymous) {
+        // Use the new method for Google users
+        await ref.read(linkEmailPasswordToGoogleProvider(
+                EmailPasswordCredentials(email: email, password: password))
+            .future);
+      } else {
+        // Use the standard method for anonymous users
+        await ref.read(authServiceProvider).linkWithEmailAndPassword(
+              email,
+              password,
+            );
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      // Show success message
+      if (mounted) {
+        display_name.showThemedSnackBar(
+          context: context,
+          message: 'Successfully added Email/Password authentication',
+          isError: false,
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      // Show error message
+      if (mounted) {
+        display_name.showThemedSnackBar(
+          context: context,
+          message: e is FirebaseAuthException
+              ? ref.read(authServiceProvider).getReadableAuthError(e)
+              : e.toString(),
+          isError: true,
+        );
+      }
+    }
+  }
+
+  // Removed unused _showLinkEmailPasswordDialog method
+
+  /// Show the update password dialog
+  void _showUpdatePasswordDialog() {
+    // Use the newly created dialog
+    showDialog(
+      context: context,
+      builder: (context) => UpdatePasswordDialog(
+        onUpdatePassword: (newPassword) async {
+          // Call the actual update password method
+          await _updatePassword(newPassword);
+        },
+      ),
+    );
+  }
+
+  /// Update the user's password
+  Future<void> _updatePassword(String newPassword) async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      await ref.read(authServiceProvider).updatePassword(newPassword);
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        display_name.showThemedSnackBar(
+            context: context,
+            message: 'Password updated successfully.',
+            isError: false);
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        display_name.showThemedSnackBar(
+            context: context,
+            message: e is FirebaseAuthException
+                ? ref.read(authServiceProvider).getReadableAuthError(e)
+                : 'Failed to update password.',
+            isError: true);
+      }
+    }
+  }
+
   String _getProviderDisplayName(String providerId) {
     switch (providerId) {
       case 'google.com':
@@ -801,9 +928,10 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
             });
           },
           onAuthenticate: _isAccountDeletion
-              ? _reauthenticateAndDeleteAccount
-              : _reauthenticateAndContinue,
-          onGoogleAuthenticate: _reauthenticateWithGoogle,
+              ? _reauthenticateAndDeleteAccount // Handles deletion
+              : _reauthenticateAndContinue, // Handles email update or password change trigger
+          onGoogleAuthenticate:
+              _reauthenticateWithGoogle, // Handles Google re-auth
         ),
       );
     }
@@ -849,10 +977,20 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                     onUpdateEmail: _updateEmail,
                     onUnlinkProvider: _unlinkProvider,
                     onLinkWithGoogle: _linkWithGoogle,
-                    onLinkWithEmailPassword: (email, password) {
-                      ref
-                          .read(authServiceProvider)
-                          .linkWithEmailAndPassword(email, password);
+                    onLinkWithEmailPassword: _linkWithEmailPassword,
+                    // Add callback to trigger password change re-auth
+                    onChangePassword: () async {
+                      final shouldReauth = await showReauthRequiredDialog(
+                          context,
+                          isForDeletion: false, // Not for deletion
+                          actionText: 'changing your password'); // Custom text
+                      if (shouldReauth) {
+                        setState(() {
+                          _showReauthDialog = true;
+                          _isAccountDeletion = false;
+                          _isPasswordChange = true; // Set password change flag
+                        });
+                      }
                     },
                     isLoading: _isLoading,
                   ),
@@ -1039,7 +1177,9 @@ Future<bool> showDeleteConfirmationDialog(BuildContext context) async {
 }
 
 Future<bool> showReauthRequiredDialog(BuildContext context,
-    {bool isForDeletion = true}) async {
+    {bool isForDeletion = true,
+    String actionText = 'deleting your account'}) async {
+  // Added actionText
   final colorScheme = Theme.of(context).colorScheme;
   return await showDialog<bool>(
         context: context,
@@ -1057,7 +1197,7 @@ Future<bool> showReauthRequiredDialog(BuildContext context,
               ],
             ),
             content: Text(
-                'For security reasons, you need to re-authenticate before ${isForDeletion ? 'deleting your account' : 'updating your email'}.'),
+                'For security reasons, you need to re-authenticate before $actionText.'), // Use actionText
             actions: <Widget>[
               TextButton(
                 style: TextButton.styleFrom(

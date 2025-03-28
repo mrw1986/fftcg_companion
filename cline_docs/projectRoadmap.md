@@ -80,20 +80,20 @@
 
 ## Completion Criteria
 
-### Authentication System ✓
+### Authentication System (In Progress - Rebuild)
 
-- [x] Implement secure user authentication
-- [x] Support multiple auth providers
-- [x] Handle email verification
-- [x] Manage user accounts
-- [x] Provide secure account deletion
-- [x] Implement re-authentication
-- [x] Support anonymous accounts
-- [x] Implement proper email update flow with logout
-- [x] Fix Forgot Password flow for anonymous users
-- [x] Implement proper account linking for anonymous users
-- [x] Fix account deletion flow with proper state reset
-- [x] Fix Google authentication flow
+- [ ] Implement secure user authentication (Rebuild)
+- [ ] Support multiple auth providers (Rebuild)
+- [ ] Handle email verification (Rebuild)
+- [ ] Manage user accounts (Rebuild)
+- [ ] Provide secure account deletion (Rebuild)
+- [ ] Implement re-authentication (Rebuild)
+- [ ] Support anonymous accounts (Rebuild)
+- [ ] Implement proper email update flow with logout (Rebuild)
+- [ ] Fix Forgot Password flow for anonymous users (Rebuild)
+- [ ] Implement proper account linking for anonymous users (Rebuild)
+- [ ] Fix account deletion flow with proper state reset (Rebuild)
+- [ ] Fix Google authentication flow (Rebuild)
 
 ### Collection Management ✓
 
@@ -118,7 +118,14 @@
 
 ### Recently Completed
 
-1. Fixed Google authentication flow:
+1. Fixed Firebase Authentication issues:
+   - Fixed Google authentication in register flow to properly detect existing accounts
+   - Improved re-authentication handling with better token refreshing
+   - Enhanced error handling for specific Firebase Authentication errors
+   - Fixed code structure for consistent error handling
+   - Eliminated misleading success messages when signing in with existing credentials
+
+2. Fixed Google authentication flow:
    - Updated register_page.dart to properly navigate to the profile page after successful Google sign-in
    - Modified auth_service.dart to sign out and sign in with Google when encountering the 'provider-already-linked' error
    - Updated login_page.dart to handle the 'provider-already-linked' error case
@@ -168,7 +175,7 @@
 
 ### Next Steps
 
-1. Perform comprehensive security assessment of authentication system
+1. **Rebuild Authentication System (Current Objective 26)**
 2. Implement deck builder feature
 3. Add card scanner functionality
 4. Develop price tracking system

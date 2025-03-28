@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_email_update.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/profile_auth_methods.dart';
+import 'package:fftcg_companion/features/profile/presentation/widgets/link_email_password_dialog.dart';
 
 class AccountInfoCard extends StatelessWidget {
   final User? user;
@@ -13,6 +14,7 @@ class AccountInfoCard extends StatelessWidget {
   final Function(String) onUnlinkProvider;
   final Future<void> Function() onLinkWithGoogle;
   final Function(String, String) onLinkWithEmailPassword;
+  final VoidCallback onChangePassword; // Add this callback
   final bool isLoading;
 
   const AccountInfoCard({
@@ -26,6 +28,7 @@ class AccountInfoCard extends StatelessWidget {
     required this.onUnlinkProvider,
     required this.onLinkWithGoogle,
     required this.onLinkWithEmailPassword,
+    required this.onChangePassword, // Add to constructor
     required this.isLoading,
   });
 
@@ -36,6 +39,28 @@ class AccountInfoCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final providers = user!.providerData.map((e) => e.providerId).toList();
     final hasPassword = providers.contains('password');
+    // Removed unused hasGoogle variable
+
+    // Function to show the link email/password dialog
+    void showLinkEmailPasswordDialog() {
+      showDialog(
+        context: context,
+        builder: (context) => LinkEmailPasswordDialog(
+          onSuccess: () {
+            // Refresh the UI after successful linking
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Email/password authentication added successfully',
+                  style: TextStyle(color: colorScheme.onPrimary),
+                ),
+                backgroundColor: colorScheme.primary,
+              ),
+            );
+          },
+        ),
+      );
+    }
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -108,7 +133,7 @@ class AccountInfoCard extends StatelessWidget {
               onUnlinkProvider: onUnlinkProvider,
               onLinkWithGoogle: onLinkWithGoogle,
               onLinkWithEmailPassword: onLinkWithEmailPassword,
-              onShowLinkEmailPasswordDialog: onToggleChangeEmail,
+              onShowLinkEmailPasswordDialog: showLinkEmailPasswordDialog,
               showChangeEmail: showChangeEmail,
               onToggleChangeEmail: onToggleChangeEmail,
               isEmailNotVerified: isEmailNotVerified,
@@ -134,6 +159,28 @@ class AccountInfoCard extends StatelessWidget {
                 ),
                 onTap: () =>
                     Navigator.of(context).pushNamed('/profile/reset-password'),
+              ),
+            ],
+
+            // Change password option for password users
+            if (!user!.isAnonymous && hasPassword) ...[
+              const SizedBox(height: 8),
+              ListTile(
+                title: const Text('Change Password'),
+                subtitle: const Text('Update your account password'),
+                leading: Icon(
+                  Icons.key_outlined,
+                  color: colorScheme.tertiary,
+                ),
+                trailing: Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                onTap: onChangePassword, // Use the callback here
               ),
             ],
           ],

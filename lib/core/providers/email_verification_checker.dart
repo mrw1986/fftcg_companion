@@ -98,5 +98,3 @@ Future<void> _checkEmailVerification(Ref ref) async {
     talker.error('Error checking email verification status', e);
   }
 }
-
-// TODO: Remove this once we confirm the email verification is working as expected

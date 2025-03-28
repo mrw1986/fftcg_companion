@@ -74,11 +74,12 @@ class UserRepository {
       final updatedUser = existingUser.copyWith(
         lastLogin: Timestamp.now(),
         lastAccessed: Timestamp.now(),
-        // Always use the latest displayName from Firebase Auth, even if it's null
+        // Always use the latest info from Firebase Auth, even if it's null
         // This ensures we don't have stale data
         displayName: authUser.displayName,
         email: authUser.email ?? existingUser.email,
         photoURL: authUser.photoURL ?? existingUser.photoURL,
+        isVerified: authUser.emailVerified, // Update verification status
         settings: updatedSettings,
       );
       await createOrUpdateUser(updatedUser);
@@ -101,6 +102,7 @@ class UserRepository {
       createdAt: Timestamp.now(),
       lastLogin: Timestamp.now(),
       lastAccessed: Timestamp.now(),
+      isVerified: authUser.emailVerified, // Set initial verification status
       settings: settings,
     );
     await createOrUpdateUser(newUser);

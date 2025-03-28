@@ -218,7 +218,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         talker.debug('Login page: Calling authService.signInWithGoogle()');
         await authService.signInWithGoogle();
         talker.debug('Login page: Google Sign-In successful');
-        _navigateToProfile();
+        // _navigateToProfile(); // Rely on router redirect via authStateProvider
       }
     } catch (e) {
       String errorMessage = 'Failed to sign in with Google';

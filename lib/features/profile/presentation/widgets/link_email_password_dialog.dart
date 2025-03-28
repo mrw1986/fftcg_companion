@@ -25,13 +25,45 @@ class _LinkEmailPasswordDialogState
   bool _showPassword = false;
   bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
+  final FocusNode _passwordFocusNode = FocusNode(); // Add FocusNode
+  bool _isPasswordFocused = false; // State to track focus
+
+  @override
+  void initState() {
+    // Add listener to FocusNode
+    _passwordFocusNode.addListener(_onPasswordFocusChange);
+    super.initState();
+
+    // Pre-fill email if user is signed in with Google
+    final user = ref.read(authStateProvider).user;
+    if (user != null) {
+      // Check if user has Google provider
+      final hasGoogleProvider = user.providerData.any(
+        (element) => element.providerId == 'google.com',
+      );
+
+      if (hasGoogleProvider && user.email != null) {
+        _emailController.text = user.email!;
+      }
+    }
+  }
 
   @override
   void dispose() {
+    _passwordFocusNode
+        .removeListener(_onPasswordFocusChange); // Remove listener
+    _passwordFocusNode.dispose(); // Dispose FocusNode
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  // Listener for focus changes
+  void _onPasswordFocusChange() {
+    setState(() {
+      _isPasswordFocused = _passwordFocusNode.hasFocus;
+    });
   }
 
   void _togglePasswordVisibility() {
@@ -50,18 +82,47 @@ class _LinkEmailPasswordDialogState
     });
 
     try {
-      await ref.read(authServiceProvider).linkWithEmailAndPassword(
-            _emailController.text.trim(),
-            _passwordController.text,
-          );
+      final user = ref.read(authStateProvider).user;
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+
+      // Check if user is signed in with Google
+      final hasGoogleProvider = user?.providerData.any(
+            (element) => element.providerId == 'google.com',
+          ) ??
+          false;
+
+      if (hasGoogleProvider && !user!.isAnonymous) {
+        // Use the new method for Google users
+        await ref.read(linkEmailPasswordToGoogleProvider(
+                EmailPasswordCredentials(email: email, password: password))
+            .future);
+      } else {
+        // Use the standard method for anonymous users
+        await ref.read(authServiceProvider).linkWithEmailAndPassword(
+              email,
+              password,
+            );
+      }
 
       if (mounted) {
-        Navigator.of(context).pop();
-        widget.onSuccess();
-        SnackBarHelper.showSuccessSnackBar(
-          context: context,
-          message: 'Email/password authentication added successfully',
-        );
+        // Invalidate providers to force UI refresh
+        ref.invalidate(authStateProvider);
+        ref.invalidate(currentUserProvider);
+
+        // Wait a moment for providers to update before closing dialog
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        if (mounted) {
+          // Add mounted check
+          Navigator.of(context).pop();
+          widget
+              .onSuccess(); // Call the onSuccess callback provided by the parent
+          SnackBarHelper.showSuccessSnackBar(
+            context: context,
+            message: 'Email/password authentication added successfully',
+          );
+        }
       }
     } catch (e) {
       setState(() {
@@ -113,6 +174,11 @@ class _LinkEmailPasswordDialogState
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final user = ref.watch(authStateProvider).user;
+    final hasGoogleProvider = user?.providerData.any(
+          (element) => element.providerId == 'google.com',
+        ) ??
+        false;
 
     return AlertDialog(
       shape: RoundedRectangleBorder(
@@ -143,6 +209,8 @@ class _LinkEmailPasswordDialogState
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.emailAddress,
+                // Disable email field if user is signed in with Google
+                enabled: !hasGoogleProvider || user!.isAnonymous,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter your email';
@@ -171,16 +239,72 @@ class _LinkEmailPasswordDialogState
                   ),
                 ),
                 obscureText: !_showPassword,
+                focusNode: _passwordFocusNode, // Assign FocusNode
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a password';
                   }
-                  if (value.length < 6) {
-                    return 'Password must be at least 6 characters';
+                  if (value.length < 8) {
+                    return 'Password must be at least 8 characters long.';
                   }
-                  return null;
+                  // Check for uppercase letter
+                  if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
+                    return 'Password must contain an uppercase letter.';
+                  }
+                  // Check for lowercase letter
+                  if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
+                    return 'Password must contain a lowercase letter.';
+                  }
+                  // Check for numeric character
+                  if (!RegExp(r'(?=.*[0-9])').hasMatch(value)) {
+                    return 'Password must contain a number.';
+                  }
+                  // Check for special character
+                  if (!RegExp(r'(?=.*[!@#$%^&*(),.?":{}|<>])')
+                      .hasMatch(value)) {
+                    return 'Password must contain a special character.';
+                  }
+                  return null; // Password is valid
                 },
               ),
+              // Conditionally show requirements based on focus state
+              if (_isPasswordFocused) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerLow, // Use a slightly different background
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .outlineVariant
+                          .withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Password Requirements:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text('• At least 8 characters long'),
+                      Text('• At least one uppercase letter (A-Z)'),
+                      Text('• At least one lowercase letter (a-z)'),
+                      Text('• At least one number (0-9)'),
+                      Text(
+                          '• At least one special character (!@#\$%^&*(),.?":{}|<>)'),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               TextFormField(
                 controller: _confirmPasswordController,

@@ -139,6 +139,25 @@ final unlinkProviderProvider = FutureProvider.autoDispose.family<User, String>(
   },
 );
 
+/// Provider for linking Email/Password to a Google account
+final linkEmailPasswordToGoogleProvider =
+    FutureProvider.autoDispose.family<UserCredential, EmailPasswordCredentials>(
+  (ref, credentials) async {
+    final authService = ref.watch(authServiceProvider);
+    return await authService.linkEmailPasswordToGoogleAccount(
+      credentials.email,
+      credentials.password,
+    );
+  },
+);
+
+/// Provider for updating user password
+final updatePasswordProvider =
+    FutureProvider.autoDispose.family<void, String>((ref, newPassword) async {
+  final authService = ref.watch(authServiceProvider);
+  await authService.updatePassword(newPassword);
+});
+
 /// Helper class for email/password credentials
 class EmailPasswordCredentials {
   final String email;
