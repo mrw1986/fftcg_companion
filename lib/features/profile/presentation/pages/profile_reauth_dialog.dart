@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/shared/widgets/google_sign_in_button.dart';
 import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
 
 class ProfileReauthDialog extends ConsumerStatefulWidget {
   const ProfileReauthDialog({
@@ -54,8 +55,12 @@ class _ProfileReauthDialogState extends ConsumerState<ProfileReauthDialog> {
         final providerData = user.providerData;
         _providers =
             providerData.map((userInfo) => userInfo.providerId).toList();
+
+        // Log the providers for debugging
+        talker.debug('Available auth providers: $_providers');
       }
     } catch (e) {
+      talker.error('Error loading providers: $e');
       // If there's an error, default to showing all options
       _providers = ['password', 'google.com'];
     } finally {

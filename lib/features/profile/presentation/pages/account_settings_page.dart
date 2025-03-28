@@ -420,7 +420,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     });
 
     try {
-      // Re-authenticate with Google
+      talker.debug('Starting Google re-authentication from account settings');
+
+      // Re-authenticate with Google using the improved method
       await ref.read(authServiceProvider).reauthenticateWithGoogle();
 
       talker.debug('Google re-authentication successful');
@@ -433,10 +435,13 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
       // If this was for account deletion, proceed with deletion
       if (_isAccountDeletion) {
+        talker
+            .debug('Proceeding with account deletion after re-authentication');
         await _deleteAccount();
       }
       // If this was for email update, proceed with email update
       else if (_showChangeEmail) {
+        talker.debug('Proceeding with email update after re-authentication');
         await _updateEmail();
       }
       // Otherwise just show a success message
@@ -450,11 +455,30 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
         }
       }
     } catch (e) {
+      talker.error('Error during Google re-authentication: $e');
+
       setState(() {
         _isLoading = false;
       });
 
-      // Show error message
+      // Handle specific error cases
+      if (e is FirebaseAuthException) {
+        if (e.code == 'wrong-account') {
+          // Special handling for wrong Google account
+          if (mounted) {
+            display_name.showThemedSnackBar(
+              context: context,
+              message:
+                  'Please use the same Google account you originally signed in with.',
+              isError: true,
+              duration: const Duration(seconds: 5),
+            );
+          }
+          return;
+        }
+      }
+
+      // Show general error message
       if (mounted) {
         display_name.showThemedSnackBar(
           context: context,

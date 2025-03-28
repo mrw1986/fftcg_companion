@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 
 /// A button that follows Google's branding guidelines for Sign-In buttons
@@ -112,8 +113,27 @@ class _GoogleSignInButtonStateState extends State<_GoogleSignInButtonState> {
                 }
               } catch (e) {
                 talker.error('Error in Google Sign-In button: $e');
+
+                // Handle specific error cases
+                String errorMessage = 'Failed to sign in with Google';
+
+                if (e is FirebaseAuthException) {
+                  if (e.code == 'requires-recent-login') {
+                    errorMessage =
+                        'Please sign out and sign in again to continue';
+                  } else if (e.code == 'wrong-account') {
+                    errorMessage =
+                        'Please use the same Google account you originally signed in with';
+                  } else if (e.code == 'user-token-expired') {
+                    errorMessage =
+                        'Your session has expired. Please sign in again';
+                  } else if (e.message?.contains('BAD_REQUEST') == true) {
+                    errorMessage = 'Authentication error. Please try again';
+                  }
+                }
+
                 setState(() {
-                  _errorMessage = 'Failed to sign in with Google';
+                  _errorMessage = errorMessage;
                   if (e is Exception && widget.onError != null) {
                     widget.onError!(e);
                   }

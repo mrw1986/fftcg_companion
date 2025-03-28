@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 
@@ -68,6 +69,39 @@ class _LinkEmailPasswordDialogState
       });
 
       if (mounted) {
+        // Handle specific error cases
+        if (e is FirebaseAuthException) {
+          if (e.code == 'requires-recent-login') {
+            // Show a more specific message for re-authentication requirement
+            SnackBarHelper.showErrorSnackBar(
+              context: context,
+              message:
+                  'For security reasons, you need to re-authenticate before adding a password. Please sign out and sign in again, then try adding a password.',
+              duration: const Duration(seconds: 6),
+            );
+            // Close the dialog since re-authentication is needed
+            Navigator.of(context).pop();
+            return;
+          } else if (e.code == 'email-already-in-use' ||
+              e.code == 'credential-already-in-use') {
+            SnackBarHelper.showErrorSnackBar(
+              context: context,
+              message: 'This email is already associated with another account.',
+              duration: const Duration(seconds: 4),
+            );
+            return;
+          } else if (e.code == 'provider-already-linked') {
+            SnackBarHelper.showErrorSnackBar(
+              context: context,
+              message:
+                  'Email/password authentication is already set up for this account.',
+              duration: const Duration(seconds: 4),
+            );
+            return;
+          }
+        }
+
+        // Default error handling
         SnackBarHelper.showErrorSnackBar(
           context: context,
           message: e.toString(),

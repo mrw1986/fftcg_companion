@@ -372,24 +372,95 @@ class AuthService {
   /// Re-authenticate with Google
   Future<UserCredential> reauthenticateWithGoogle() async {
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        throw FirebaseAuthException(
-          code: 'sign-in-cancelled',
-          message: 'Google sign in was cancelled.',
+      talker.debug('Starting Google re-authentication');
+
+      // Store the current user's email for verification later
+      final currentEmail = _auth.currentUser?.email;
+
+      // First approach: Try to use the standard reauthentication flow
+      try {
+        // Sign out from Google (but not Firebase) to ensure a fresh authentication
+        await _googleSignIn.signOut();
+
+        // Trigger the authentication flow
+        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+        if (googleUser == null) {
+          throw FirebaseAuthException(
+            code: 'sign-in-cancelled',
+            message: 'Google sign in was cancelled.',
+          );
+        }
+
+        // Verify it's the same email
+        if (googleUser.email != currentEmail) {
+          talker.warning(
+              'User tried to reauthenticate with a different Google account');
+          throw FirebaseAuthException(
+            code: 'wrong-account',
+            message:
+                'Please use the same Google account you originally signed in with.',
+          );
+        }
+
+        // Obtain the auth details from the request
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+
+        // Create a new credential
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
         );
+
+        // Try to reauthenticate with the credential
+        final userCredential =
+            await _auth.currentUser!.reauthenticateWithCredential(credential);
+        talker.debug('Standard Google reauthentication successful');
+        return userCredential;
+      } catch (reauthError) {
+        // If the standard approach fails, log the error and try the alternative approach
+        talker.error('Standard Google reauthentication failed: $reauthError');
+
+        if (reauthError is FirebaseAuthException) {
+          // If it's a token issue or requires recent login, try the alternative approach
+          if (reauthError.code == 'user-token-expired' ||
+              reauthError.code == 'requires-recent-login' ||
+              reauthError.message?.contains('token') == true ||
+              reauthError.message?.contains('BAD_REQUEST') == true) {
+            talker.debug('Trying alternative Google reauthentication approach');
+
+            // Alternative approach: Sign out completely and sign in again
+            try {
+              // Sign out from both Google and Firebase
+              await signOut();
+
+              // Sign in with Google again
+              final newCredential = await signInWithGoogle();
+
+              // Verify it's the same user (by email)
+              if (newCredential.user?.email != currentEmail) {
+                talker.warning(
+                    'User signed in with a different Google account during reauthentication');
+                throw FirebaseAuthException(
+                  code: 'wrong-account',
+                  message:
+                      'You signed in with a different Google account. Please use your original account.',
+                );
+              }
+
+              talker.debug('Alternative Google reauthentication successful');
+              return newCredential;
+            } catch (alternativeError) {
+              talker.error(
+                  'Alternative Google reauthentication failed: $alternativeError');
+              rethrow;
+            }
+          }
+        }
+
+        // If it's not a token issue or the alternative approach failed, rethrow the original error
+        rethrow;
       }
-
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final userCredential =
-          await _auth.currentUser!.reauthenticateWithCredential(credential);
-      return userCredential;
     } catch (e) {
       throw _handleAuthException(e);
     }
