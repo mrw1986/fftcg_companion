@@ -16,7 +16,7 @@ class ProfileAuthMethods extends ConsumerWidget {
     required this.onShowLinkEmailPasswordDialog,
     this.showChangeEmail = false,
     required this.onToggleChangeEmail,
-    required this.isEmailNotVerified,
+    required this.isEmailNotVerified, // Keep this for the badge logic
   });
 
   final User? user;
@@ -26,15 +26,26 @@ class ProfileAuthMethods extends ConsumerWidget {
   final VoidCallback onShowLinkEmailPasswordDialog;
   final bool showChangeEmail;
   final VoidCallback onToggleChangeEmail;
-  final bool isEmailNotVerified;
+  final bool isEmailNotVerified; // Keep for badge
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (user == null) return const SizedBox.shrink();
-
+    // Watch both providers to ensure rebuild on user stream changes or derived state changes
     final authState = ref.watch(authStateProvider);
-    final isEmailVerified = !authState.isEmailNotVerified;
-    final providers = user!.providerData.map((e) => e.providerId).toList();
+    ref.watch(
+        currentUserProvider); // Watch the user stream directly for reactivity
+
+    // Use the user from authState for consistency, but watching currentUserProvider triggers rebuilds
+    final currentUser = authState.user;
+
+    if (currentUser == null) return const SizedBox.shrink();
+
+    // Determine email verification status based on the specific AuthStatus
+    final bool isEmailActuallyUnverified =
+        authState.status == AuthStatus.emailNotVerified;
+
+    final providers =
+        currentUser.providerData.map((e) => e.providerId).toList();
     final hasPassword = providers.contains('password');
     final hasGoogle = providers.contains('google.com');
     final colorScheme = Theme.of(context).colorScheme;
@@ -42,7 +53,7 @@ class ProfileAuthMethods extends ConsumerWidget {
     // Get Google account info if available
     UserInfo? googleProvider;
     try {
-      googleProvider = user!.providerData.firstWhere(
+      googleProvider = currentUser.providerData.firstWhere(
         (element) => element.providerId == 'google.com',
       );
     } catch (_) {
@@ -51,6 +62,7 @@ class ProfileAuthMethods extends ConsumerWidget {
     }
 
     final String? googleEmail = googleProvider?.email;
+    final String? passwordEmail = currentUser.email; // User's primary email
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -100,7 +112,21 @@ class ProfileAuthMethods extends ConsumerWidget {
                                 color: colorScheme.onSurface,
                               ),
                             ),
-                            if (isEmailNotVerified)
+                            // Display the email associated with the password provider
+                            if (passwordEmail != null &&
+                                passwordEmail.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                passwordEmail,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                            // Show unverified badge only if the status is specifically emailNotVerified
+                            if (isEmailActuallyUnverified)
                               Container(
                                 margin: const EdgeInsets.only(top: 4),
                                 padding: const EdgeInsets.symmetric(
@@ -121,9 +147,10 @@ class ProfileAuthMethods extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      if (user!.email != null &&
-                          !user!.isAnonymous &&
-                          !isEmailNotVerified &&
+                      // Show "Change" button only if email is verified and password provider exists
+                      if (currentUser.email != null &&
+                          !currentUser.isAnonymous &&
+                          !isEmailActuallyUnverified && // Use specific status check
                           hasPassword)
                         TextButton.icon(
                           onPressed: onToggleChangeEmail,
@@ -224,11 +251,12 @@ class ProfileAuthMethods extends ConsumerWidget {
           ],
 
           // Add authentication methods section - only show if there are methods to add
-          if (!hasPassword && isEmailVerified || !hasGoogle) ...[
+          // Show "Add Email/Password" only if not present AND user is not in emailNotVerified state
+          if (!hasPassword && !isEmailActuallyUnverified || !hasGoogle) ...[
             const SizedBox(height: 8),
 
             // Add Email/Password
-            if (!hasPassword && isEmailVerified)
+            if (!hasPassword && !isEmailActuallyUnverified)
               Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(

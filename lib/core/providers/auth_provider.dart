@@ -22,9 +22,14 @@ final authStateProvider = Provider.autoDispose<AuthState>((ref) {
     data: (user) {
       if (user == null) {
         return const AuthState.unauthenticated();
-      } else if (user.isAnonymous) {
+      }
+
+      // First check if the user is anonymous
+      if (user.isAnonymous) {
+        // Even if there are providers, if isAnonymous is true, treat as anonymous
         return AuthState.anonymous(user);
       } else {
+        // User is not anonymous, check providers
         // Check if the user has at least one verified authentication method.
         // Google is considered verified by default.
         // Email/Password is verified only if user.emailVerified is true.
@@ -170,7 +175,9 @@ final unlinkProviderProvider = FutureProvider.autoDispose.family<void, String>(
     final authService = ref.watch(authServiceProvider);
     // Call the service method but don't need to return the User? object
     await authService.unlinkProvider(providerId);
-    // Invalidate the auth state to trigger UI updates if necessary
+    // Invalidate both the source stream and the derived state
+    // to ensure the UI updates reliably after the user object is reloaded.
+    ref.invalidate(currentUserProvider);
     ref.invalidate(authStateProvider);
   },
 );

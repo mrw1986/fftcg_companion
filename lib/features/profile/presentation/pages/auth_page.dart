@@ -163,60 +163,48 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       final authState = ref.read(authStateProvider);
       final authService = ref.read(authServiceProvider);
 
-      // If user is anonymous, link the account instead of creating a new one
+      // If user is anonymous, try to link the account first
       if (authState.isAnonymous) {
         try {
-          // Check if provider is already linked (should not happen on this page ideally)
-          final currentUser = FirebaseAuth.instance.currentUser;
-          if (currentUser != null) {
-            final providerData = currentUser.providerData;
-            final isGoogleLinked = providerData.any(
-                (info) => info.providerId == GoogleAuthProvider.PROVIDER_ID);
-            if (isGoogleLinked) {
-              talker.warning(
-                  'Auth page: Google already linked to anonymous user. Signing out and signing in.');
-              // Set skip flag before signing out
-              ref.read(skipAutoAuthProvider.notifier).state = true;
-              await authService.signOut();
-              await authService.signInWithGoogle();
-              _navigateToProfile();
-              return;
-            }
-          }
+          talker.debug(
+              'Auth page: Anonymous user linking with Google. Setting skip flag.');
+          // Set flag to prevent auto anonymous sign-in after sign out
+          ref.read(skipAutoAuthProvider.notifier).state = true;
 
           talker
               .debug('Auth page: Calling authService.linkGoogleToAnonymous()');
-          // Corrected method call for linking Google to anonymous user
-          await authService.linkGoogleToAnonymous();
+          await authService.linkGoogleToAnonymous(context);
           talker.debug('Auth page: Google linking successful');
           _navigateToProfile();
         } catch (linkError) {
-          // Catch AuthException specifically for linking errors handled by AuthService
-          if (linkError is AuthException) {
+          // If linking fails because user is NOT anonymous (timing issue after sign out?)
+          if (linkError is AuthException && linkError.code == 'not-anonymous') {
+            talker.warning(
+                'Auth page: Attempted to link Google, but user was not anonymous. Falling back to standard sign-in.');
+            // Fallback: Try standard sign-in instead
+            await authService.signInWithGoogle();
+            talker.debug(
+                'Auth page: Fallback Google Sign-In successful after link failure.');
+            _navigateToProfile();
+          }
+          // Handle other linking errors (like account already exists with different credential)
+          else if (linkError is AuthException) {
             talker.warning(
                 'Auth page: Google link failed - ${linkError.code}: ${linkError.message}');
             if (mounted) {
-              _showError(linkError.message,
-                  isError: true); // Show specific message from AuthException
-              _setLoading(false);
-              return;
+              _showError(linkError.message, isError: true);
             }
-          }
-          // Catch potential FirebaseAuthException if not handled by AuthService (less likely now)
-          else if (linkError is FirebaseAuthException) {
+          } else if (linkError is FirebaseAuthException) {
             talker.error(
                 'FirebaseAuthException during Google link: ${linkError.code}');
             if (mounted) {
-              final authService = ref.read(authServiceProvider);
               _showError(
                   authService.getReadableAuthError(
                       linkError.code, linkError.message),
                   isError: true);
-              _setLoading(false);
-              return;
             }
           } else {
-            // Rethrow other non-FirebaseAuthException errors
+            // Rethrow other unexpected errors
             rethrow;
           }
         }
@@ -227,7 +215,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         talker.debug('Auth page: Google Sign-In successful');
         _navigateToProfile(); // Navigate after successful sign-in
       }
-      // Catch AuthException from sign-in attempts
+      // Catch AuthException from sign-in attempts (including fallback)
     } on AuthException catch (e) {
       talker.error(
           'Caught AuthException in auth_page (Google): ${e.code} - ${e.message}');

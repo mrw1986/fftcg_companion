@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,11 +12,9 @@ import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/profile_header_card.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/account_info_card.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/account_actions_card.dart';
-// import 'package:fftcg_companion/features/profile/presentation/widgets/link_email_password_dialog.dart'; // No longer needed here
 import 'package:fftcg_companion/features/profile/presentation/widgets/update_password_dialog.dart';
-// Import AuthException and skipAutoAuthProvider
+// Import AuthException
 import 'package:fftcg_companion/core/services/auth_service.dart';
-import 'package:fftcg_companion/core/providers/auto_auth_provider.dart';
 
 class AccountSettingsPage extends ConsumerStatefulWidget {
   const AccountSettingsPage({super.key});
@@ -40,20 +39,24 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   @override
   void initState() {
     super.initState();
-    _initializeUserData();
+    // Initial population might still happen here, but build method will override
+    _initializeUserDataFromState(ref.read(authStateProvider).user);
   }
 
-  void _initializeUserData() {
-    // Use context.read for initState
-    final user = ref.read(authStateProvider).user;
+  // Initialize controllers based on user data
+  void _initializeUserDataFromState(User? user) {
     if (user != null) {
-      if (user.displayName != null) {
+      // Only update if the text is different to avoid cursor jumps
+      if (user.displayName != null &&
+          _displayNameController.text != user.displayName) {
         _displayNameController.text = user.displayName!;
       }
-      if (user.email != null) {
+      if (user.email != null && _emailController.text != user.email) {
         _emailController.text = user.email!;
-        _reauthEmailController.text =
-            user.email!; // Pre-fill for re-authentication
+        // Also update reauth email only if different
+        if (_reauthEmailController.text != user.email) {
+          _reauthEmailController.text = user.email!;
+        }
       }
     }
   }
@@ -76,6 +79,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       await ref.read(authServiceProvider).updateProfile(
             displayName: _displayNameController.text.trim(),
           );
+      // No need to manually update controllers, watch will trigger rebuild
       setState(() {
         _isLoading = false;
       });
@@ -135,8 +139,6 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       if (mounted) {
         await showEmailUpdateInitiatedDialog(
             context, _emailController.text.trim());
-        // DO NOT SIGN OUT HERE - User remains logged in
-        // await _signOutWithoutConfirmation(); // Removed this line
       }
     } on AuthException catch (e) {
       // Catch custom AuthException
@@ -208,17 +210,15 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     }
   }
 
-  // Sign out without showing confirmation dialog (kept for potential other uses)
+  // Sign out without showing confirmation dialog
   Future<void> _signOutWithoutConfirmation() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Set skip flag before signing out
-      ref.read(skipAutoAuthProvider.notifier).state = true;
       await ref.read(authServiceProvider).signOut();
-      // The UI will automatically update due to the authStateProvider
+      // UI will update via provider watch
 
       setState(() {
         _isLoading = false;
@@ -262,11 +262,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       });
 
       await ref.read(authServiceProvider).deleteUser();
-
-      // Set skip flag before signing out
-      ref.read(skipAutoAuthProvider.notifier).state = true;
-      // Sign out to reset the authentication state
-      await ref.read(authServiceProvider).signOut();
+      await ref.read(authServiceProvider).signOut(); // Sign out after deletion
 
       setState(() {
         _isLoading = false;
@@ -301,46 +297,34 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
         return;
       } else {
         talker.error('Error deleting account: $e');
-
-        // Show a themed dialog instead of a snackbar
         if (mounted) {
           showDialog<void>(
             barrierDismissible: false,
             context: context,
             builder: (BuildContext context) {
               final colorScheme = Theme.of(context).colorScheme;
-              String errorMessage = e.message; // Use message from AuthException
-
-              // Make the error message more user-friendly if needed
+              String errorMessage = e.message;
               if (errorMessage.contains('An unexpected error occurred')) {
                 errorMessage =
                     'An error occurred while deleting your account. Please try again or contact support if the problem persists.';
               }
-
               return AlertDialog(
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                title: Row(
-                  children: [
-                    Icon(Icons.error_outline, color: colorScheme.error),
-                    const SizedBox(width: 12),
-                    const Text('Error'),
-                  ],
-                ),
-                content: Text(
-                  errorMessage,
-                  style: TextStyle(color: colorScheme.onSurface),
-                ),
+                    borderRadius: BorderRadius.circular(16)),
+                title: Row(children: [
+                  Icon(Icons.error_outline, color: colorScheme.error),
+                  const SizedBox(width: 12),
+                  const Text('Error')
+                ]),
+                content: Text(errorMessage,
+                    style: TextStyle(color: colorScheme.onSurface)),
                 actions: [
                   FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
-                      foregroundColor: colorScheme.onPrimary,
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('OK'),
-                  ),
+                      style: FilledButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('OK'))
                 ],
                 actionsPadding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -354,10 +338,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       setState(() {
         _isLoading = false;
       });
-
       talker.error('Unexpected error during account deletion: $e');
-
-      // Check if the error message indicates re-authentication needed
       if (e.toString().contains('requires-recent-login') ||
           e.toString().contains('user-token-expired') ||
           e.toString().contains('recent authentication') ||
@@ -376,7 +357,6 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
         }
         return;
       }
-
       if (mounted) {
         showDialog<void>(
           barrierDismissible: false,
@@ -385,31 +365,23 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
             final colorScheme = Theme.of(context).colorScheme;
             String errorMessage =
                 'An unexpected error occurred. Please try again or contact support if the problem persists.';
-
             return AlertDialog(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Row(
-                children: [
-                  Icon(Icons.error_outline, color: colorScheme.error),
-                  const SizedBox(width: 12),
-                  const Text('Error'),
-                ],
-              ),
-              content: Text(
-                errorMessage,
-                style: TextStyle(color: colorScheme.onSurface),
-              ),
+                  borderRadius: BorderRadius.circular(16)),
+              title: Row(children: [
+                Icon(Icons.error_outline, color: colorScheme.error),
+                const SizedBox(width: 12),
+                const Text('Error')
+              ]),
+              content: Text(errorMessage,
+                  style: TextStyle(color: colorScheme.onSurface)),
               actions: [
                 FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    foregroundColor: colorScheme.onPrimary,
-                  ),
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('OK'),
-                ),
+                    style: FilledButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('OK'))
               ],
               actionsPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -427,79 +399,52 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
     try {
       talker.debug('Starting Google re-authentication from account settings');
-
-      // Re-authenticate with Google using the improved method
       await ref.read(authServiceProvider).reauthenticateWithGoogle();
-
       talker.debug('Google re-authentication successful');
-
-      // Close the re-auth dialog
       setState(() {
         _isLoading = false;
         _showReauthDialog = false;
       });
-
-      // If this was for account deletion, proceed with deletion
       if (_isAccountDeletion) {
         talker
             .debug('Proceeding with account deletion after re-authentication');
         await _deleteAccount();
-      }
-      // If this was for email update, proceed with email update
-      else if (_showChangeEmail) {
+      } else if (_showChangeEmail) {
         talker.debug('Proceeding with email update after re-authentication');
         await _updateEmail();
-      }
-      // If this was for password change, show the update password dialog
-      else if (_isPasswordChange) {
+      } else if (_isPasswordChange) {
         talker.debug('Proceeding with password change after re-authentication');
         if (mounted) {
-          _showUpdatePasswordDialog(); // Show dialog to enter new password
+          _showUpdatePasswordDialog();
         }
-      }
-      // Otherwise just show a success message (e.g., re-auth without specific action)
-      else {
+      } else {
         if (mounted) {
           display_name.showThemedSnackBar(
-            context: context,
-            message: 'Authentication successful',
-            isError: false,
-          );
+              context: context,
+              message: 'Authentication successful',
+              isError: false);
         }
       }
     } catch (e) {
       talker.error('Error during Google re-authentication: $e');
-
       setState(() {
         _isLoading = false;
       });
-
-      // Handle specific error cases
-      if (e is AuthException) {
-        // Catch custom AuthException
-        if (e.code == 'wrong-account') {
-          // Special handling for wrong Google account
-          if (mounted) {
-            display_name.showThemedSnackBar(
+      if (e is AuthException && e.code == 'wrong-account') {
+        if (mounted) {
+          display_name.showThemedSnackBar(
               context: context,
-              message: e.message, // Use message from AuthException
+              message: e.message,
               isError: true,
-              duration: const Duration(seconds: 5),
-            );
-          }
-          return;
+              duration: const Duration(seconds: 5));
         }
+        return;
       }
-
-      // Show general error message
       if (mounted) {
         display_name.showThemedSnackBar(
-          context: context,
-          message: e is AuthException
-              ? e.message
-              : e.toString(), // Use message from AuthException
-          isError: true,
-        );
+            context: context,
+            message: e is AuthException ? e.message : e.toString(),
+            isError: true);
       }
     }
   }
@@ -521,41 +466,27 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     });
 
     try {
-      // Re-authenticate the user
       await ref.read(authServiceProvider).reauthenticateWithEmailAndPassword(
             _reauthEmailController.text.trim(),
             _reauthPasswordController.text,
           );
       talker.debug(
           'Re-authentication successful, proceeding with account deletion');
-
-      // Now try to delete the account again
       await ref.read(authServiceProvider).deleteUser();
-
-      // Set skip flag before signing out
-      ref.read(skipAutoAuthProvider.notifier).state = true;
-      // Sign out to reset the authentication state
       await ref.read(authServiceProvider).signOut();
-
       setState(() {
         _isLoading = false;
         _showReauthDialog = false;
       });
-
-      // Navigate back to profile page after successful deletion
       if (mounted) {
         context.go('/profile');
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        // Keep the dialog open on error
         _showReauthDialog = true;
       });
-
       talker.error('Error during re-authentication or account deletion: $e');
-
-      // Show error message in a dialog
       if (mounted) {
         showDialog(
             context: context,
@@ -563,30 +494,24 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
               final colorScheme = Theme.of(context).colorScheme;
               return AlertDialog(
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                title: Row(
-                  children: [
-                    Icon(Icons.error_outline, color: colorScheme.error),
-                    const SizedBox(width: 12),
-                    const Text('Authentication Error'),
-                  ],
-                ),
+                    borderRadius: BorderRadius.circular(16)),
+                title: Row(children: [
+                  Icon(Icons.error_outline, color: colorScheme.error),
+                  const SizedBox(width: 12),
+                  const Text('Authentication Error')
+                ]),
                 content: Text(
-                  e is AuthException // Catch custom AuthException
-                      ? e.message // Use message from AuthException
-                      : 'An error occurred during authentication. Please check your credentials and try again.',
-                  style: TextStyle(color: colorScheme.onSurface),
-                ),
+                    e is AuthException
+                        ? e.message
+                        : 'An error occurred during authentication. Please check your credentials and try again.',
+                    style: TextStyle(color: colorScheme.onSurface)),
                 actions: [
                   FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
-                      foregroundColor: colorScheme.onPrimary,
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('OK'),
-                  ),
+                      style: FilledButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('OK'))
                 ],
                 actionsPadding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -612,71 +537,51 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     });
 
     try {
-      // Re-authenticate the user
       await ref.read(authServiceProvider).reauthenticateWithEmailAndPassword(
             _reauthEmailController.text.trim(),
             _reauthPasswordController.text,
           );
-
       talker.debug('Re-authentication successful');
-
-      // Close the re-auth dialog
       setState(() {
         _isLoading = false;
         _showReauthDialog = false;
       });
-
-      // If this was for email update, try to update the email now
       if (!_isAccountDeletion && !_isPasswordChange && _showChangeEmail) {
         talker.debug('Proceeding with email update after re-authentication');
-
-        // Show a loading indicator while updating email
         setState(() {
           _isLoading = true;
         });
-
         try {
           await ref.read(authServiceProvider).verifyBeforeUpdateEmail(
                 _emailController.text.trim(),
               );
-
           setState(() {
             _isLoading = false;
             _showChangeEmail = false;
           });
-
-          // Show confirmation dialog (updated message)
           if (mounted) {
             await showEmailUpdateInitiatedDialog(
                 context, _emailController.text.trim());
-            // DO NOT SIGN OUT
-            // await _signOutWithoutConfirmation();
           }
         } catch (emailError) {
           setState(() {
             _isLoading = false;
           });
-
-          // Show error message
           if (mounted) {
             display_name.showThemedSnackBar(
                 context: context,
-                message:
-                    emailError is AuthException // Catch custom AuthException
-                        ? emailError.message // Use message from AuthException
-                        : emailError.toString(),
+                message: emailError is AuthException
+                    ? emailError.message
+                    : emailError.toString(),
                 isError: true);
           }
         }
-      }
-      // If this was for password change, show the update password dialog
-      else if (_isPasswordChange) {
+      } else if (_isPasswordChange) {
         talker.debug('Proceeding with password change after re-authentication');
         if (mounted) {
-          _showUpdatePasswordDialog(); // Show dialog to enter new password
+          _showUpdatePasswordDialog();
         }
       } else {
-        // Just show a general success message (e.g., re-auth without specific action)
         if (mounted) {
           display_name.showThemedSnackBar(
               context: context,
@@ -689,14 +594,10 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       setState(() {
         _isLoading = false;
       });
-
-      // Show error message
       if (mounted) {
         display_name.showThemedSnackBar(
             context: context,
-            message: e is AuthException // Catch custom AuthException
-                ? e.message // Use message from AuthException
-                : e.toString(),
+            message: e is AuthException ? e.message : e.toString(),
             isError: true);
       }
     }
@@ -708,7 +609,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     });
 
     try {
-      await ref.read(authServiceProvider).unlinkProvider(providerId);
+      // Call unlink and wait for the reloaded user
+      await ref.read(unlinkProviderProvider(providerId).future); // Use .future
+      // Invalidation is handled by the provider now, state will update via watch
 
       setState(() {
         _isLoading = false;
@@ -746,35 +649,26 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     });
 
     try {
-      // Corrected method call: link Google to existing Email/Password account
       await ref.read(authServiceProvider).linkGoogleToEmailPassword();
-
+      // Invalidation handled by provider
       setState(() {
         _isLoading = false;
       });
-
-      // Show success message
       if (mounted) {
         display_name.showThemedSnackBar(
-          context: context,
-          message: 'Successfully linked with Google',
-          isError: false,
-        );
+            context: context,
+            message: 'Successfully linked with Google',
+            isError: false);
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
-
-      // Show error message
       if (mounted) {
         display_name.showThemedSnackBar(
-          context: context,
-          message: e is AuthException // Catch custom AuthException
-              ? e.message // Use message from AuthException
-              : e.toString(),
-          isError: true,
-        );
+            context: context,
+            message: e is AuthException ? e.message : e.toString(),
+            isError: true);
       }
     }
   }
@@ -787,68 +681,50 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
     try {
       final user = ref.read(authStateProvider).user;
-
-      // Check if user is signed in with Google
       final hasGoogleProvider = user?.providerData.any(
             (element) => element.providerId == 'google.com',
           ) ??
           false;
 
       if (hasGoogleProvider && !user!.isAnonymous) {
-        // Use the new method for Google users
-        // Corrected method call: link Email/Password to existing Google account
         await ref.read(linkEmailPasswordToGoogleProvider(
                 EmailPasswordCredentials(email: email, password: password))
             .future);
       } else {
-        // Use the standard method for anonymous users
-        // Corrected method call: link Email/Password to anonymous user
         await ref.read(authServiceProvider).linkEmailAndPasswordToAnonymous(
               email,
               password,
             );
       }
-
+      // Invalidation handled by provider
       setState(() {
         _isLoading = false;
       });
-
-      // Show success message
       if (mounted) {
         display_name.showThemedSnackBar(
-          context: context,
-          message: 'Successfully added Email/Password authentication',
-          isError: false,
-        );
+            context: context,
+            message: 'Successfully added Email/Password authentication',
+            isError: false);
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
-
-      // Show error message
       if (mounted) {
         display_name.showThemedSnackBar(
-          context: context,
-          message: e is AuthException // Catch custom AuthException
-              ? e.message // Use message from AuthException
-              : e.toString(),
-          isError: true,
-        );
+            context: context,
+            message: e is AuthException ? e.message : e.toString(),
+            isError: true);
       }
     }
   }
 
-  // Removed unused _showLinkEmailPasswordDialog method
-
   /// Show the update password dialog
   void _showUpdatePasswordDialog() {
-    // Use the newly created dialog
     showDialog(
       context: context,
       builder: (context) => UpdatePasswordDialog(
         onUpdatePassword: (newPassword) async {
-          // Call the actual update password method
           await _updatePassword(newPassword);
         },
       ),
@@ -862,6 +738,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     });
     try {
       await ref.read(authServiceProvider).updatePassword(newPassword);
+      // Invalidation handled by provider
       setState(() {
         _isLoading = false;
       });
@@ -878,9 +755,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       if (mounted) {
         display_name.showThemedSnackBar(
             context: context,
-            message: e is AuthException // Catch custom AuthException
-                ? e.message // Use message from AuthException
-                : 'Failed to update password.',
+            message:
+                e is AuthException ? e.message : 'Failed to update password.',
             isError: true);
       }
     }
@@ -900,10 +776,28 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
+    // Watch currentUserProvider to trigger rebuilds on user data changes (like unlink)
+    final currentUserAsyncValue = ref.watch(currentUserProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    if (authState.isLoading) {
+    // Update controllers whenever currentUser changes
+    // Use addPostFrameCallback to avoid calling setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        // Ensure widget is still mounted
+        _initializeUserDataFromState(currentUserAsyncValue.value);
+      }
+    });
+
+    // Determine the user object to use for the UI
+    // Prioritize the direct user stream value if available, fallback to authState
+    final userForUI = currentUserAsyncValue.value ?? authState.user;
+
+    // Handle loading state more robustly
+    if (authState.isLoading ||
+        (authState.isAuthenticated && userForUI == null)) {
+      // Show loading if authState is loading OR if we expect an authenticated user but don't have one yet
       return const Scaffold(
         body: Center(child: LoadingIndicator()),
       );
@@ -959,7 +853,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                 children: [
                   // Profile Header with display name
                   ProfileHeaderCard(
-                    user: authState.user,
+                    user: userForUI, // Use userForUI
                     displayNameController: _displayNameController,
                     onUpdateProfile: _updateProfile,
                     isLoading: _isLoading,
@@ -967,8 +861,10 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
                   // Account Information
                   AccountInfoCard(
-                    user: authState.user,
-                    isEmailNotVerified: authState.isEmailNotVerified,
+                    user: userForUI, // Pass userForUI down - FIXED LINTER ERROR
+                    isEmailNotVerified: authState.status ==
+                        AuthStatus
+                            .emailNotVerified, // Use specific status check
                     emailController: _emailController,
                     showChangeEmail: _showChangeEmail,
                     onToggleChangeEmail: () {
@@ -980,17 +876,16 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                     onUnlinkProvider: _unlinkProvider,
                     onLinkWithGoogle: _linkWithGoogle,
                     onLinkWithEmailPassword: _linkWithEmailPassword,
-                    // Add callback to trigger password change re-auth
                     onChangePassword: () async {
                       final shouldReauth = await showReauthRequiredDialog(
                           context,
-                          isForDeletion: false, // Not for deletion
-                          actionText: 'changing your password'); // Custom text
+                          isForDeletion: false,
+                          actionText: 'changing your password');
                       if (shouldReauth) {
                         setState(() {
                           _showReauthDialog = true;
                           _isAccountDeletion = false;
-                          _isPasswordChange = true; // Set password change flag
+                          _isPasswordChange = true;
                         });
                       }
                     },
@@ -999,7 +894,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
                   // Account Actions
                   AccountActionsCard(
-                    user: authState.user,
+                    user: userForUI, // Use userForUI
                     onSignOut: _signOut,
                     onDeleteAccount: _deleteAccount,
                   ),
@@ -1009,6 +904,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     );
   }
 }
+
+// ... (Dialog functions remain the same) ...
 
 // Updated Dialog: User stays logged in
 Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {

@@ -2,6 +2,28 @@
 
 ## Recent Changes
 
+### Authentication State & UI Fixes (Objective 26 - Ongoing Testing)
+
+- Corrected provider unlinking logic in `AuthService` to prevent removing the last provider incorrectly.
+- Improved state invalidation in `auth_provider` for `unlinkProviderProvider` to ensure UI updates after unlinking.
+- Fixed state handling after account deletion in `account_settings_page` by removing the suppression of automatic anonymous sign-in, ensuring a consistent state for subsequent actions.
+- Corrected Google sign-in logic in `auth_page.dart` to handle state transitions after sign-out more robustly by adding a fallback from linking to standard sign-in if the user is not anonymous.
+- Fixed email display for the password provider in `ProfileAuthMethods`.
+- Ensured `AccountSettingsPage` watches `currentUserProvider` and passes the updated user object down to children (`AccountInfoCard`, `AccountActionsCard`) for reliable UI updates and data propagation.
+- Corrected email pre-population logic in `LinkEmailPasswordDialog` by having it receive the initial email via constructor parameter from `AccountInfoCard`, which now gets the latest user data from `AccountSettingsPage`.
+- Fixed profile page banner logic (`profile_page.dart`) to only show the email verification warning when the `authState.status` is specifically `AuthStatus.emailNotVerified`.
+- Implemented data migration for anonymous users linking with Google accounts:
+  - Added `merge_data_decision_dialog.dart` for user confirmation
+  - Created `collection_merge_helper.dart` for data migration logic
+  - Fixed timing of data migration to occur after successful sign-in
+  - Added proper BuildContext handling for async operations
+  - Ensured anonymous user data is preserved until migration decision
+- **Refined Google linking state management:**
+  - Updated `auth_page.dart` to set `skipAutoAuthProvider` flag during Google linking.
+  - Modified `auto_auth_provider.dart` to reset the flag only for fully authenticated users.
+  - Updated `auth_service.dart` to explicitly sign out from Google and Firebase with delays, and added more logging during the sign-out/sign-in process for linking.
+- **Note:** Authentication system is still undergoing testing and troubleshooting, particularly for edge cases like the Google linking redirect issue.
+
 ### Authentication System Rebuild (Completed - Objective 26)
 
 - **Completed a full rebuild of the authentication system** (`AuthService` and related UI/provider integrations) for simplicity, robustness, and adherence to best practices.
@@ -77,42 +99,44 @@
 
 ### Key Components
 
-#### Auth Service (lib/core/services/auth_service.dart) - **(Rebuilt)**
+#### Auth Service (lib/core/services/auth_service.dart) - **(Rebuilt & Refined - Testing)**
 
-- **Status:** Rebuilt for simplicity and robustness.
-- **Functionality:** Provides clear, direct methods for all core authentication flows using the `FirebaseAuth.instance` SDK:
-  - Anonymous, Email/Password, Google sign-in/registration.
-  - Linking providers (Anonymous -> Email/Pass, Anon -> Google, Email/Pass -> Google, Google -> Email/Pass).
-  - Account management (Password Reset, Email Update, Password Update, Sign Out, Deletion).
-  - Re-authentication (Email/Password, Google).
-  - Provider Unlinking.
-  - Profile Updates.
-  - Email Verification handling.
-- **Error Handling:** Uses custom `AuthException` with `AuthErrorCategory` for structured error reporting.
-- **Dependencies:** Interacts with `UserRepository` for Firestore data consistency, uses `Talker` for logging.
+- **Status:** Rebuilt for simplicity and robustness, with recent refinements to Google linking state management. **Currently undergoing testing and troubleshooting.**
+- **Functionality:** Provides clear, direct methods for all core authentication flows using the `FirebaseAuth.instance` SDK.
+- **Error Handling:** Uses custom `AuthException` with `AuthErrorCategory`. Includes specific handling for `not-anonymous` errors during linking attempts.
+- **Dependencies:** Interacts with `UserRepository`, uses `Talker`.
+- **Data Migration:** Handles anonymous user data migration when linking with existing Google accounts:
+  - Stores anonymous user ID before sign-in
+  - Prompts for data migration after successful sign-in
+  - Uses `CollectionRepository` and `collection_merge_helper.dart` for data transfer
+  - Ensures BuildContext safety with mounted checks
+- **State Management:** Includes explicit sign-out from Google/Firebase with delays and detailed logging to manage state transitions during linking.
 
-#### Email Verification Checker (lib/core/providers/email_verification_checker.dart)
+#### Riverpod Providers (lib/core/providers/)
 
-- Monitors email verification status periodically for users with unverified email/password accounts.
-- Uses the rebuilt `AuthService` (`handleEmailVerificationComplete`) to update state upon verification.
-- Refreshes the router upon successful verification.
+- **`auth_provider.dart`:** Defines `authServiceProvider`, `currentUserProvider`, `authStateProvider`, and action providers (`unlinkProviderProvider`, etc.). `unlinkProviderProvider` now awaits the reloaded user before invalidating state. `authStateProvider` logic updated to prioritize `isAnonymous` check.
+- **`email_verification_checker.dart`:** Monitors verification status.
+- **`auto_auth_provider.dart`:** Handles automatic anonymous sign-in (no longer skipped during deletion). Logic updated to reset `skipAutoAuthProvider` flag only for fully authenticated users.
 
 #### Profile Page Components
 
-- (Descriptions remain largely unchanged, but interactions now use the rebuilt AuthService via providers)
-- **ProfilePage**, **ProfileAuthSection**, **AccountInfoCard**, **AccountActionsCard**, **ProfileHeaderCard**, **ProfileReauthDialog**, **UpdatePasswordDialog**, etc.
+- **`profile_page.dart`:** Main profile view. Logic corrected to only show email verification banner when `authState.status == AuthStatus.emailNotVerified`.
+- **`account_settings_page.dart`:** Manages account details. Now watches `currentUserProvider` to ensure child widgets receive updated user data. Correctly handles state after account deletion (allows auto-anonymous sign-in).
+- **`AccountInfoCard.dart`:** Displays auth methods via `ProfileAuthMethods`. Now receives user object reliably from `AccountSettingsPage`. Passes correct email to `LinkEmailPasswordDialog`.
+- **`ProfileAuthMethods.dart`:** Displays individual auth methods. Fixed email display for password provider. Watches `currentUserProvider` for better reactivity after unlinks.
+- **`LinkEmailPasswordDialog.dart`:** Fixed to receive `initialEmail` via constructor and keep the field editable.
+- **Other Dialogs/Cards:** (`ProfileHeaderCard`, `AccountActionsCard`, `ProfileReauthDialog`, `UpdatePasswordDialog`, etc.)
 
 #### Authentication Pages
 
-- **LoginPage**, **RegisterPage**, **ResetPasswordPage**, **AuthPage**, **AccountSettingsPage**
-- Updated to use the rebuilt `AuthService` via `authServiceProvider`.
-- Corrected method calls for sign-in, registration, linking, and error handling.
+- **`auth_page.dart`:** Handles sign-in. Google sign-in logic improved to handle `not-anonymous` errors by falling back to standard sign-in and sets `skipAutoAuthProvider` flag during linking.
+- **`register_page.dart`:** Handles registration and linking anonymous users. Google linking logic improved to handle `not-anonymous` errors.
+- **`login_page.dart`:** Handles login and linking anonymous users.
+- **`reset_password_page.dart`:** Handles password reset.
 
 ### Data Flow
 
-- **Authentication Flow (Rebuilt)**
-
-The authentication flow now follows the simplified structure implemented in the rebuilt `AuthService`:
+- **Authentication Flow (Rebuilt & Refined - Testing)**
 
 ```mermaid
 graph TD
@@ -127,8 +151,14 @@ graph TD
         Anon[Anonymous User] -- Link --> LinkChoice{Link Email/Pass or Google?};
         LinkChoice -- Email/Pass --> LinkEmailPass[Link Email/Pass Credential];
         LinkChoice -- Google --> LinkGoogle[Link Google Credential];
+        LinkGoogle -- Exists --> MergePrompt{Merge Data?};
+        MergePrompt -- Yes --> MigrateData[Migrate Collection Data];
+        MergePrompt -- No --> DiscardData[Keep Google Account Data];
+        MigrateData --> SignOutSignIn[Sign Out & Sign In w/ Google];
+        DiscardData --> SignOutSignIn;
         LinkEmailPass --> AuthState;
-        LinkGoogle --> AuthState;
+        LinkGoogle -- Success --> SignOutSignIn;
+        SignOutSignIn --> AuthState;
     end
 
     subgraph Email/Password Flow
@@ -175,10 +205,13 @@ graph TD
     style ReAuth1 fill:#fdc,stroke:#333,stroke-width:1px
     style ReAuth2 fill:#fdc,stroke:#333,stroke-width:1px
     style ReAuth3 fill:#fdc,stroke:#333,stroke-width:1px
+    style MergePrompt fill:#9f9,stroke:#333,stroke-width:2px
+    style MigrateData fill:#9f9,stroke:#333,stroke-width:2px
+    style SignOutSignIn fill:#ffcc99,stroke:#333,stroke-width:2px
 ```
 
 - State management relies on Riverpod providers (`authStateProvider`, `currentUserProvider`) watching changes from the rebuilt `AuthService`.
-- UI components react to state changes provided by these providers.
+- UI components react to state changes provided by these providers. `AccountSettingsPage` now explicitly watches `currentUserProvider` to ensure timely updates are passed down.
 
 ### External Dependencies
 
@@ -192,9 +225,9 @@ graph TD
 - `AuthService` interacts with `UserRepository` to ensure data consistency (e.g., creating user doc on sign-up/link, updating email, deleting user doc).
 - Security rules enforce access control based on authentication status and user roles.
 
-### Recent Significant Changes
+### Recent Significant Changes (Consolidated)
 
-1. **Authentication System Rebuild (Objective 26):** The most significant recent change, involving a complete rewrite of `AuthService` and updates to all related providers and UI components for improved simplicity, robustness, and maintainability.
+1. **Authentication System Rebuild & Refinements (Objective 26 - Ongoing Testing):** Completed a full rebuild and subsequent fixes addressing state management, UI refresh issues (especially after unlinking), error handling edge cases (sign-in after sign-out), dialog behavior (email pre-population), data migration for anonymous users, and Google linking state management. **Currently testing and troubleshooting.**
 2. UI Improvements for Authentication (Logo, Google Icon).
 3. Email Display Simplification in Profile.
 4. Color Handling Improvements (`withValues`).

@@ -179,7 +179,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           // This preserves the user's data since the user ID remains the same
           talker.debug('Login page: Linking anonymous account with Google');
           // Corrected method call
-          await authService.linkGoogleToAnonymous();
+          await authService.linkGoogleToAnonymous(context);
 
           talker.debug('Login page: Google linking successful');
           _navigateToProfile();

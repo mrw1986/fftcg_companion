@@ -4,63 +4,58 @@
 
 [Previous objectives remain unchanged...]
 
-## Current Objective 26 (Completed)
+## Current Objective 26 (In Progress - Testing & Troubleshooting)
 
 Rebuild Authentication System for Simplicity and Robustness
 
 ### Context
 
-Despite previous attempts to fix and enhance the Firebase Authentication system, ongoing issues and perceived over-engineering necessitated a rebuild. The goal was to create a simpler, more robust system from scratch while preserving the existing UI/UX.
+Despite previous attempts to fix and enhance the Firebase Authentication system, ongoing issues and perceived over-engineering necessitated a rebuild. The goal was to create a simpler, more robust system from scratch while preserving the existing UI/UX. Subsequent testing revealed edge cases and state management issues requiring further refinement, particularly with Google account linking for anonymous users.
 
 ### Goal
 
-Implement a robust and simplified authentication system using Firebase Authentication (Email/Password, Anonymous, Google) covering all essential user flows.
+Implement a robust and simplified authentication system using Firebase Authentication (Email/Password, Anonymous, Google) covering all essential user flows, including edge cases and state transitions. **Currently focused on resolving the Google linking redirect issue.**
 
 ### Implementation Outcome
 
 1. **Refactored `AuthService` (`lib/core/services/auth_service.dart`):**
     * Rewrote the service focusing on direct, clear calls to the `FirebaseAuth.instance` SDK.
-    * Implemented straightforward methods for each core flow:
-        * Anonymous sign-in (`signInAnonymously`)
-        * Email/Password sign-in (`signInWithEmailAndPassword`)
-        * Email/Password registration (`createUserWithEmailAndPassword`)
-        * Google sign-in/registration (`signInWithGoogle`)
-        * Linking Email/Password to Anonymous (`linkEmailAndPasswordToAnonymous`)
-        * Linking Google to Anonymous (`linkGoogleToAnonymous`)
-        * Linking Email/Password to Google (`linkEmailPasswordToGoogle`)
-        * Linking Google to Email/Password (`linkGoogleToEmailPassword`)
-        * Password Reset (`sendPasswordResetEmail`)
-        * Email Update (`verifyBeforeUpdateEmail`)
-        * Password Update (`updatePassword`)
-        * Sign Out (`signOut`)
-        * Account Deletion (`deleteUser`)
-        * Re-authentication (Email/Password: `reauthenticateWithEmailAndPassword`, Google: `reauthenticateWithGoogle`)
-        * Provider Unlinking (`unlinkProvider`)
-        * Profile Update (`updateProfile`)
-        * Email Verification Check (`isEmailVerified`, `sendEmailVerification`, `handleEmailVerificationComplete`)
-        * Account Age Check (`isAccountOlderThan`)
+    * Implemented straightforward methods for each core flow (Anonymous, Email/Password, Google, Linking, Updates, Deletion, Re-auth).
     * Simplified error handling using `AuthException` and `AuthErrorCategory`.
     * Maintained necessary interactions with `UserRepository`.
     * Added detailed logging using `Talker`.
+    * Corrected `unlinkProvider` logic to prevent removing the last provider.
+    * Added `not-anonymous` error code handling.
+    * Implemented data migration for anonymous users linking with existing Google accounts:
+        * Added `merge_data_decision_dialog.dart` for user confirmation
+        * Created `collection_merge_helper.dart` for data migration logic
+        * Fixed timing of data migration to occur after successful sign-in
+        * Added proper BuildContext handling for async operations
+        * Ensured anonymous user data is preserved until migration decision
+    * **Refined Google linking state management:** Added explicit sign-out from Google and Firebase with delays, plus more logging during the sign-out/sign-in process.
 
 2. **Reviewed/Updated State Management (Riverpod Providers):**
-    * Corrected provider instantiations in `security_migration_provider.dart` to use the shared `authServiceProvider`.
-    * Updated `auth_provider.dart` to align with the new `AuthService` method signatures (e.g., `unlinkProvider` return type, `linkEmailPasswordToGoogle` name).
-    * Ensured `email_verification_checker.dart` correctly calls `handleEmailVerificationComplete` using the shared provider.
+    * Corrected provider instantiations in `security_migration_provider.dart`.
+    * Updated `auth_provider.dart` to align with the new `AuthService` and correctly prioritize `isAnonymous` check.
+    * Ensured `email_verification_checker.dart` correctly calls `handleEmailVerificationComplete`.
+    * Updated `unlinkProviderProvider` to await the reloaded user and invalidate both `currentUserProvider` and `authStateProvider` for better UI reactivity.
+    * Updated `auto_auth_provider.dart` to reset `skipAutoAuthProvider` flag only for fully authenticated users.
 
 3. **UI Integration (No Visual Changes):**
-    * Updated UI pages/widgets to call the refactored `AuthService` methods correctly:
-        * `auth_page.dart`: Fixed `getReadableAuthError` calls, updated `linkGoogleToAnonymous` call.
-        * `register_page.dart`: Fixed `getReadableAuthError` calls, updated `linkEmailAndPasswordToAnonymous` and `linkGoogleToAnonymous` calls.
-        * `link_accounts_dialog.dart`: Updated `linkGoogleToEmailPassword` call.
-        * `account_settings_page.dart`: Fixed `getReadableAuthError` calls, updated `linkGoogleToEmailPassword` and `linkEmailPasswordToGoogle` calls.
-        * `login_page.dart`: Fixed `getReadableAuthError` calls, updated `linkGoogleToAnonymous` call.
-        * `reset_password_page.dart`: Fixed `getReadableAuthError` call.
-        * `link_email_password_dialog.dart`: Updated `linkEmailAndPasswordToAnonymous` and `linkEmailPasswordToGoogle` calls (via provider).
+    * Updated UI pages/widgets to call the refactored `AuthService` methods correctly.
     * Ensured UI handling of loading states and errors aligns with the new service.
+    * Corrected Google sign-in logic in `auth_page.dart` and `register_page.dart` to handle state transitions after sign-out/deletion more robustly (fallback from link to sign-in) and set `skipAutoAuthProvider` flag.
+    * Fixed email display for password provider in `ProfileAuthMethods`.
+    * Ensured `AccountSettingsPage` watches `currentUserProvider` for reliable UI updates and passes the correct user object down.
+    * Corrected email pre-population logic in `LinkEmailPasswordDialog` by passing data reliably from `AccountInfoCard`.
+    * Fixed profile page banner logic (`profile_page.dart`) to only show email verification warning when appropriate (`AuthStatus.emailNotVerified`).
+    * Fixed state handling after account deletion in `account_settings_page` to allow immediate anonymous sign-in.
 
 4. **Testing:**
-    * Manual testing confirmed core flows are functional. (Further rigorous testing recommended).
+    * Manual testing confirmed core flows are functional.
+    * Identified and fixed several edge case bugs related to state transitions, unlinking, and dialog pre-population.
+    * Verified data migration flow for anonymous users linking with Google accounts.
+    * **Currently testing the fix for the Google linking redirect issue.**
 
 5. **Documentation Update:**
     * Updated `currentTask.md` (this file).
@@ -82,8 +77,14 @@ graph TD
         Anon[Anonymous User] -- Link --> LinkChoice{Link Email/Pass or Google?};
         LinkChoice -- Email/Pass --> LinkEmailPass[Link Email/Pass Credential];
         LinkChoice -- Google --> LinkGoogle[Link Google Credential];
+        LinkGoogle -- Exists --> MergePrompt{Merge Data?};
+        MergePrompt -- Yes --> MigrateData[Migrate Collection Data];
+        MergePrompt -- No --> DiscardData[Keep Google Account Data];
+        MigrateData --> SignOutSignIn[Sign Out & Sign In w/ Google];
+        DiscardData --> SignOutSignIn;
         LinkEmailPass --> AuthState;
-        LinkGoogle --> AuthState;
+        LinkGoogle -- Success --> SignOutSignIn;
+        SignOutSignIn --> AuthState;
     end
 
     subgraph Email/Password Flow
@@ -130,15 +131,20 @@ graph TD
     style ReAuth1 fill:#fdc,stroke:#333,stroke-width:1px
     style ReAuth2 fill:#fdc,stroke:#333,stroke-width:1px
     style ReAuth3 fill:#fdc,stroke:#333,stroke-width:1px
+    style MergePrompt fill:#9f9,stroke:#333,stroke-width:2px
+    style MigrateData fill:#9f9,stroke:#333,stroke-width:2px
+    style SignOutSignIn fill:#ffcc99,stroke:#333,stroke-width:2px
 ```
 
 ## Next Steps
 
-1. Implement deck builder feature (Objective from Roadmap)
-2. Add card scanner functionality
-3. Develop price tracking system
-4. Add collection import/export
-5. Implement collection sharing
-6. Add favorites and wishlist
-7. Enhance filtering options
-8. Add batch operations
+1. **Test the Google linking flow thoroughly** to confirm the redirect issue is resolved.
+2. Address any remaining edge cases identified during testing.
+3. Once authentication is stable, proceed to implement the deck builder feature (Objective from Roadmap).
+4. Add card scanner functionality
+5. Develop price tracking system
+6. Add collection import/export
+7. Implement collection sharing
+8. Add favorites and wishlist
+9. Enhance filtering options
+10. Add batch operations

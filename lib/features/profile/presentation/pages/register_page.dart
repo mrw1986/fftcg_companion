@@ -250,7 +250,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         talker.debug('Register page: Linking anonymous account with Google');
         try {
           // Corrected method call
-          await authService.linkGoogleToAnonymous();
+          await authService.linkGoogleToAnonymous(context);
           talker.debug('Register page: Google linking successful');
 
           // Navigate to profile page after successful linking

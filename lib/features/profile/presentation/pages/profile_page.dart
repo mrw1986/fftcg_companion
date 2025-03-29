@@ -106,12 +106,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ? const Center(child: LoadingIndicator())
           : ListView(
               children: [
-                // For unauthenticated users (including anonymous)
-                if (!authState.isAuthenticated || authState.isAnonymous)
+                // Show auth banner only for unauthenticated or anonymous users
+                if (authState.status == AuthStatus.unauthenticated ||
+                    authState.status == AuthStatus.anonymous)
                   _buildAuthBanner(context, colorScheme, theme),
 
                 // Email verification warning banner
-                if (authState.isEmailNotVerified)
+                // Corrected Condition: Check the specific status, not the flag
+                if (authState.status == AuthStatus.emailNotVerified)
                   Container(
                     margin: const EdgeInsets.all(16),
                     padding: const EdgeInsets.all(16),
@@ -207,7 +209,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   ),
 
                 // Account Settings option for authenticated users
-                if (authState.isAuthenticated && !authState.isEmailNotVerified)
+                // Corrected Condition: Show only if truly authenticated, not in emailNotVerified state
+                if (authState.status == AuthStatus.authenticated)
                   ListTile(
                     leading: Icon(Icons.manage_accounts,
                         color: colorScheme.secondary),
@@ -220,7 +223,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   ),
 
                 // Divider before app settings
-                if (authState.isAuthenticated && !authState.isEmailNotVerified)
+                // Corrected Condition: Show only if truly authenticated
+                if (authState.status == AuthStatus.authenticated)
                   const Divider(
                     height: 32,
                     thickness: 1,
@@ -229,7 +233,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   ),
 
                 // App settings section header
-                if (authState.isAuthenticated && !authState.isEmailNotVerified)
+                // Corrected Condition: Show only if truly authenticated
+                if (authState.status == AuthStatus.authenticated)
                   Padding(
                     padding:
                         const EdgeInsets.only(left: 16, right: 16, bottom: 8),

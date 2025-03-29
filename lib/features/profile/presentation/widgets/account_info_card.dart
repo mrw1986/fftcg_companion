@@ -1,13 +1,16 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart'; // Import GoRouter
-import 'package:fftcg_companion/core/utils/logger.dart'; // Import logger
+// Removed Riverpod import
+import 'package:go_router/go_router.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_email_update.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/profile_auth_methods.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/link_email_password_dialog.dart';
+// Removed auth_provider import
 
+// Reverted to StatelessWidget
 class AccountInfoCard extends StatelessWidget {
-  final User? user;
+  final User? user; // Use user prop passed from parent
   final bool isEmailNotVerified;
   final TextEditingController emailController;
   final bool showChangeEmail;
@@ -16,12 +19,12 @@ class AccountInfoCard extends StatelessWidget {
   final Function(String) onUnlinkProvider;
   final Future<void> Function() onLinkWithGoogle;
   final Function(String, String) onLinkWithEmailPassword;
-  final VoidCallback onChangePassword; // Add this callback
+  final VoidCallback onChangePassword;
   final bool isLoading;
 
   const AccountInfoCard({
     super.key,
-    required this.user,
+    required this.user, // Expect user from parent
     required this.isEmailNotVerified,
     required this.emailController,
     required this.showChangeEmail,
@@ -30,39 +33,46 @@ class AccountInfoCard extends StatelessWidget {
     required this.onUnlinkProvider,
     required this.onLinkWithGoogle,
     required this.onLinkWithEmailPassword,
-    required this.onChangePassword, // Add to constructor
+    required this.onChangePassword,
     required this.isLoading,
   });
 
+  // Reverted dialog showing logic to use the passed user prop
+  void _showLinkEmailPasswordDialog(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final initialEmailValue = user?.email; // Use email from user prop
+
+    talker.debug(
+        'AccountInfoCard: Showing LinkEmailPasswordDialog. User email from prop: $initialEmailValue');
+
+    showDialog(
+      context: context,
+      builder: (context) => LinkEmailPasswordDialog(
+        initialEmail: initialEmailValue, // Pass the email from user prop
+        onSuccess: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Email/password authentication added successfully',
+                style: TextStyle(color: colorScheme.onPrimary),
+              ),
+              backgroundColor: colorScheme.primary,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Removed WidgetRef
+    // Use the user passed via constructor
     if (user == null) return const SizedBox.shrink();
 
     final colorScheme = Theme.of(context).colorScheme;
     final providers = user!.providerData.map((e) => e.providerId).toList();
     final hasPassword = providers.contains('password');
-    // Removed unused hasGoogle variable
-
-    // Function to show the link email/password dialog
-    void showLinkEmailPasswordDialog() {
-      showDialog(
-        context: context,
-        builder: (context) => LinkEmailPasswordDialog(
-          onSuccess: () {
-            // Refresh the UI after successful linking
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Email/password authentication added successfully',
-                  style: TextStyle(color: colorScheme.onPrimary),
-                ),
-                backgroundColor: colorScheme.primary,
-              ),
-            );
-          },
-        ),
-      );
-    }
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -131,11 +141,13 @@ class AccountInfoCard extends StatelessWidget {
 
             // Use ProfileAuthMethods for authentication methods
             ProfileAuthMethods(
-              user: user,
+              user: user, // Pass the user from props
               onUnlinkProvider: onUnlinkProvider,
               onLinkWithGoogle: onLinkWithGoogle,
               onLinkWithEmailPassword: onLinkWithEmailPassword,
-              onShowLinkEmailPasswordDialog: showLinkEmailPasswordDialog,
+              // Pass the class method as the callback
+              onShowLinkEmailPasswordDialog: () =>
+                  _showLinkEmailPasswordDialog(context), // No ref needed
               showChangeEmail: showChangeEmail,
               onToggleChangeEmail: onToggleChangeEmail,
               isEmailNotVerified: isEmailNotVerified,
@@ -160,10 +172,8 @@ class AccountInfoCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 onTap: () {
-                  // Add logging
                   talker.debug(
                       'Reset Password tapped, navigating to /profile/reset-password');
-                  // Use context.push instead of Navigator.pushNamed with GoRouter
                   context.push('/profile/reset-password');
                 },
               ),
@@ -187,7 +197,7 @@ class AccountInfoCard extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
-                onTap: onChangePassword, // Use the callback here
+                onTap: onChangePassword,
               ),
             ],
           ],

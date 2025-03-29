@@ -8,9 +8,11 @@ class LinkEmailPasswordDialog extends ConsumerStatefulWidget {
   const LinkEmailPasswordDialog({
     super.key,
     required this.onSuccess,
+    this.initialEmail, // Add optional parameter
   });
 
   final VoidCallback onSuccess;
+  final String? initialEmail; // Add optional parameter
 
   @override
   ConsumerState<LinkEmailPasswordDialog> createState() =>
@@ -30,22 +32,15 @@ class _LinkEmailPasswordDialogState
 
   @override
   void initState() {
+    super.initState(); // Call super.initState first
     // Add listener to FocusNode
     _passwordFocusNode.addListener(_onPasswordFocusChange);
-    super.initState();
 
-    // Pre-fill email if user is signed in with Google
-    final user = ref.read(authStateProvider).user;
-    if (user != null) {
-      // Check if user has Google provider
-      final hasGoogleProvider = user.providerData.any(
-        (element) => element.providerId == 'google.com',
-      );
-
-      if (hasGoogleProvider && user.email != null) {
-        _emailController.text = user.email!;
-      }
+    // Use the passed-in initialEmail if available to pre-populate
+    if (widget.initialEmail != null) {
+      _emailController.text = widget.initialEmail!;
     }
+    // DO NOT read provider state here, rely on constructor parameter
   }
 
   @override
@@ -175,11 +170,7 @@ class _LinkEmailPasswordDialogState
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final user = ref.watch(authStateProvider).user;
-    final hasGoogleProvider = user?.providerData.any(
-          (element) => element.providerId == 'google.com',
-        ) ??
-        false;
+    // Removed unused variables: user, hasGoogleProvider
 
     return AlertDialog(
       shape: RoundedRectangleBorder(
@@ -210,8 +201,8 @@ class _LinkEmailPasswordDialogState
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.emailAddress,
-                // Disable email field if user is signed in with Google
-                enabled: !hasGoogleProvider || user!.isAnonymous,
+                // REMOVED: enabled property to make it always editable
+                // enabled: !hasGoogleProvider || user!.isAnonymous,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter your email';

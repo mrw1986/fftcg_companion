@@ -4,10 +4,14 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:fftcg_companion/features/profile/data/repositories/user_repository.dart';
 import 'package:flutter/foundation.dart'; // Required for kReleaseMode
+import 'package:flutter/material.dart';
+import 'package:fftcg_companion/features/profile/presentation/widgets/merge_data_decision_dialog.dart';
+import 'package:fftcg_companion/features/collection/data/repositories/collection_repository.dart';
+import 'package:fftcg_companion/features/collection/data/repositories/collection_merge_helper.dart';
 
 /// Enum for categorizing authentication errors
 enum AuthErrorCategory {
-  authentication, // Wrong password, user not found, requires-recent-login
+  authentication, // Wrong password, user not found, requires-recent-login, not-anonymous
   network, // Timeout, network request failed
   permission, // Operation not allowed, user disabled
   validation, // Invalid email, weak password, email-already-in-use
@@ -63,7 +67,13 @@ class AuthService {
       final userCredential = await _auth.signInAnonymously().timeout(_timeout);
       talker.info('Anonymous sign-in successful: ${userCredential.user?.uid}');
       if (userCredential.user != null) {
-        await _userRepository.createUserFromAuth(userCredential.user!);
+        // Reload the user to ensure we have the latest provider data
+        await userCredential.user!.reload();
+        // Get the refreshed user object
+        final refreshedUser = _auth.currentUser;
+        if (refreshedUser != null) {
+          await _userRepository.createUserFromAuth(refreshedUser);
+        }
       }
       return userCredential;
     } catch (e) {
@@ -197,7 +207,7 @@ class AuthService {
     if (currentUser == null || !currentUser.isAnonymous) {
       talker.error('Link failed: No anonymous user is signed in.');
       throw AuthException(
-          code: 'not-anonymous',
+          code: 'not-anonymous', // Specific code for this case
           message: 'No anonymous user is currently signed in.',
           category: AuthErrorCategory.authentication);
     }
@@ -244,13 +254,13 @@ class AuthService {
   }
 
   /// Links Google credentials to the currently signed-in anonymous user.
-  Future<UserCredential> linkGoogleToAnonymous() async {
+  Future<UserCredential> linkGoogleToAnonymous(BuildContext context) async {
     talker.info('Attempting to link Google to anonymous user...');
     final currentUser = _auth.currentUser;
     if (currentUser == null || !currentUser.isAnonymous) {
       talker.error('Link failed: No anonymous user is signed in.');
       throw AuthException(
-          code: 'not-anonymous',
+          code: 'not-anonymous', // Specific code for this case
           message: 'No anonymous user is currently signed in.',
           category: AuthErrorCategory.authentication);
     }
@@ -276,15 +286,141 @@ class AuthService {
       );
       talker.debug('Google credential created for linking.');
 
-      // Link credential
-      final userCredential =
-          await currentUser.linkWithCredential(credential).timeout(_timeout);
-      talker.info(
-          'Successfully linked Google to anonymous user: ${userCredential.user?.uid}');
+      // Try linking credential
+      UserCredential userCredential;
+      try {
+        userCredential =
+            await currentUser.linkWithCredential(credential).timeout(_timeout);
+        talker.info(
+            'Successfully linked Google to anonymous user: ${userCredential.user?.uid}');
 
-      if (userCredential.user != null) {
-        await _userRepository.createUserFromAuth(userCredential.user!);
+        // Reload user to ensure we have latest provider data
+        if (userCredential.user != null) {
+          await userCredential.user!.reload();
+          final refreshedUser = _auth.currentUser;
+          if (refreshedUser != null) {
+            await _userRepository.createUserFromAuth(refreshedUser);
+            // Sign out and sign back in to ensure clean state
+            try {
+              talker.debug(
+                  'Signing out and back in to ensure clean state after Google linking');
+              final googleCredential = GoogleAuthProvider.credential(
+                accessToken: googleAuth.accessToken,
+                idToken: googleAuth.idToken,
+              );
+              talker.info('Current auth state before sign out: ' +
+                  'isAnonymous=${_auth.currentUser?.isAnonymous}, ' +
+                  'providers=${_auth.currentUser?.providerData.map((p) => p.providerId).join(", ")}');
+
+              // Sign out from both services with delay
+              await _googleSignIn.signOut();
+              talker.debug('Signed out from Google.');
+              await Future.delayed(const Duration(milliseconds: 500));
+
+              await _auth.signOut();
+              talker.info('Signed out from Firebase.');
+              await Future.delayed(const Duration(milliseconds: 500));
+
+              // Sign back in with Google
+              userCredential = await _auth
+                  .signInWithCredential(googleCredential)
+                  .timeout(_timeout);
+              talker.info('Successfully signed back in with Google after linking. ' +
+                  'New auth state: isAnonymous=${userCredential.user?.isAnonymous}, ' +
+                  'providers=${userCredential.user?.providerData.map((p) => p.providerId).join(", ")}');
+
+              // Reload one more time to ensure we have the latest state
+              await userCredential.user?.reload();
+              final finalUser = _auth.currentUser;
+              if (finalUser != null) {
+                await _userRepository.createUserFromAuth(finalUser);
+                talker.info(
+                    'Final user state after Google linking: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
+              }
+            } catch (signInError) {
+              talker.error('Error during sign out/sign in after Google linking',
+                  signInError);
+              throw _handleAuthException(signInError);
+            }
+          }
+        }
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'credential-already-in-use') {
+          talker.warning(
+              'Credential already in use. Attempting sign-in instead.');
+          final signedInCredential =
+              await _auth.signInWithCredential(credential).timeout(_timeout);
+          talker.info(
+              'Signed in with Google instead of linking: ${signedInCredential.user?.uid}');
+
+          // Store the anonymous user's ID before signing in
+          final anonymousUserId = currentUser.uid;
+          userCredential = signedInCredential;
+
+          // First, prompt user to merge data before we sign out
+          if (context.mounted) {
+            final shouldMerge = await showMergeDataDecisionDialog(context);
+            if (shouldMerge == true) {
+              final collectionRepo = CollectionRepository();
+              await migrateCollectionData(
+                collectionRepository: collectionRepo,
+                fromUserId: anonymousUserId,
+                toUserId: userCredential.user!.uid,
+              );
+            }
+          }
+
+          // Now reload user and sign out/sign back in to ensure clean state
+          if (userCredential.user != null) {
+            await userCredential.user!.reload();
+            final refreshedUser = _auth.currentUser;
+            if (refreshedUser != null) {
+              await _userRepository.createUserFromAuth(refreshedUser);
+
+              try {
+                talker.debug(
+                    'Signing out and back in to ensure clean state after Google sign-in');
+                final googleCredential = GoogleAuthProvider.credential(
+                  accessToken: googleAuth.accessToken,
+                  idToken: googleAuth.idToken,
+                );
+                // Sign out from both services with delay
+                await _googleSignIn.signOut();
+                talker.debug('Signed out from Google.');
+                await Future.delayed(const Duration(milliseconds: 500));
+
+                await _auth.signOut();
+                talker.info('Signed out from Firebase.');
+                await Future.delayed(const Duration(milliseconds: 500));
+
+                // Sign back in with Google
+                userCredential = await _auth
+                    .signInWithCredential(googleCredential)
+                    .timeout(_timeout);
+                talker.info(
+                    'Successfully signed back in with Google after sign-in');
+
+                // Reload one more time to ensure we have the latest state
+                await userCredential.user?.reload();
+                final finalUser = _auth.currentUser;
+                if (finalUser != null) {
+                  await _userRepository.createUserFromAuth(finalUser);
+                  talker.info(
+                      'Final user state after Google sign-in: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
+                }
+              } catch (signInError) {
+                talker.error(
+                    'Error during sign out/sign in after Google sign-in',
+                    signInError);
+                throw _handleAuthException(signInError);
+              }
+            }
+          }
+        } else {
+          rethrow;
+        }
       }
+
       return userCredential;
     } catch (e) {
       // Handle specific conflict: Anonymous user tries to link Google, but Google email belongs to existing Email/Password account
@@ -425,10 +561,16 @@ class AuthService {
       final userCredential =
           await currentUser.linkWithCredential(credential).timeout(_timeout);
       talker.info(
-          'Successfully linked Google to Email/Password user: ${userCredential.user?.uid}');
+          'Successfully linked Google to anonymous user: ${userCredential.user?.uid}');
 
       if (userCredential.user != null) {
-        await _userRepository.createUserFromAuth(userCredential.user!);
+        // Reload the user to ensure we have the latest provider data
+        await userCredential.user!.reload();
+        // Get the refreshed user object
+        final refreshedUser = _auth.currentUser;
+        if (refreshedUser != null) {
+          await _userRepository.createUserFromAuth(refreshedUser);
+        }
       }
       return userCredential;
     } catch (e) {
@@ -526,12 +668,21 @@ class AuthService {
       final providers =
           _auth.currentUser?.providerData.map((p) => p.providerId).toList() ??
               [];
+
+      // Always sign out from Google first if it's a provider
       if (providers.contains(GoogleAuthProvider.PROVIDER_ID)) {
         await _googleSignIn.signOut();
         talker.debug('Signed out from Google.');
+        // Add a small delay to ensure Google sign out completes
+        await Future.delayed(const Duration(milliseconds: 500));
       }
+
+      // Then sign out from Firebase
       await _auth.signOut();
       talker.info('Signed out from Firebase.');
+
+      // Add a small delay to ensure auth state updates properly
+      await Future.delayed(const Duration(milliseconds: 500));
     } catch (e) {
       talker.error('Sign out failed: $e');
       throw _handleAuthException(e);
@@ -728,7 +879,8 @@ class AuthService {
           category: AuthErrorCategory.authentication);
     }
     // Prevent unlinking the last provider if it's not anonymous
-    if (currentUser.providerData.length <= 1 && !currentUser.isAnonymous) {
+    if (currentUser.providerData.length == 1 && !currentUser.isAnonymous) {
+      // Corrected check
       talker.error(
           'Unlink failed: Cannot unlink the last sign-in method for a non-anonymous account.');
       throw AuthException(
@@ -738,12 +890,21 @@ class AuthService {
     }
 
     try {
-      final updatedUser =
-          await currentUser.unlink(providerId).timeout(_timeout);
+      await currentUser.unlink(providerId).timeout(_timeout);
       talker.info('Successfully unlinked provider: $providerId');
-      // Update Firestore user data if needed (optional, depends on requirements)
-      await _userRepository.createUserFromAuth(updatedUser);
-      return updatedUser;
+
+      // Reload the user data to get the updated provider list
+      await currentUser.reload();
+      final reloadedUser = _auth.currentUser; // Get the refreshed user object
+
+      // Update Firestore user data with the reloaded user
+      if (reloadedUser != null) {
+        await _userRepository.createUserFromAuth(reloadedUser);
+      } else {
+        // This case should ideally not happen if unlink succeeded, but handle defensively
+        talker.warning('User object was null after reload post-unlink.');
+      }
+      return reloadedUser; // Return the reloaded user object
     } catch (e) {
       talker.error('Failed to unlink provider $providerId: $e');
       throw _handleAuthException(e);
@@ -901,6 +1062,10 @@ class AuthService {
       case 'user-token-expired':
       case 'web-context-cancelled':
       case 'wrong-account': // Custom code added in reauth
+      case 'not-anonymous': // Added custom code
+      case 'not-authenticated': // Added custom code
+      case 'not-google-user': // Added custom code
+      case 'not-email-user': // Added custom code
         return AuthErrorCategory.authentication;
 
       // Network Issues
@@ -914,6 +1079,7 @@ class AuthService {
       case 'operation-not-allowed':
       case 'user-disabled':
       case 'web-context-unsupported':
+      case 'cannot-unlink-last-provider': // Added custom code
         return AuthErrorCategory.permission;
 
       // Validation Issues
@@ -970,6 +1136,12 @@ class AuthService {
         return 'Your session has expired. Please sign in again.';
       case 'wrong-account': // Custom code
         return 'Please use the same account you originally signed in with.';
+      case 'not-anonymous': // Custom code
+      case 'not-authenticated': // Custom code
+      case 'not-google-user': // Custom code
+      case 'not-email-user': // Custom code
+        // These are internal logic errors, show a generic message to the user
+        return 'An unexpected authentication error occurred. Please try again.';
 
       // Validation
       case 'invalid-email':
@@ -1003,6 +1175,8 @@ class AuthService {
       case 'cancelled':
       case 'sign-in-cancelled':
         return 'Sign-in process was cancelled.';
+      case 'cannot-unlink-last-provider': // Added custom code
+        return 'You cannot remove your only sign-in method.';
 
       // Default for unhandled codes
       default:
