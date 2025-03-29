@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:fftcg_companion/features/profile/presentation/widgets/unlink_confirmation_dialog.dart';
 
 /// Widget for displaying and managing authentication methods
 class ProfileAuthMethods extends ConsumerWidget {
@@ -27,6 +28,28 @@ class ProfileAuthMethods extends ConsumerWidget {
   final bool showChangeEmail;
   final VoidCallback onToggleChangeEmail;
   final bool isEmailNotVerified; // Keep for badge
+
+  String _getProviderDisplayName(String providerId) {
+    switch (providerId) {
+      case 'google.com':
+        return 'Google';
+      case 'password':
+        return 'Email/Password';
+      default:
+        return 'Unknown Provider';
+    }
+  }
+
+  Future<void> _handleUnlink(BuildContext context, String providerId) async {
+    final shouldUnlink = await showUnlinkConfirmationDialog(
+      context,
+      _getProviderDisplayName(providerId),
+    );
+
+    if (shouldUnlink && context.mounted) {
+      onUnlinkProvider(providerId);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -179,7 +202,7 @@ class ProfileAuthMethods extends ConsumerWidget {
                             color: colorScheme.primary,
                           ),
                           tooltip: 'Unlink Email/Password',
-                          onPressed: () => onUnlinkProvider('password'),
+                          onPressed: () => _handleUnlink(context, 'password'),
                         ),
                     ],
                   ),
@@ -242,7 +265,7 @@ class ProfileAuthMethods extends ConsumerWidget {
                             color: colorScheme.primary,
                           ),
                           tooltip: 'Unlink Google',
-                          onPressed: () => onUnlinkProvider('google.com'),
+                          onPressed: () => _handleUnlink(context, 'google.com'),
                         ),
                     ],
                   ),

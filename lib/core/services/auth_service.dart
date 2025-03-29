@@ -308,8 +308,8 @@ class AuthService {
                 accessToken: googleAuth.accessToken,
                 idToken: googleAuth.idToken,
               );
-              talker.info('Current auth state before sign out: ' +
-                  'isAnonymous=${_auth.currentUser?.isAnonymous}, ' +
+              talker.info('Current auth state before sign out: '
+                  'isAnonymous=${_auth.currentUser?.isAnonymous}, '
                   'providers=${_auth.currentUser?.providerData.map((p) => p.providerId).join(", ")}');
 
               // Sign out from both services with delay
@@ -325,8 +325,9 @@ class AuthService {
               userCredential = await _auth
                   .signInWithCredential(googleCredential)
                   .timeout(_timeout);
-              talker.info('Successfully signed back in with Google after linking. ' +
-                  'New auth state: isAnonymous=${userCredential.user?.isAnonymous}, ' +
+              talker.info(
+                  'Successfully signed back in with Google after linking. '
+                  'New auth state: isAnonymous=${userCredential.user?.isAnonymous}, '
                   'providers=${userCredential.user?.providerData.map((p) => p.providerId).join(", ")}');
 
               // Reload one more time to ensure we have the latest state
@@ -360,7 +361,7 @@ class AuthService {
           // First, prompt user to merge data before we sign out
           if (context.mounted) {
             final shouldMerge = await showMergeDataDecisionDialog(context);
-            if (shouldMerge == true) {
+            if (shouldMerge == MergeAction.merge) {
               final collectionRepo = CollectionRepository();
               await migrateCollectionData(
                 collectionRepository: collectionRepo,

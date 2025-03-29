@@ -46,11 +46,36 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   // Initialize controllers based on user data
   void _initializeUserDataFromState(User? user) {
     if (user != null) {
-      // Only update if the text is different to avoid cursor jumps
-      if (user.displayName != null &&
+      // For display name:
+      // 1. If current display name is empty, try to get it from:
+      //    a. User's display name
+      //    b. Google provider's display name
+      if (_displayNameController.text.isEmpty) {
+        String? newDisplayName = user.displayName;
+
+        if (newDisplayName == null || newDisplayName.isEmpty) {
+          // Try to get display name from Google provider
+          try {
+            final googleProvider = user.providerData.firstWhere(
+              (element) => element.providerId == 'google.com',
+            );
+            newDisplayName = googleProvider.displayName;
+          } catch (_) {
+            // No Google provider found, continue with null display name
+          }
+        }
+
+        if (newDisplayName != null && newDisplayName.isNotEmpty) {
+          _displayNameController.text = newDisplayName;
+        }
+      }
+      // Otherwise, only update if the text is different to avoid cursor jumps
+      else if (user.displayName != null &&
           _displayNameController.text != user.displayName) {
         _displayNameController.text = user.displayName!;
       }
+
+      // For email:
       if (user.email != null && _emailController.text != user.email) {
         _emailController.text = user.email!;
         // Also update reauth email only if different
