@@ -30,35 +30,26 @@ final authStateProvider = Provider.autoDispose<AuthState>((ref) {
         return AuthState.anonymous(user);
       } else {
         // User is not anonymous, check providers
-        // Check if the user has at least one verified authentication method.
-        // Google is considered verified by default.
-        // Email/Password is verified only if user.emailVerified is true.
-        bool hasVerifiedProvider = user.providerData.any((userInfo) {
-          if (userInfo.providerId == 'google.com') {
-            return true; // Google is always considered verified
-          }
-          if (userInfo.providerId == 'password' && user.emailVerified) {
-            return true; // Verified Email/Password
-          }
-          // Add checks for other providers if needed (e.g., Apple, Facebook)
-          return false;
-        });
-
-        // Check if the user has an email/password provider linked
+        // Check for providers
         bool hasPasswordProvider = user.providerData
             .any((userInfo) => userInfo.providerId == 'password');
+        bool hasGoogleProvider = user.providerData
+            .any((userInfo) => userInfo.providerId == 'google.com');
 
-        if (hasVerifiedProvider) {
-          // If any provider is verified, the user is fully authenticated
-          // We still pass the user object so UI can check user.emailVerified if needed
-          return AuthState.authenticated(user);
-        } else if (hasPasswordProvider && !user.emailVerified) {
-          // If the *only* provider is an unverified email/password, then state is emailNotVerified
-          return AuthState.emailNotVerified(user);
-        } else {
-          // Fallback: Should not happen with current providers, but treat as authenticated
-          return AuthState.authenticated(user);
+        // If user has an unverified email/password but also has Google,
+        // keep them authenticated but set emailNotVerified flag
+        if (hasPasswordProvider && !user.emailVerified) {
+          if (hasGoogleProvider) {
+            // User has Google auth, so keep them authenticated but mark email as unverified
+            return AuthState.authenticated(user);
+          } else {
+            // Only has unverified email/password, show unverified state
+            return AuthState.emailNotVerified(user);
+          }
         }
+
+        // User either has no email/password or it's verified
+        return AuthState.authenticated(user);
       }
     },
     loading: () => const AuthState.loading(),
@@ -97,16 +88,16 @@ class AuthState {
   // Removed const keyword as initializers are not constant
   AuthState.authenticated(this.user)
       : status = AuthStatus.authenticated,
-        // Determine emailNotVerified based on user object if needed for UI hints
+        // Always check for unverified email/password, even in authenticated state
         emailNotVerified =
-            (user?.providerData.any((p) => p.providerId == 'password') ??
-                    false) &&
+            user?.providerData.any((p) => p.providerId == 'password') == true &&
                 !(user?.emailVerified ?? true),
         errorMessage = null;
 
-  const AuthState.emailNotVerified(this.user)
+  AuthState.emailNotVerified(this.user)
       : status = AuthStatus.emailNotVerified,
-        emailNotVerified = true, // Explicitly true for this state
+        // Always true for unverified state since we know it has unverified email
+        emailNotVerified = true,
         errorMessage = null;
 
   const AuthState.loading()

@@ -28,10 +28,14 @@ Implement a robust and simplified authentication system using Firebase Authentic
     * Added `not-anonymous` error code handling.
     * Implemented data migration for anonymous users linking with existing Google accounts:
         * Added `merge_data_decision_dialog.dart` for user confirmation
-        * Created `collection_merge_helper.dart` for data migration logic
+        * Created `collection_merge_helper.dart` for collection data migration
         * Fixed timing of data migration to occur after successful sign-in
         * Added proper BuildContext handling for async operations
         * Ensured anonymous user data is preserved until migration decision
+        * **Note:** Data migration currently only handles collection data. Need to expand to include:
+          * Deck data (lists, metadata, statistics)
+          * User settings (theme, display, layout preferences)
+          * User preferences (favorites, custom tags, search history)
     * **Refined Google linking state management:** Added explicit sign-out from Google and Firebase with delays, plus more logging during the sign-out/sign-in process.
 
 2. **Reviewed/Updated State Management (Riverpod Providers):**
@@ -139,12 +143,18 @@ graph TD
 ## Next Steps
 
 1. **Test the Google linking flow thoroughly** to confirm the redirect issue is resolved.
-2. Address any remaining edge cases identified during testing.
-3. Once authentication is stable, proceed to implement the deck builder feature (Objective from Roadmap).
-4. Add card scanner functionality
-5. Develop price tracking system
-6. Add collection import/export
-7. Implement collection sharing
-8. Add favorites and wishlist
-9. Enhance filtering options
-10. Add batch operations
+2. **Expand data migration system to handle all user data:**
+   * Implement deck data migration (lists, metadata, statistics)
+   * Add user settings migration (theme, display, layout preferences)
+   * Include user preferences migration (favorites, tags, history)
+   * Add progress indicators for larger migrations
+   * Implement proper error handling and rollback mechanisms
+3. Address any remaining edge cases identified during testing.
+4. Once authentication is stable, proceed to implement the deck builder feature (Objective from Roadmap).
+5. Add card scanner functionality
+6. Develop price tracking system
+7. Add collection import/export
+8. Implement collection sharing
+9. Add favorites and wishlist
+10. Enhance filtering options
+11. Add batch operations

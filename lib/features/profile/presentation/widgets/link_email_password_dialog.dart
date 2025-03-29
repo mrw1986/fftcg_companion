@@ -111,13 +111,17 @@ class _LinkEmailPasswordDialogState
 
         if (mounted) {
           // Add mounted check
+          // Show verification email notification with consistent styling
+          SnackBarHelper.showSuccessSnackBar(
+            context: context,
+            message:
+                'Email/password authentication added successfully. Please check your email to verify your account.',
+            duration: const Duration(seconds: 6),
+          );
+
           Navigator.of(context).pop();
           widget
               .onSuccess(); // Call the onSuccess callback provided by the parent
-          SnackBarHelper.showSuccessSnackBar(
-            context: context,
-            message: 'Email/password authentication added successfully',
-          );
         }
       }
     } catch (e) {

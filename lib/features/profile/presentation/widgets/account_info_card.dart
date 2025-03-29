@@ -39,7 +39,6 @@ class AccountInfoCard extends StatelessWidget {
 
   // Reverted dialog showing logic to use the passed user prop
   void _showLinkEmailPasswordDialog(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final initialEmailValue = user?.email; // Use email from user prop
 
     talker.debug(
@@ -49,17 +48,8 @@ class AccountInfoCard extends StatelessWidget {
       context: context,
       builder: (context) => LinkEmailPasswordDialog(
         initialEmail: initialEmailValue, // Pass the email from user prop
-        onSuccess: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Email/password authentication added successfully',
-                style: TextStyle(color: colorScheme.onPrimary),
-              ),
-              backgroundColor: colorScheme.primary,
-            ),
-          );
-        },
+        onSuccess:
+            () {}, // Empty callback since we show the message in the dialog
       ),
     );
   }

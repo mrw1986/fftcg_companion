@@ -108,9 +108,19 @@
 - **Data Migration:** Handles anonymous user data migration when linking with existing Google accounts:
   - Stores anonymous user ID before sign-in
   - Prompts for data migration after successful sign-in
-  - Uses `CollectionRepository` and `collection_merge_helper.dart` for data transfer
+  - Uses `CollectionRepository` and `collection_merge_helper.dart` for collection data transfer
   - Ensures BuildContext safety with mounted checks
+  - **Note:** Currently only handles collection data. Needs expansion to include:
+    - Deck data (lists, metadata, statistics)
+    - User settings (theme, display, layout preferences)
+    - User preferences (favorites, custom tags, search history)
 - **State Management:** Includes explicit sign-out from Google/Firebase with delays and detailed logging to manage state transitions during linking.
+- **Data Migration Needs:**
+  - Expand migration system to handle all user data types
+  - Support both merge and overwrite scenarios
+  - Implement proper error handling and rollback mechanisms
+  - Add progress indicators for larger migrations
+  - Ensure data integrity during migration process
 
 #### Riverpod Providers (lib/core/providers/)
 

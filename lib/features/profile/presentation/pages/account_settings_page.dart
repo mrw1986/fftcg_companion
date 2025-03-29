@@ -887,9 +887,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                   // Account Information
                   AccountInfoCard(
                     user: userForUI, // Pass userForUI down - FIXED LINTER ERROR
-                    isEmailNotVerified: authState.status ==
-                        AuthStatus
-                            .emailNotVerified, // Use specific status check
+                    isEmailNotVerified: authState
+                        .isEmailNotVerified, // Use the getter that checks user.emailVerified
                     emailController: _emailController,
                     showChangeEmail: _showChangeEmail,
                     onToggleChangeEmail: () {
