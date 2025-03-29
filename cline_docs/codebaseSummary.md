@@ -2,6 +2,22 @@
 
 ## Recent Changes
 
+### Email Update Flow and UI Improvements (Objective 26)
+
+- Fixed UI not updating after linking Google authentication:
+  - Added explicit provider invalidation in `_linkWithGoogle` method of `account_settings_page.dart`
+  - Ensured both `currentUserProvider` and `authStateProvider` are invalidated after successful linking
+  - UI now immediately reflects newly linked authentication methods
+- Improved email update messaging:
+  - Made note text and dialogs dynamic based on authentication methods
+  - Users with Google auth are informed they'll remain logged in
+  - Users with only email/password are informed they'll be logged out
+  - Messages adapt in real-time to authentication state changes
+- Enhanced user experience:
+  - UI updates immediately when linking/unlinking authentication methods
+  - Clearer communication about email update consequences
+  - Consistent messaging across all dialogs and UI elements
+
 ### Authentication State & UI Fixes (Objective 26 - Ongoing Testing)
 
 - Corrected provider unlinking logic in `AuthService` to prevent removing the last provider incorrectly.

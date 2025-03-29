@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/app/theme/theme_provider.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:fftcg_companion/shared/widgets/app_bar_factory.dart';
-import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 
 class ThemeSettingsPage extends ConsumerStatefulWidget {
   const ThemeSettingsPage({super.key});
@@ -192,51 +191,6 @@ class _ThemeSettingsPageState extends ConsumerState<ThemeSettingsPage> {
                                   fontWeight: FontWeight.bold,
                                   color: colorScheme.onSurface,
                                 ),
-                          ),
-                        ),
-                      ),
-
-                      // Add a button to apply the selected color
-                      const SizedBox(height: 24),
-                      Center(
-                        child: Material(
-                          color:
-                              themeColor, // Use the selected color for the button
-                          borderRadius: BorderRadius.circular(24),
-                          elevation: 2,
-                          child: InkWell(
-                            onTap: () {
-                              // Show a confirmation message
-                              SnackBarHelper.showSuccessSnackBar(
-                                context: context,
-                                message: 'Theme color updated',
-                                centered: true,
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(24),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 24, vertical: 12),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.check,
-                                    color:
-                                        _getTextColorForBackground(themeColor),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Apply Theme Color',
-                                    style: TextStyle(
-                                      color: _getTextColorForBackground(
-                                          themeColor),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ),
                         ),
                       ),

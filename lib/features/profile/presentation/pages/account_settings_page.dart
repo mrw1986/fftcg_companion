@@ -674,8 +674,10 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     });
 
     try {
-      await ref.read(authServiceProvider).linkGoogleToEmailPassword();
-      // Invalidation handled by provider
+      await ref.read(linkGoogleToEmailPasswordProvider.future);
+      // Explicitly invalidate providers to ensure UI updates
+      ref.invalidate(currentUserProvider);
+      ref.invalidate(authStateProvider);
       setState(() {
         _isLoading = false;
       });
@@ -934,9 +936,21 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 // Updated Dialog: User stays logged in
 Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
   final colorScheme = Theme.of(context).colorScheme;
+  final user = FirebaseAuth.instance.currentUser;
+
+  // Check if user has Google auth (a verified method)
+  final hasGoogleAuth = user?.providerData
+          .any((userInfo) => userInfo.providerId == 'google.com') ??
+      false;
+
+  // Determine the appropriate message
+  final message = hasGoogleAuth
+      ? 'A verification link will be sent to your new email address. Please click the link to confirm the change.'
+      : 'A verification link will be sent to your new email address. Please click the link to confirm the change. You will be logged out after updating your email.';
+
   return await showDialog<bool>(
         context: context,
-        barrierDismissible: false, // Prevent dismissing by tapping outside
+        barrierDismissible: false,
         builder: (BuildContext context) {
           return AlertDialog(
             shape: RoundedRectangleBorder(
@@ -949,8 +963,7 @@ Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
                 const Text('Confirm Email Update'),
               ],
             ),
-            content: const Text(
-                'A verification link will be sent to your new email address. Please click the link to confirm the change. You will remain logged in.'), // Updated message
+            content: Text(message),
             actions: <Widget>[
               TextButton(
                 style: TextButton.styleFrom(
@@ -981,9 +994,21 @@ Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
 Future<void> showEmailUpdateInitiatedDialog(
     BuildContext context, String newEmail) async {
   final colorScheme = Theme.of(context).colorScheme;
+  final user = FirebaseAuth.instance.currentUser;
+
+  // Check if user has Google auth (a verified method)
+  final hasGoogleAuth = user?.providerData
+          .any((userInfo) => userInfo.providerId == 'google.com') ??
+      false;
+
+  // Determine the appropriate message
+  final message = hasGoogleAuth
+      ? 'A verification email has been sent to $newEmail. Please check your inbox and click the link to finalize the email change. You will remain logged in since you have other verified authentication methods.'
+      : 'A verification email has been sent to $newEmail. Please check your inbox and click the link to finalize the email change. You will be logged out after verifying since this is your only authentication method.';
+
   return showDialog<void>(
     context: context,
-    barrierDismissible: false, // Prevent dismissing
+    barrierDismissible: false,
     builder: (BuildContext context) {
       return AlertDialog(
         shape: RoundedRectangleBorder(
@@ -993,11 +1018,10 @@ Future<void> showEmailUpdateInitiatedDialog(
           children: [
             Icon(Icons.mark_email_read_outlined, color: colorScheme.primary),
             const SizedBox(width: 12),
-            const Text('Verification Email Sent'), // Updated title
+            const Text('Verification Email Sent'),
           ],
         ),
-        content: Text(
-            'A verification email has been sent to $newEmail. Please check your inbox and click the link to finalize the email change. You remain logged in.'), // Updated message
+        content: Text(message),
         actions: <Widget>[
           FilledButton(
             style: FilledButton.styleFrom(

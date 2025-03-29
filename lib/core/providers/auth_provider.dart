@@ -186,6 +186,18 @@ final linkEmailPasswordToGoogleProvider =
   },
 );
 
+/// Provider for linking Google to Email/Password account
+final linkGoogleToEmailPasswordProvider = FutureProvider.autoDispose<void>(
+  (ref) async {
+    final authService = ref.watch(authServiceProvider);
+    await authService.linkGoogleToEmailPassword();
+    // Invalidate both the source stream and the derived state
+    // to ensure the UI updates reliably after the user object is reloaded.
+    ref.invalidate(currentUserProvider);
+    ref.invalidate(authStateProvider);
+  },
+);
+
 /// Provider for updating user password
 final updatePasswordProvider =
     FutureProvider.autoDispose.family<void, String>((ref, newPassword) async {

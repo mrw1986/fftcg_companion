@@ -103,6 +103,7 @@ class AccountInfoCard extends StatelessWidget {
                   emailController: emailController,
                   onUpdateEmail: onUpdateEmail,
                   isLoading: isLoading,
+                  user: user,
                 ),
               ),
               const SizedBox(height: 16),

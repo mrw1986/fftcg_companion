@@ -54,6 +54,8 @@
    - [x] Fixed BuildContext handling in async operations
    - [x] Improved Google linking state management (skipAutoAuth flag, sign-out/sign-in process)
    - [x] Fixed authentication method order consistency in UI
+   - [x] Fixed UI updates after linking Google authentication
+   - [x] Improved email update messaging based on auth methods
    - [ ] **Ongoing:** Testing and troubleshooting edge cases (e.g., Google linking redirect)
    - [ ] **Pending:** Expand data migration to include all user data (decks, settings, preferences)
 
@@ -134,7 +136,21 @@
 
 ### Recently Completed
 
-1. **Fixed Authentication State & UI Issues (Objective 26 - Ongoing Testing)**
+1. **Fixed Email Update Flow and UI Updates (Objective 26)**
+    - Fixed UI not updating after linking Google authentication:
+        - Added explicit provider invalidation after successful Google linking
+        - Ensured UI immediately reflects newly linked authentication methods
+        - Updated email update messaging to be dynamic based on auth methods
+    - Improved email update messaging:
+        - Note text and dialogs now show correct message based on auth methods
+        - Users with Google auth are informed they'll remain logged in
+        - Users with only email/password are informed they'll be logged out
+    - Enhanced user experience:
+        - UI updates immediately when linking/unlinking authentication methods
+        - Messages adapt in real-time to authentication state changes
+        - Clearer communication about email update consequences
+
+2. **Fixed Authentication State & UI Issues (Objective 26 - Ongoing Testing)**
     - Fixed authentication method order consistency in UI:
         - Email/Password (or Add Email/Password) always appears first
         - Google (or Add Google) always appears second

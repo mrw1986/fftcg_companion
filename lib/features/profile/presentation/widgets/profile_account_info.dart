@@ -77,6 +77,7 @@ class ProfileAccountInfo extends ConsumerWidget {
                 emailController: emailController,
                 onUpdateEmail: onUpdateEmail,
                 isLoading: isLoading,
+                user: user,
               ),
             ],
 
