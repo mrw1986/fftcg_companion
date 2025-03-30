@@ -67,7 +67,14 @@
 
 ### Security Enhancements (Partially Superseded by Rebuild)
 
-- Implemented security improvements in Firestore rules (role-based access, validation, limits).
+- Implemented security improvements in Firestore rules:
+  - Role-based access control
+  - Data validation
+  - Anonymous user limits:
+    - Tracks unique cards via user.collectionCount
+    - Limits anonymous users to 50 unique cards
+    - Enforces collectionCount increments/decrements in rules
+  - Other security validations and limits
 - (AuthService logic related to security was handled within the rebuild).
 
 ### Google Authentication Flow Improvements (Superseded by Rebuild)

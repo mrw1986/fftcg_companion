@@ -147,6 +147,13 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
     final cardCacheAsync = ref.watch(cardCacheNotifierProvider);
 
     return Scaffold(
+      floatingActionButton: !_isSearching && _selectedCardId != null
+          ? FloatingActionButton.extended(
+              onPressed: _saveCard,
+              icon: const Icon(Icons.save),
+              label: const Text('Save'),
+            )
+          : null,
       appBar: AppBar(
         title: _isSearching
             ? TextField(
@@ -168,13 +175,6 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
               icon: Icon(_isSearching ? Icons.close : Icons.search),
               tooltip: _isSearching ? 'Cancel' : 'Search',
               onPressed: _toggleSearch,
-            ),
-
-          // Save button (only show when not searching)
-          if (!_isSearching && _selectedCardId != null)
-            TextButton(
-              onPressed: _saveCard,
-              child: const Text('Save'),
             ),
         ],
       ),
@@ -258,7 +258,8 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
   Widget _buildCardForm(BuildContext context, ThemeData theme,
       ColorScheme colorScheme, AsyncValue<CardCache> cardCacheAsync) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.fromLTRB(
+          16.0, 16.0, 16.0, 80.0), // Added bottom padding for FAB
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
