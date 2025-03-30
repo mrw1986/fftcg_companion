@@ -32,10 +32,10 @@ Implement a robust and simplified authentication system using Firebase Authentic
         * Fixed timing of data migration to occur after successful sign-in
         * Added proper BuildContext handling for async operations
         * Ensured anonymous user data is preserved until migration decision
-        * **Note:** Data migration currently only handles collection data. Need to expand to include:
-          * Deck data (lists, metadata, statistics)
-          * User settings (theme, display, layout preferences)
-          * User preferences (favorites, custom tags, search history)
+          * **Note:** Data migration now handles:
+            * Collection data (quantities, conditions, purchase info, grading)
+            * User settings (theme mode, theme color, recent colors)
+            * **Pending:** Deck data (lists, metadata, statistics)
     * **Refined Google linking state management:** Added explicit sign-out from Google and Firebase with delays, plus more logging during the sign-out/sign-in process.
 
 2. **Reviewed/Updated State Management (Riverpod Providers):**

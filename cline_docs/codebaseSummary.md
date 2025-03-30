@@ -272,11 +272,45 @@ graph TD
 
 ## Core Features
 
-[Previous core features remain unchanged...]
+1. Authentication System
+   - Email/Password authentication
+   - Google Sign-In
+   - Anonymous accounts
+   - Account linking
+   - Email verification
+   - Password reset
+   - Account deletion
+   - Re-authentication
+
+2. Collection Management
+   - Card tracking
+   - Condition tracking
+   - Collection statistics
+   - Search and filtering
+   - Import/Export
+
+3. Theme System
+   - Light/Dark modes
+   - Custom colors
+   - Material 3 design
+   - Consistent styling
 
 ## Architecture
 
-[Previous architecture details remain unchanged...]
+1. State Management
+   - Riverpod for state management
+   - Provider pattern for dependency injection
+   - Stream-based reactive updates
+
+2. Firebase Integration
+   - Authentication
+   - Firestore for data storage
+   - Security rules
+
+3. UI Architecture
+   - Feature-first organization
+   - Presentation/Domain/Data layers
+   - Shared widgets and utilities
 
 ## Future Development
 

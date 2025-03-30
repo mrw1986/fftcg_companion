@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/merge_data_decision_dialog.dart';
 import 'package:fftcg_companion/features/collection/data/repositories/collection_repository.dart';
 import 'package:fftcg_companion/features/collection/data/repositories/collection_merge_helper.dart';
+import 'package:fftcg_companion/features/profile/data/repositories/settings_merge_helper.dart';
 
 /// Enum for categorizing authentication errors
 enum AuthErrorCategory {
@@ -360,13 +361,27 @@ class AuthService {
 
           // First, prompt user to merge data before we sign out
           if (context.mounted) {
-            final shouldMerge = await showMergeDataDecisionDialog(context);
-            if (shouldMerge == MergeAction.merge) {
+            final mergeAction = await showMergeDataDecisionDialog(context);
+            if (mergeAction != null) {
               final collectionRepo = CollectionRepository();
-              await migrateCollectionData(
-                collectionRepository: collectionRepo,
+              final userRepo = UserRepository();
+
+              // Handle collection data
+              if (mergeAction == MergeAction.merge ||
+                  mergeAction == MergeAction.overwrite) {
+                await migrateCollectionData(
+                  collectionRepository: collectionRepo,
+                  fromUserId: anonymousUserId,
+                  toUserId: userCredential.user!.uid,
+                );
+              }
+
+              // Handle settings data
+              await migrateUserSettings(
+                userRepository: userRepo,
                 fromUserId: anonymousUserId,
                 toUserId: userCredential.user!.uid,
+                overwrite: mergeAction == MergeAction.overwrite,
               );
             }
           }
