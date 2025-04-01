@@ -94,23 +94,25 @@ There is a secondary issue with the Account Limits dialog appearing after Google
 
 ## Next Steps
 
-1. **Address Account Limits Dialog Issue:**
-   * Investigate why the Account Limits dialog appears after Google sign-in when it shouldn't.
-   * This may be related to the auth state transitions during the sign-out/sign-in process.
-
-2. **Test Firestore Permission Fix (Critical - Objective 27):**
+1. **Test Firestore Permission Fix (Critical - Objective 27):**
    * [ ] Test account deletion flow (triggers anonymous sign-in, check for user doc creation with `collectionCount: 0`).
    * [ ] **Test anonymous user linking to Google account (Primary test for this fix, check for user doc creation/update with `collectionCount`).**
    * [ ] Verify user document creation for new anonymous users (initial app start).
    * [ ] Test standard operations (collection add/update, settings changes) for both anonymous and authenticated users.
    * [ ] Specifically check Firestore logs for permission errors during these tests.
 
+2. **Address Account Limits Dialog Issue (Completed - Objective 31):**
+   * The Account Limits dialog no longer appears after cancelling Google sign-in or linking.
+   * The fix involved modifying the auto-sign-in logic in `auto_auth_provider.dart` to pass `isInternalAuthFlow=true` when creating temporary anonymous users.
+   * This ensures the dialog timestamp isn't reset during internal auth flows like Google sign-in.
+   * The dialog now only appears for actual anonymous sign-ins, not during temporary auth state changes.
+
 3. **Continue Authentication System Testing:**
    * [ ] Test Google linking flow thoroughly.
    * [ ] Verify all edge cases are handled.
    * [ ] Ensure proper state transitions.
 
-4. **Expand Data Migration (If Step 2 Successful):**
+4. **Expand Data Migration (If Step 1 Successful):**
    * [ ] Implement deck data migration.
    * [ ] Add user settings migration.
    * [ ] Include user preferences migration.
@@ -126,3 +128,17 @@ There is a secondary issue with the Account Limits dialog appearing after Google
    * Add favorites and wishlist
    * Enhance filtering options
    * Add batch operations
+
+## Completed Objective 31 (Account Limits Dialog Issue)**
+
+Prevented the Account Limits dialog from appearing after cancelling Google sign-in or linking:
+
+* Modified the auto-sign-in logic in `auto_auth_provider.dart` to pass `isInternalAuthFlow=true` when creating temporary anonymous users.
+* This ensures the dialog timestamp isn't reset during internal auth flows like Google sign-in.
+* The dialog will now only appear for actual anonymous sign-ins, not during temporary auth state changes.
+
+Testing Results:
+
+* When cancelling Google sign-in, the "Google sign-in was cancelled" SnackBar appears.
+* The Account Limits dialog does not appear since the anonymous sign-in is part of an internal auth flow.
+* The dialog still appears normally for actual anonymous users.

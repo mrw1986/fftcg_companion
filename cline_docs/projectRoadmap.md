@@ -114,9 +114,21 @@
 - [x] Improved Google linking state management (Rebuilt)
 - [x] Fixed authentication method order consistency in UI
 - [x] Fixed Google authentication display name not storing in Firestore
-- [ ] **Fix Firestore permission issues during data migration (Critical)**
-- [ ] **Ensure all edge cases and state transitions are handled correctly (Ongoing Testing)**
-- [ ] **Implement comprehensive data migration for all user data (Pending)**
+  - [ ] **Fix Firestore permission issues during data migration (Critical)**
+  - [ ] **Ensure all edge cases and state transitions are handled correctly (Ongoing Testing)**
+  - [ ] **Implement comprehensive data migration for all user data (Pending)**
+
+### Recently Completed Tasks
+
+1. **Fixed Account Limits Dialog Issue After Google Sign-In (Objective 31)**
+    - Prevented the Account Limits dialog from appearing after cancelling Google sign-in or linking:
+        - Modified the auto-sign-in logic in `auto_auth_provider.dart` to pass `isInternalAuthFlow=true` when creating temporary anonymous users.
+        - This ensures the dialog timestamp isn't reset during internal auth flows like Google sign-in.
+        - The dialog will now only appear for actual anonymous sign-ins, not during temporary auth state changes.
+    - Successfully tested the solution:
+        - When cancelling Google sign-in, the "Google sign-in was cancelled" SnackBar appears.
+        - The Account Limits dialog does not appear since the anonymous sign-in is part of an internal auth flow.
+        - The dialog still appears normally for actual anonymous users.
 
 ### Collection Management ✓
 
@@ -205,8 +217,8 @@
 ### Next Steps
 
 1. **Address Account Limits Dialog Issue:**
-   - [ ] Investigate why the Account Limits dialog appears after Google sign-in
-   - [ ] Fix auth state transitions during the sign-out/sign-in process
+   - [x] Investigate why the Account Limits dialog appears after Google sign-in
+   - [x] Fix auth state transitions during the sign-out/sign-in process
 
 2. **Fix Firestore permission issues during data migration (Critical)**
    - [ ] Review and update Firestore rules for all migration scenarios
