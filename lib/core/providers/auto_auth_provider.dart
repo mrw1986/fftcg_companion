@@ -57,7 +57,7 @@ Future<void> _signInAnonymously(Ref ref) async {
   try {
     final authService = ref.read(authServiceProvider);
     talker.debug('Auto-signing in anonymously');
-    await authService.signInAnonymously();
+    await authService.signInAnonymously(isInternalAuthFlow: true);
   } catch (e) {
     talker.error('Error auto-signing in anonymously', e);
   }

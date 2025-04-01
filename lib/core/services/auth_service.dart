@@ -63,17 +63,20 @@ class AuthService {
   // --- Core Sign-in/Registration Methods ---
 
   /// Signs in a user anonymously. Creates a corresponding Firestore document.
-  Future<UserCredential> signInAnonymously() async {
+  Future<UserCredential> signInAnonymously(
+      {bool isInternalAuthFlow = false}) async {
     talker.info('Attempting anonymous sign-in...');
     try {
-      // Reset the last shown timestamp for account limits dialog
-      // This ensures new anonymous users will see the dialog
-      final storage = HiveStorage();
-      final isBoxAvailable = await storage.isBoxAvailable('settings');
-      if (isBoxAvailable) {
-        await storage.put('last_limits_dialog_shown', 0, boxName: 'settings');
-        talker.debug(
-            'Reset account limits dialog timestamp for new anonymous user');
+      // Only reset the dialog timestamp for actual anonymous sign-ins,
+      // not during internal auth flows like Google sign-in
+      if (!isInternalAuthFlow) {
+        final storage = HiveStorage();
+        final isBoxAvailable = await storage.isBoxAvailable('settings');
+        if (isBoxAvailable) {
+          await storage.put('last_limits_dialog_shown', 0, boxName: 'settings');
+          talker.debug(
+              'Reset account limits dialog timestamp for new anonymous user');
+        }
       }
 
       final userCredential = await _auth.signInAnonymously().timeout(_timeout);
@@ -340,8 +343,7 @@ class AuthService {
             talker.debug('Signed out from Google.');
             await Future.delayed(const Duration(milliseconds: 500));
 
-            await _auth.signOut();
-            talker.info('Signed out from Firebase.');
+            await signOut(isInternalAuthFlow: true);
             await Future.delayed(const Duration(milliseconds: 500));
 
             // Sign back in with Google
@@ -448,8 +450,7 @@ class AuthService {
               talker.debug('Signed out from Google.');
               await Future.delayed(const Duration(milliseconds: 500));
 
-              await _auth.signOut();
-              talker.info('Signed out from Firebase.');
+              await signOut(isInternalAuthFlow: true);
               await Future.delayed(const Duration(milliseconds: 500));
 
               // Sign back in with Google
@@ -725,7 +726,10 @@ class AuthService {
   }
 
   /// Signs out the current user from Firebase and Google (if applicable).
-  Future<void> signOut() async {
+  ///
+  /// [isInternalAuthFlow] indicates whether this sign out is part of an internal auth flow
+  /// (like Google sign-in clean up) rather than an actual user-initiated sign out.
+  Future<void> signOut({bool isInternalAuthFlow = false}) async {
     talker.info('Attempting sign out...');
     try {
       // Check which providers are linked to sign out appropriately
@@ -741,18 +745,19 @@ class AuthService {
         await Future.delayed(const Duration(milliseconds: 500));
       }
 
-      // Reset the last shown timestamp for account limits dialog
-      // This ensures new anonymous users will see the dialog
-      final storage = HiveStorage();
-      final isBoxAvailable = await storage.isBoxAvailable('settings');
-      if (isBoxAvailable) {
-        await storage.put('last_limits_dialog_shown', 0, boxName: 'settings');
-        talker.debug('Reset account limits dialog timestamp');
-      }
-
       // Then sign out from Firebase
       await _auth.signOut();
       talker.info('Signed out from Firebase.');
+
+      // Only reset the dialog timestamp for actual sign outs, not during auth flows
+      if (!isInternalAuthFlow) {
+        final storage = HiveStorage();
+        final isBoxAvailable = await storage.isBoxAvailable('settings');
+        if (isBoxAvailable) {
+          await storage.put('last_limits_dialog_shown', 0, boxName: 'settings');
+          talker.debug('Reset account limits dialog timestamp');
+        }
+      }
 
       // Add a small delay to ensure auth state updates properly
       await Future.delayed(const Duration(milliseconds: 500));
@@ -856,7 +861,7 @@ class AuthService {
         talker.warning(
             'Re-authentication failed: Different Google account used.');
         // Sign the user out completely as they used the wrong account
-        await signOut();
+        await signOut(isInternalAuthFlow: true);
         throw AuthException(
             code: 'wrong-account',
             message:
@@ -881,11 +886,15 @@ class AuthService {
       return userCredential;
     } catch (e) {
       talker.error('Google re-authentication failed: $e');
-      // If re-auth fails, sign the user out for security
-      await signOut().catchError((signOutError) {
-        talker.error(
-            'Error signing out after failed re-authentication: $signOutError');
-      });
+
+      // Only sign out for security-critical failures, not for cancellations
+      if (e is! AuthException || e.category != AuthErrorCategory.cancelled) {
+        await signOut(isInternalAuthFlow: true).catchError((signOutError) {
+          talker.error(
+              'Error signing out after failed re-authentication: $signOutError');
+        });
+      }
+
       throw _handleAuthException(e);
     }
   }

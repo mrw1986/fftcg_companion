@@ -56,6 +56,7 @@
    - [x] Fixed authentication method order consistency in UI
    - [x] Fixed UI updates after linking Google authentication
    - [x] Improved email update messaging based on auth methods
+   - [x] Fixed Google authentication display name not storing in Firestore
    - [ ] **Critical:** Fix Firestore permission issues during data migration
    - [ ] **Ongoing:** Testing and troubleshooting edge cases (e.g., Google linking redirect)
    - [x] Implemented settings migration (theme, display preferences)
@@ -112,6 +113,7 @@
 - [x] Implement data migration for anonymous users (Rebuilt)
 - [x] Improved Google linking state management (Rebuilt)
 - [x] Fixed authentication method order consistency in UI
+- [x] Fixed Google authentication display name not storing in Firestore
 - [ ] **Fix Firestore permission issues during data migration (Critical)**
 - [ ] **Ensure all edge cases and state transitions are handled correctly (Ongoing Testing)**
 - [ ] **Implement comprehensive data migration for all user data (Pending)**
@@ -139,7 +141,19 @@
 
 ### Recently Completed
 
-1. **Data Migration and Firestore Rules Updates (Objective 27)**
+1. **Fixed Google Authentication Display Name Issue (Objective 30)**
+    - Fixed issue where Google display name wasn't storing in Firestore:
+        - Added code to extract display name directly from Google provider data
+        - Updated logic to prioritize Google provider display name
+        - Enhanced logging to track display name at various stages
+    - Successfully tested the solution:
+        - Display name now correctly extracted from Google provider data
+        - Display name properly stored in Firestore user document
+        - UI correctly displays the name from Google
+    - **Remaining Issue:**
+        - Account Limits dialog appears after Google sign-in (separate concern)
+
+2. **Data Migration and Firestore Rules Updates (Objective 27)**
     - Updated Firestore rules to handle migrations:
         - Added special case for collection updates during migration
         - Added permission for initial user document creation
@@ -154,7 +168,7 @@
         - Need to verify and fix Firestore rules for all migration scenarios
         - Ensure proper user document creation timing
 
-2. **Fixed Email Update Flow and UI Updates (Objective 26)**
+3. **Fixed Email Update Flow and UI Updates (Objective 26)**
     - Fixed UI not updating after linking Google authentication:
         - Added explicit provider invalidation after successful Google linking
         - Ensured UI immediately reflects newly linked authentication methods
@@ -167,39 +181,6 @@
         - UI updates immediately when linking/unlinking authentication methods
         - Messages adapt in real-time to authentication state changes
         - Clearer communication about email update consequences
-
-3. **Fixed Authentication State & UI Issues (Objective 26 - Ongoing Testing)**
-    - Implemented security enhancements and user notifications:
-        - Added 50-card limit for anonymous users with collectionCount tracking
-        - Added 7-day grace period for email verification
-        - Created daily account limits dialog to inform users about:
-          - Anonymous user card limits
-          - Email verification requirements
-          - Direct links to sign in, register, or resend verification
-    - Fixed authentication method order consistency in UI:
-        - Email/Password (or Add Email/Password) always appears first
-        - Google (or Add Google) always appears second
-        - Order remains consistent even after unlinking/relinking methods
-    - Corrected provider unlinking logic in `AuthService` to prevent removing the last provider incorrectly.
-    - Improved state invalidation in `auth_provider` for `unlinkProviderProvider` to ensure UI updates.
-    - Fixed state handling after account deletion in `account_settings_page` to allow immediate anonymous sign-in.
-    - Corrected Google sign-in logic in `auth_page.dart` to handle state transitions after sign-out more robustly (fallback from link to sign-in).
-    - Fixed email display for password provider in `ProfileAuthMethods`.
-    - Ensured `AccountSettingsPage` watches `currentUserProvider` for reliable UI updates.
-    - Corrected email pre-population logic in `LinkEmailPasswordDialog` by passing data reliably from `AccountInfoCard`.
-    - Fixed profile page banner logic (`profile_page.dart`) to only show email verification warning when appropriate (`AuthStatus.emailNotVerified`).
-    - Implemented data migration for anonymous users linking with Google accounts:
-        - Added `merge_data_decision_dialog.dart` for user confirmation
-        - Created `collection_merge_helper.dart` for data migration logic
-        - Fixed timing of data migration to occur after successful sign-in
-        - Added proper BuildContext handling for async operations
-        - Ensured anonymous user data is preserved until migration decision
-        - **Note:** Data migration currently only handles collection data. Need to expand to include decks, settings, and preferences.
-    - **Refined Google linking state management:**
-        - Updated `auth_page.dart` to set `skipAutoAuthProvider` flag during Google linking.
-        - Modified `auto_auth_provider.dart` to reset the flag only for fully authenticated users.
-        - Updated `auth_service.dart` to explicitly sign out from Google and Firebase with delays, and added more logging during the sign-out/sign-in process for linking.
-    - **Note:** Authentication system is still undergoing testing and troubleshooting, particularly for edge cases like the Google linking redirect issue.
 
 ### Previous Achievements
 
@@ -223,28 +204,32 @@
 
 ### Next Steps
 
-1. **Fix Firestore permission issues during data migration (Critical)**
+1. **Address Account Limits Dialog Issue:**
+   - [ ] Investigate why the Account Limits dialog appears after Google sign-in
+   - [ ] Fix auth state transitions during the sign-out/sign-in process
+
+2. **Fix Firestore permission issues during data migration (Critical)**
    - [ ] Review and update Firestore rules for all migration scenarios
    - [ ] Fix user document creation timing
    - [ ] Add proper error handling for permission denied cases
    - [ ] Test all data migration paths
 
-2. **Continue testing and troubleshooting Authentication edge cases and flows (especially Google linking)**
+3. **Continue testing and troubleshooting Authentication edge cases and flows (especially Google linking)**
 
-3. **Expand data migration to handle all user data:**
+4. **Expand data migration to handle all user data:**
    - [ ] Deck data migration
    - [ ] User settings migration
    - [ ] User preferences migration
    - [ ] Ensure data integrity during migration
 
-4. Implement deck builder feature
-5. Add card scanner functionality
-6. Develop price tracking system
-7. Add collection import/export
-8. Implement collection sharing
-9. Add favorites and wishlist
-10. Enhance filtering options
-11. Add batch operations
+5. Implement deck builder feature
+6. Add card scanner functionality
+7. Develop price tracking system
+8. Add collection import/export
+9. Implement collection sharing
+10. Add favorites and wishlist
+11. Enhance filtering options
+12. Add batch operations
 
 ### Future Considerations
 

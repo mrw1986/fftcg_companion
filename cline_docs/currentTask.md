@@ -37,89 +37,92 @@
 7. **Security Enhancements**
     * Implemented proper Firestore rules, re-authentication flows.
 
-## Current Objective 29 (Completed - Bug Fix & Enhancement)
+## Current Objective 30 (Completed - Google Auth Display Name Fix)
 
-Fix Display Name Update and Preserve Name During Google Link
+Fix Google Authentication Display Name Not Storing in Firestore
 
 ### Context
 
-1. **Update Bug:** When updating the display name via the profile settings, the change was reflected in Firebase Auth but not immediately updated in the corresponding Firestore user document. The Firestore update only occurred on a subsequent attempt.
-2. **Linking Enhancement:** When linking a Google account to an existing Email/Password account that already had a custom display name set, the linking process would overwrite the custom name with the Google account's name.
+When a user creates an account with Google authentication, the display name is correctly showing in the UI but was not being stored in Firestore. The `displayName` field in Firestore remained null despite the UI showing the correct name from Google.
 
 ### Goal
 
-1. Ensure that updating the display name in the profile settings correctly updates both Firebase Auth and the Firestore user document simultaneously.
-2. Preserve the user's existing custom display name in Firestore when they link a Google account, only using the Google name if no custom name was previously set.
+Ensure that when a user signs in with Google, their display name from Google is properly stored in the Firestore user document.
 
 ### Changes Made
 
-1. **Added `UserRepository.updateUserProfileData`:**
-    * Created a new method specifically for updating profile fields (`displayName`, `photoURL`) in the Firestore user document using `_usersCollection.doc(userId).update()`. This avoids overwriting other fields unnecessarily.
+1. **Enhanced Logging in `auth_service.dart`:**
+   * Added detailed logging to track the display name at various stages of the Google sign-in process:
+     * When the Google user is obtained: `talker.debug('Google user display name: ${googleUser.displayName}');`
+     * When the Firebase user is created: `talker.debug('Firebase user display name: ${userCredential.user?.displayName}');`
+     * After the user is reloaded: `talker.debug('Refreshed user display name: ${refreshedUser.displayName}');`
+   * Similar logging was added to the Google linking process.
 
-2. **Modified `AuthService.updateProfile`:**
-    * Changed the method to call the new `_userRepository.updateUserProfileData` after successfully updating the Firebase Auth profile (`currentUser.updateDisplayName`). This ensures the Firestore document is updated correctly with the new display name.
+2. **Modified `UserRepository.createUserFromAuth` Method:**
+   * Added code to extract the display name directly from the Google provider data:
 
-3. **Modified `UserRepository.createUserFromAuth`:**
-    * Updated the logic within the `existingUser != null` block.
-    * When constructing the `updatedUser` using `copyWith`, it now checks if `existingUser.displayName` is already set (not null and not empty).
-    * If an existing name is present, it's preserved (`displayName: existingUser.displayName`).
-    * If no existing name is set, it falls back to using the name from the `authUser` (e.g., the newly linked Google account's name) (`displayName: authUser.displayName`).
+   ```dart
+   // Get the provider data to check for Google sign-in
+   final providerData = authUser.providerData;
+   String? googleDisplayName;
+   
+   // Check if user is signed in with Google
+   for (var provider in providerData) {
+     if (provider.providerId == 'google.com') {
+       // Log the provider display name
+       talker.debug('Google provider display name: ${provider.displayName}');
+       googleDisplayName = provider.displayName;
+       break;
+     }
+   }
+   ```
 
-### Implementation Plan
+   * Updated the logic to prioritize the Google provider display name:
+     * For existing users: `displayName: (existingUser.displayName != null && existingUser.displayName!.isNotEmpty) ? existingUser.displayName : googleDisplayName ?? authUser.displayName`
+     * For new users: `displayName: googleDisplayName ?? authUser.displayName`
+   * This ensures that the display name from Google is correctly used when creating or updating the user document in Firestore.
 
-1. **Test Display Name Update Fix:**
-    * Sign in with an existing account (or create one).
-    * Go to Account Settings.
-    * Change the Display Name and tap Update.
-    * Verify the success SnackBar appears.
-    * **Crucially, check Firestore immediately** to confirm the `displayName` field in the user document has been updated correctly on the *first* attempt.
-    * Refresh the Account Settings page (e.g., navigate away and back) and verify the updated name is displayed.
+### Testing Results
 
-2. **Test Display Name Preservation During Google Link:**
-    * **Scenario A (Existing Name):**
-        * Create an account with Email/Password.
-        * Set a custom Display Name in Account Settings (e.g., "MyCustomName"). Verify it saves to Firestore.
-        * Link a Google account via Account Settings.
-        * After linking, check Firestore: the `displayName` should still be "MyCustomName", not the Google account name.
-        * Verify the UI also shows "MyCustomName".
-    * **Scenario B (No Existing Name):**
-        * Create an account with Email/Password.
-        * Do *not* set a custom Display Name (leave it as null or empty in Firestore).
-        * Link a Google account via Account Settings.
-        * After linking, check Firestore: the `displayName` should now be populated with the Google account's name.
-        * Verify the UI shows the Google account name.
+The changes were successful. When a user signs in with Google:
+
+1. The display name is correctly extracted from the Google provider data
+2. The display name is properly stored in the Firestore user document
+3. The UI correctly displays the name from Google
+
+There is a secondary issue with the Account Limits dialog appearing after Google sign-in, but that's a separate concern from the original display name problem which has been resolved.
 
 ## Next Steps
 
-1. **Test Display Name Update Fix (Critical - Objective 29).**
-2. **Test Display Name Preservation During Google Link (Critical - Objective 29).**
-3. **Test New Email Verification UI Flow (Critical - Objective 28).**
-4. **Test Profile Page Visuals (Objective 28).**
-5. **Test Firestore Permission Fix (Critical - Objective 27):**
-    * [ ] Test account deletion flow (triggers anonymous sign-in, check for user doc creation with `collectionCount: 0`).
-    * [ ] **Test anonymous user linking to Google account (Primary test for this fix, check for user doc creation/update with `collectionCount`).**
-    * [ ] Verify user document creation for new anonymous users (initial app start).
-    * [ ] Test standard operations (collection add/update, settings changes) for both anonymous and authenticated users.
-    * [ ] Specifically check Firestore logs for permission errors during these tests.
+1. **Address Account Limits Dialog Issue:**
+   * Investigate why the Account Limits dialog appears after Google sign-in when it shouldn't.
+   * This may be related to the auth state transitions during the sign-out/sign-in process.
 
-6. **Continue Authentication System Testing:**
-    * [ ] Test Google linking flow thoroughly.
-    * [ ] Verify all edge cases are handled.
-    * [ ] Ensure proper state transitions.
+2. **Test Firestore Permission Fix (Critical - Objective 27):**
+   * [ ] Test account deletion flow (triggers anonymous sign-in, check for user doc creation with `collectionCount: 0`).
+   * [ ] **Test anonymous user linking to Google account (Primary test for this fix, check for user doc creation/update with `collectionCount`).**
+   * [ ] Verify user document creation for new anonymous users (initial app start).
+   * [ ] Test standard operations (collection add/update, settings changes) for both anonymous and authenticated users.
+   * [ ] Specifically check Firestore logs for permission errors during these tests.
 
-7. **Expand Data Migration (If Step 5 Successful):**
-    * [ ] Implement deck data migration.
-    * [ ] Add user settings migration.
-    * [ ] Include user preferences migration.
-    * [ ] Add progress indicators.
-    * [ ] Implement rollback mechanisms.
+3. **Continue Authentication System Testing:**
+   * [ ] Test Google linking flow thoroughly.
+   * [ ] Verify all edge cases are handled.
+   * [ ] Ensure proper state transitions.
 
-8. **Future Features (After Migration Fix):**
-    * Implement deck builder feature
-    * Add card scanner functionality
-    * Develop price tracking system
-    * Add collection import/export
-    * Implement collection sharing
-    * Add favorites and wishlist
-    * Enhance filtering options
-    * Add batch operations
+4. **Expand Data Migration (If Step 2 Successful):**
+   * [ ] Implement deck data migration.
+   * [ ] Add user settings migration.
+   * [ ] Include user preferences migration.
+   * [ ] Add progress indicators.
+   * [ ] Implement rollback mechanisms.
+
+5. **Future Features (After Migration Fix):**
+   * Implement deck builder feature
+   * Add card scanner functionality
+   * Develop price tracking system
+   * Add collection import/export
+   * Implement collection sharing
+   * Add favorites and wishlist
+   * Enhance filtering options
+   * Add batch operations

@@ -2,6 +2,21 @@
 
 ## Recent Changes
 
+### Fixed Google Authentication Display Name Issue (Objective 30)
+
+- **Issue:**
+  - When a user created an account with Google authentication, the display name was correctly showing in the UI but was not being stored in Firestore.
+  - The `displayName` field in Firestore remained null despite the UI showing the correct name from Google.
+- **Changes Made:**
+  - **Enhanced Logging in `auth_service.dart`:** Added detailed logging to track the display name at various stages of the Google sign-in process (when Google user is obtained, when Firebase user is created, after user reload).
+  - **Modified `UserRepository.createUserFromAuth` Method:** Added code to extract the display name directly from the Google provider data and updated the logic to prioritize the Google provider display name over the auth user display name.
+- **Results:**
+  - The display name is now correctly extracted from the Google provider data.
+  - The display name is properly stored in the Firestore user document.
+  - The UI correctly displays the name from Google.
+- **Remaining Issue:**
+  - Account Limits dialog appears after Google sign-in (separate concern to be addressed).
+
 ### Firestore Permission Issues During Data Migration (Objective 27 - Fix Applied)
 
 - **Current Issues:**
@@ -145,13 +160,13 @@
 
 ### Auth Service (lib/core/services/auth_service.dart)
 
-- **Status:** Logic updated to call `UserRepository.createUserFromAuth` *after* sign-out/sign-in during Google linking to ensure correct auth context.
-- **Pending:** Testing required to confirm Firestore permission issues are resolved.
+- **Status:** Enhanced with detailed logging to track display name at various stages of the Google sign-in process. Logic updated to call `UserRepository.createUserFromAuth` *after* sign-out/sign-in during Google linking to ensure correct auth context.
+- **Pending:** Testing required to confirm Firestore permission issues are resolved and to address the Account Limits dialog issue after Google sign-in.
 
 ### User Repository (lib/features/profile/data/repositories/user_repository.dart)
 
-- **Status:** `createUserFromAuth` method updated to initialize `collectionCount: 0` directly when creating a *new* user document.
-- **Pending:** Testing required to confirm this resolves permission errors during initial user creation.
+- **Status:** Modified `createUserFromAuth` method to extract the display name directly from the Google provider data and prioritize it over the auth user display name. Also updated to initialize `collectionCount: 0` directly when creating a *new* user document.
+- **Pending:** Testing required to confirm this resolves permission errors during initial user creation and ensures display names are correctly stored.
 
 ### Firestore Rules (firestore.rules) - **(Fix Applied)**
 
@@ -233,7 +248,8 @@ graph TD
 
     subgraph Google Flow
         D -- Google --> LoginGoogle[Login/Register with Google];
-        LoginGoogle --> CreateOrUpdateGoogleDoc[Create/Update User Doc (incl. collectionCount)];
+        LoginGoogle --> ExtractGoogleName[Extract Google Display Name];
+        ExtractGoogleName --> CreateOrUpdateGoogleDoc[Create/Update User Doc with Google Name];
         CreateOrUpdateGoogleDoc --> AuthState;
         GoogleUser[Google User] -- Link Email/Pass --> LinkEmailPass2[Link Email/Pass Credential];
         LinkEmailPass2 --> UpdateLinkedEmailDoc2[Update Linked User Doc];
@@ -262,6 +278,7 @@ graph TD
     style MergePrompt fill:#9f9,stroke:#333,stroke-width:2px
     style MigrateData fill:#9f9,stroke:#333,stroke-width:2px
     style SignOutSignIn fill:#ffcc99,stroke:#333,stroke-width:2px
+    style ExtractGoogleName fill:#ffcc99,stroke:#333,stroke-width:2px
     style CreateAnonDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
     style CreateLinkedEmailDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
     style CreateGoogleDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
@@ -274,6 +291,7 @@ graph TD
 
 - State management relies on Riverpod providers (`authStateProvider`, `currentUserProvider`) watching changes from the rebuilt `AuthService`.
 - UI components react to state changes provided by these providers. `AccountSettingsPage` now explicitly watches `currentUserProvider` to ensure timely updates are passed down.
+- **Google display name extraction** is now handled correctly in `UserRepository.createUserFromAuth` by checking the provider data for Google sign-in information and prioritizing it over the auth user display name.
 - **Firestore writes (`createUserFromAuth`) are now timed correctly** (after auth state settles in linking flows) and **structured correctly** (initializing `collectionCount: 0` on creation) to align with Firestore rules and prevent permission errors during user document creation.
 - **Firestore rules (`allow update` for `/users/{userId}`) have been updated** to permit updates where `collectionCount` is present but unchanged.
 
@@ -291,17 +309,18 @@ graph TD
 
 ## Recent Significant Changes (Consolidated)
 
-1. **Firestore Permission Fix (Objective 27 - Fix Applied):** Corrected Firestore rules (`allow update` for `/users/{userId}`) to permit updates where `collectionCount` is unchanged. Also corrected the structure of Firestore writes (`createUserFromAuth` in `UserRepository`) to initialize `collectionCount: 0` directly during new user creation. Ensured correct timing of writes during Google linking (in `AuthService`).
-2. **Authentication System Rebuild & Refinements (Objective 26 - Ongoing Testing):** Completed a full rebuild and subsequent fixes addressing state management, UI refresh issues (especially after unlinking), error handling edge cases (sign-in after sign-out), dialog behavior (email pre-population), data migration for anonymous users, and Google linking state management. **Currently testing and troubleshooting.**
-3. UI Improvements for Authentication (Logo, Google Icon).
-4. Email Display Simplification in Profile.
-5. Color Handling Improvements (`withValues`).
-6. Security Enhancements (Firestore Rules).
-7. Dialog Button Readability Improvements.
-8. Theme System Simplification.
-9. SnackBar Theming Consistency.
-10. AppBar and Navigation Bar Theming Consistency.
-11. Profile and Account Settings Consolidation.
+1. **Fixed Google Authentication Display Name Issue (Objective 30):** Added code to extract the display name directly from the Google provider data and prioritize it over the auth user display name. Enhanced logging to track display name at various stages of the Google sign-in process.
+2. **Firestore Permission Fix (Objective 27 - Fix Applied):** Corrected Firestore rules (`allow update` for `/users/{userId}`) to permit updates where `collectionCount` is unchanged. Also corrected the structure of Firestore writes (`createUserFromAuth` in `UserRepository`) to initialize `collectionCount: 0` directly during new user creation. Ensured correct timing of writes during Google linking (in `AuthService`).
+3. **Authentication System Rebuild & Refinements (Objective 26 - Ongoing Testing):** Completed a full rebuild and subsequent fixes addressing state management, UI refresh issues (especially after unlinking), error handling edge cases (sign-in after sign-out), dialog behavior (email pre-population), data migration for anonymous users, and Google linking state management. **Currently testing and troubleshooting.**
+4. UI Improvements for Authentication (Logo, Google Icon).
+5. Email Display Simplification in Profile.
+6. Color Handling Improvements (`withValues`).
+7. Security Enhancements (Firestore Rules).
+8. Dialog Button Readability Improvements.
+9. Theme System Simplification.
+10. SnackBar Theming Consistency.
+11. AppBar and Navigation Bar Theming Consistency.
+12. Profile and Account Settings Consolidation.
 
 - *(Previous auth-specific fixes are now considered part of the rebuild context)*
 
@@ -353,11 +372,14 @@ graph TD
 
 ## Future Development
 
-1. Deck Builder
-2. Card Scanner
-3. Price Tracking
-4. Collection Import/Export
-5. Collection Sharing
-6. Favorites and Wishlist
-7. Advanced Filtering
-8. Batch Operations
+1. Address Account Limits Dialog Issue
+2. Fix Firestore permission issues during data migration
+3. Expand data migration to handle all user data
+4. Implement deck builder feature
+5. Add card scanner functionality
+6. Develop price tracking system
+7. Add collection import/export
+8. Implement collection sharing
+9. Add favorites and wishlist
+10. Enhance filtering options
+11. Add batch operations
