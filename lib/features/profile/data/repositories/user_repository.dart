@@ -43,10 +43,17 @@ class UserRepository {
   /// Create or update a user in Firestore
   Future<void> createOrUpdateUser(UserModel user) async {
     try {
+      talker.debug(
+          'Creating or updating user in Firestore: ${user.id}, displayName: ${user.displayName}');
+      final userData = user.toMap();
+      talker.debug('User data being sent to Firestore: $userData');
+
       await _usersCollection.doc(user.id).set(
-            user.toMap(),
+            userData,
             SetOptions(merge: true),
           );
+
+      talker.debug('Firestore write completed for user: ${user.id}');
     } catch (e) {
       talker.error('Error creating or updating user: $e');
       rethrow;
@@ -60,9 +67,30 @@ class UserRepository {
     User authUser, {
     Map<String, dynamic>? additionalData,
   }) async {
+    // Add logging for debugging display name
+    talker.debug(
+        'Creating user from auth. Auth user display name: ${authUser.displayName}');
+
+    // Get the provider data to check for Google sign-in
+    final providerData = authUser.providerData;
+    String? googleDisplayName;
+
+    // Check if user is signed in with Google
+    for (var provider in providerData) {
+      if (provider.providerId == 'google.com') {
+        // Log the provider display name
+        talker.debug('Google provider display name: ${provider.displayName}');
+        googleDisplayName = provider.displayName;
+        break;
+      }
+    }
+
     // Check if user already exists
     final existingUser = await getUserById(authUser.uid);
     if (existingUser != null) {
+      talker.debug(
+          'Existing user found. Existing display name: ${existingUser.displayName}');
+
       // Update last login time and any additional data
       Map<String, dynamic> updatedSettings = {...existingUser.settings};
 
@@ -74,12 +102,12 @@ class UserRepository {
       final updatedUser = existingUser.copyWith(
         lastLogin: Timestamp.now(),
         lastAccessed: Timestamp.now(),
-        // Prioritize existing display name, otherwise use the one from authUser (e.g., Google)
+        // Prioritize existing display name, then Google display name, then auth user display name
         displayName: (existingUser.displayName != null &&
                 existingUser.displayName!.isNotEmpty)
             ? existingUser.displayName // Keep existing name
-            : authUser
-                .displayName, // Use name from linked provider if existing is empty
+            : googleDisplayName ??
+                authUser.displayName, // Use Google name or auth user name
         email: authUser.email ??
             existingUser
                 .email, // Always update email from authUser if available
@@ -91,6 +119,10 @@ class UserRepository {
         // Ensure collectionCount is preserved if it exists, otherwise default to 0
         collectionCount: existingUser.collectionCount,
       );
+
+      talker.debug(
+          'Updated user display name will be: ${updatedUser.displayName}');
+
       await createOrUpdateUser(updatedUser);
       talker.debug('Updated existing user: ${updatedUser.id}');
       return updatedUser;
@@ -106,7 +138,8 @@ class UserRepository {
 
     final newUser = UserModel(
       id: authUser.uid,
-      displayName: authUser.displayName,
+      // Prioritize Google display name over auth user display name
+      displayName: googleDisplayName ?? authUser.displayName,
       email: authUser.email,
       photoURL: authUser.photoURL,
       createdAt: Timestamp.now(),
@@ -116,6 +149,9 @@ class UserRepository {
       settings: settings,
       collectionCount: 0, // Initialize collection count directly
     );
+
+    talker.debug('New user created with display name: ${newUser.displayName}');
+
     await createOrUpdateUser(newUser);
     talker.debug('Created new user: ${newUser.id} with collectionCount=0');
 

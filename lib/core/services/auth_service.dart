@@ -166,6 +166,7 @@ class AuthService {
             category: AuthErrorCategory.cancelled);
       }
       talker.debug('Google user obtained: ${googleUser.email}');
+      talker.debug('Google user display name: ${googleUser.displayName}');
 
       // Obtain Google auth details
       final GoogleSignInAuthentication googleAuth =
@@ -181,11 +182,15 @@ class AuthService {
           await _auth.signInWithCredential(credential).timeout(_timeout);
       talker.info(
           'Firebase sign-in with Google successful: ${userCredential.user?.uid}');
+      talker.debug(
+          'Firebase user display name: ${userCredential.user?.displayName}');
 
       // Reload to ensure latest state is fetched
       await userCredential.user?.reload();
       final refreshedUser = _auth.currentUser;
       if (refreshedUser != null) {
+        talker
+            .debug('Refreshed user display name: ${refreshedUser.displayName}');
         // Create/update user document AFTER successful sign-in and reload
         await _userRepository.createUserFromAuth(refreshedUser);
       }
@@ -293,6 +298,8 @@ class AuthService {
             category: AuthErrorCategory.cancelled);
       }
       talker.debug('Google user obtained for linking: ${googleUser.email}');
+      talker.debug(
+          'Google user display name for linking: ${googleUser.displayName}');
 
       // Obtain Google auth details
       final GoogleSignInAuthentication googleAuth =
