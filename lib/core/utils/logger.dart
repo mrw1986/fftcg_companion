@@ -9,8 +9,8 @@ class ProductionLogFilter extends TalkerFilter {
     if (const bool.fromEnvironment('dart.vm.product')) {
       return item.logLevel == LogLevel.error;
     }
-    // In debug mode, only show warnings and errors
-    return item.logLevel == LogLevel.error || item.logLevel == LogLevel.warning;
+    // In debug mode, show all logs
+    return true;
   }
 }
 
@@ -18,10 +18,19 @@ final talker = TalkerFlutter.init(
   settings: TalkerSettings(
     enabled: true,
     useConsoleLogs: true,
-    maxHistoryItems: 100,
+    maxHistoryItems: 1000,
   ),
+  logger: TalkerLogger(),
   filter: ProductionLogFilter(),
 );
+
+// Initialize talker immediately
+void initializeTalker() {
+  talker.debug('Talker initialized');
+  talker.debug('Console logs enabled: ${talker.settings.useConsoleLogs}');
+  talker.debug('History enabled: ${talker.settings.useHistory}');
+  talker.debug('Max history items: ${talker.settings.maxHistoryItems}');
+}
 
 extension TalkerLoggerExtension on Talker {
   void logInfo(String message) {

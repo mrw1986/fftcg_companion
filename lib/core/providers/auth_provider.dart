@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
 import 'package:fftcg_companion/core/services/auth_service.dart';
+import 'package:fftcg_companion/core/utils/logger.dart';
 
 /// Provider for the AuthService
 final authServiceProvider = Provider<AuthService>((ref) {
@@ -11,22 +12,34 @@ final authServiceProvider = Provider<AuthService>((ref) {
 /// Provider for the current user
 final currentUserProvider = StreamProvider<User?>((ref) {
   final authService = ref.watch(authServiceProvider);
+  talker.debug('Setting up auth state stream');
+  // Get current user immediately
+  final currentUser = authService.currentUser;
+  if (currentUser != null) {
+    talker.debug('Current user available: ${currentUser.email}');
+  }
   return authService.authStateChanges;
 });
 
 /// Provider for the authentication state
-final authStateProvider = Provider.autoDispose<AuthState>((ref) {
+final authStateProvider = Provider<AuthState>((ref) {
   final userAsync = ref.watch(currentUserProvider);
 
   return userAsync.when(
     data: (user) {
+      talker.debug('Auth state updated:');
+      talker.debug('User: ${user?.email}');
+      talker.debug('Is anonymous: ${user?.isAnonymous}');
+      talker.debug('Is email verified: ${user?.emailVerified}');
       if (user == null) {
+        talker.debug('Auth state: unauthenticated');
         return const AuthState.unauthenticated();
       }
 
       // First check if the user is anonymous
       if (user.isAnonymous) {
         // Even if there are providers, if isAnonymous is true, treat as anonymous
+        talker.debug('Auth state: anonymous');
         return AuthState.anonymous(user);
       } else {
         // User is not anonymous, check providers
@@ -41,19 +54,28 @@ final authStateProvider = Provider.autoDispose<AuthState>((ref) {
         if (hasPasswordProvider && !user.emailVerified) {
           if (hasGoogleProvider) {
             // User has Google auth, so keep them authenticated but mark email as unverified
+            talker.debug('Auth state: authenticated (with unverified email)');
             return AuthState.authenticated(user);
           } else {
             // Only has unverified email/password, show unverified state
+            talker.debug('Auth state: email not verified');
             return AuthState.emailNotVerified(user);
           }
         }
 
         // User either has no email/password or it's verified
+        talker.debug('Auth state: authenticated');
         return AuthState.authenticated(user);
       }
     },
-    loading: () => const AuthState.loading(),
-    error: (error, stackTrace) => AuthState.error(error.toString()),
+    loading: () {
+      talker.debug('Auth state: loading');
+      return const AuthState.loading();
+    },
+    error: (error, stackTrace) {
+      talker.error('Auth state error', error, stackTrace);
+      return AuthState.error(error.toString());
+    },
   );
 });
 

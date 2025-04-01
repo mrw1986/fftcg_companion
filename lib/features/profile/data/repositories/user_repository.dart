@@ -81,8 +81,11 @@ class UserRepository {
         photoURL: authUser.photoURL ?? existingUser.photoURL,
         isVerified: authUser.emailVerified, // Update verification status
         settings: updatedSettings,
+        // Ensure collectionCount is preserved if it exists, otherwise default to 0
+        collectionCount: existingUser.collectionCount,
       );
       await createOrUpdateUser(updatedUser);
+      talker.debug('Updated existing user: ${updatedUser.id}');
       return updatedUser;
     }
 
@@ -104,16 +107,18 @@ class UserRepository {
       lastAccessed: Timestamp.now(),
       isVerified: authUser.emailVerified, // Set initial verification status
       settings: settings,
+      collectionCount: 0, // Initialize collection count directly
     );
     await createOrUpdateUser(newUser);
+    talker.debug('Created new user: ${newUser.id} with collectionCount=0');
 
-    // Initialize collection count
-    try {
-      await updateCollectionCount(newUser.id, 0);
-    } catch (e) {
-      talker.error('Error initializing collection count: $e');
-      // Continue with user creation even if collection count initialization fails
-    }
+    // Removed the separate updateCollectionCount call as it's now initialized above
+    // try {
+    //   await updateCollectionCount(newUser.id, 0);
+    // } catch (e) {
+    //   talker.error('Error initializing collection count: $e');
+    //   // Continue with user creation even if collection count initialization fails
+    // }
 
     return newUser;
   }

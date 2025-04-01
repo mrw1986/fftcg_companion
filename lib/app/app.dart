@@ -7,12 +7,20 @@ import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/providers/auto_auth_provider.dart';
 import 'package:fftcg_companion/core/providers/email_verification_checker.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'package:fftcg_companion/app/loading_wrapper.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/initialization_provider.dart';
 
 class FFTCGCompanionApp extends ConsumerWidget {
   const FFTCGCompanionApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    talker.debug('FFTCGCompanionApp build called');
+
+    // Watch initialization state - This ensures the app rebuilds when init state changes
+    // but LoadingWrapper will handle showing the loading indicator.
+    ref.watch(initializationProvider);
+
     // Initialize auto-authentication
     ref.watch(autoAuthProvider);
 
@@ -25,6 +33,7 @@ class FFTCGCompanionApp extends ConsumerWidget {
         final themeMode = ref.watch(themeModeControllerProvider);
         final themeColor = ref.watch(themeColorControllerProvider);
 
+        // MaterialApp provides the necessary context (Directionality, Localizations)
         return MaterialApp.router(
           title: 'FFTCG Companion',
           debugShowCheckedModeBanner: false,
@@ -33,7 +42,9 @@ class FFTCGCompanionApp extends ConsumerWidget {
           darkTheme: AppTheme.darkCustomColor(themeColor),
           routerConfig: router,
           builder: (context, child) {
+            // Setup global error widget handler within Material context
             ErrorWidget.builder = (FlutterErrorDetails details) {
+              // Use TalkerWrapper for error display if needed, or just the custom widget
               return TalkerWrapper(
                 talker: talker,
                 options: const TalkerWrapperOptions(),
@@ -41,7 +52,9 @@ class FFTCGCompanionApp extends ConsumerWidget {
               );
             };
 
-            return Material(child: child!);
+            // Wrap the router's child with LoadingWrapper
+            // This ensures LoadingWrapper is built within the MaterialApp context
+            return LoadingWrapper(child: child ?? const SizedBox.shrink());
           },
         );
       },

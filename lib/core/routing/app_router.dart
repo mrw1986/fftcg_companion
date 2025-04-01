@@ -21,12 +21,15 @@ import '../../features/collection/presentation/pages/collection_edit_page.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/collection/domain/models/collection_item.dart';
 
-final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+final rootNavigatorKeyProvider = Provider<GlobalKey<NavigatorState>>((ref) {
+  return GlobalKey<NavigatorState>(debugLabel: 'root');
+});
 final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
 final routerProvider = Provider<GoRouter>((ref) {
+  final rootNavigatorKey = ref.watch(rootNavigatorKeyProvider);
   return GoRouter(
-    navigatorKey: _rootNavigatorKey,
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     debugLogDiagnostics: true,
     routes: [

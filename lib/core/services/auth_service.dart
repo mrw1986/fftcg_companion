@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:fftcg_companion/core/storage/hive_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:talker_flutter/talker_flutter.dart';
@@ -65,6 +66,16 @@ class AuthService {
   Future<UserCredential> signInAnonymously() async {
     talker.info('Attempting anonymous sign-in...');
     try {
+      // Reset the last shown timestamp for account limits dialog
+      // This ensures new anonymous users will see the dialog
+      final storage = HiveStorage();
+      final isBoxAvailable = await storage.isBoxAvailable('settings');
+      if (isBoxAvailable) {
+        await storage.put('last_limits_dialog_shown', 0, boxName: 'settings');
+        talker.debug(
+            'Reset account limits dialog timestamp for new anonymous user');
+      }
+
       final userCredential = await _auth.signInAnonymously().timeout(_timeout);
       talker.info('Anonymous sign-in successful: ${userCredential.user?.uid}');
       if (userCredential.user != null) {
@@ -73,6 +84,7 @@ class AuthService {
         // Get the refreshed user object
         final refreshedUser = _auth.currentUser;
         if (refreshedUser != null) {
+          // Create user document AFTER successful sign-in and reload
           await _userRepository.createUserFromAuth(refreshedUser);
         }
       }
@@ -97,6 +109,7 @@ class AuthService {
       await userCredential.user?.reload();
       final refreshedUser = _auth.currentUser;
       if (refreshedUser != null) {
+        // Create/update user document AFTER successful sign-in and reload
         await _userRepository.createUserFromAuth(refreshedUser);
       }
       // Return the original credential as it contains the user object
@@ -129,6 +142,7 @@ class AuthService {
       }
 
       if (userCredential.user != null) {
+        // Create user document AFTER successful creation
         await _userRepository.createUserFromAuth(userCredential.user!);
       }
       return userCredential;
@@ -172,6 +186,7 @@ class AuthService {
       await userCredential.user?.reload();
       final refreshedUser = _auth.currentUser;
       if (refreshedUser != null) {
+        // Create/update user document AFTER successful sign-in and reload
         await _userRepository.createUserFromAuth(refreshedUser);
       }
       return userCredential;
@@ -231,6 +246,7 @@ class AuthService {
       }
 
       if (userCredential.user != null) {
+        // Create/update user document AFTER successful linking
         await _userRepository.createUserFromAuth(userCredential.user!);
       }
       return userCredential;
@@ -292,27 +308,134 @@ class AuthService {
       try {
         userCredential =
             await currentUser.linkWithCredential(credential).timeout(_timeout);
+        // Use the NEW user ID from the credential after successful link
         talker.info(
-            'Successfully linked Google to anonymous user: ${userCredential.user?.uid}');
+            'Successfully linked Google to anonymous user. New UID: ${userCredential.user?.uid}');
 
         // Reload user to ensure we have latest provider data
         if (userCredential.user != null) {
           await userCredential.user!.reload();
-          final refreshedUser = _auth.currentUser;
-          if (refreshedUser != null) {
-            await _userRepository.createUserFromAuth(refreshedUser);
-            // Sign out and sign back in to ensure clean state
+
+          // Sign out and sign back in to ensure clean state
+          try {
+            talker.debug(
+                'Signing out and back in to ensure clean state after Google linking');
+            final googleCredential = GoogleAuthProvider.credential(
+              accessToken: googleAuth.accessToken,
+              idToken: googleAuth.idToken,
+            );
+            talker.info('Current auth state before sign out: '
+                'isAnonymous=${_auth.currentUser?.isAnonymous}, '
+                'providers=${_auth.currentUser?.providerData.map((p) => p.providerId).join(", ")}');
+
+            // Sign out from both services with delay
+            await _googleSignIn.signOut();
+            talker.debug('Signed out from Google.');
+            await Future.delayed(const Duration(milliseconds: 500));
+
+            await _auth.signOut();
+            talker.info('Signed out from Firebase.');
+            await Future.delayed(const Duration(milliseconds: 500));
+
+            // Sign back in with Google
+            userCredential = await _auth
+                .signInWithCredential(googleCredential)
+                .timeout(_timeout);
+            talker.info(
+                'Successfully signed back in with Google after linking. '
+                'New auth state: isAnonymous=${userCredential.user?.isAnonymous}, '
+                'providers=${userCredential.user?.providerData.map((p) => p.providerId).join(", ")}');
+
+            // Reload one more time to ensure we have the latest state
+            await userCredential.user?.reload();
+            final finalUser = _auth.currentUser;
+            if (finalUser != null) {
+              // ** ADDED DEBUG LOG **
+              talker.debug(
+                  'Attempting Firestore write with UID: ${finalUser.uid}');
+              // Create/update user document HERE, after state is settled
+              await _userRepository.createUserFromAuth(finalUser);
+              talker.info(
+                  'Final user state after Google linking: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
+            }
+          } catch (signInError) {
+            talker.error('Error during sign out/sign in after Google linking',
+                signInError);
+            throw _handleAuthException(signInError);
+          }
+        }
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'credential-already-in-use') {
+          talker.warning(
+              'Credential already in use. Attempting sign-in instead.');
+          // Store the anonymous user's ID and data before signing in
+          final anonymousUserId = currentUser.uid;
+
+          final signedInCredential =
+              await _auth.signInWithCredential(credential).timeout(_timeout);
+          talker.info(
+              'Signed in with Google instead of linking: ${signedInCredential.user?.uid}');
+          userCredential = signedInCredential;
+
+          // Then prompt user to merge data
+          if (context.mounted) {
+            final mergeAction = await showMergeDataDecisionDialog(context);
+            if (mergeAction != null) {
+              final collectionRepo = CollectionRepository();
+              final userRepo = UserRepository();
+
+              try {
+                switch (mergeAction) {
+                  case MergeAction.discard:
+                    talker.debug('Discarding anonymous user data');
+                    break;
+                  case MergeAction.merge:
+                    talker.debug('Merging anonymous user data');
+                    await migrateCollectionData(
+                      collectionRepository: collectionRepo,
+                      fromUserId: anonymousUserId,
+                      toUserId: userCredential.user!.uid,
+                    );
+                    await migrateUserSettings(
+                      userRepository: userRepo,
+                      fromUserId: anonymousUserId,
+                      toUserId: userCredential.user!.uid,
+                      overwrite: false,
+                    );
+                    break;
+                  case MergeAction.overwrite:
+                    talker.debug('Overwriting with anonymous user data');
+                    await migrateCollectionData(
+                      collectionRepository: collectionRepo,
+                      fromUserId: anonymousUserId,
+                      toUserId: userCredential.user!.uid,
+                    );
+                    await migrateUserSettings(
+                      userRepository: userRepo,
+                      fromUserId: anonymousUserId,
+                      toUserId: userCredential.user!.uid,
+                      overwrite: true,
+                    );
+                    break;
+                }
+              } catch (e) {
+                talker.error('Error during data migration: $e');
+                // Continue with sign-in process even if migration fails
+              }
+            }
+          }
+
+          // Now reload user and sign out/sign back in to ensure clean state
+          if (userCredential.user != null) {
+            await userCredential.user!.reload();
+
             try {
               talker.debug(
-                  'Signing out and back in to ensure clean state after Google linking');
+                  'Signing out and back in to ensure clean state after Google sign-in');
               final googleCredential = GoogleAuthProvider.credential(
                 accessToken: googleAuth.accessToken,
                 idToken: googleAuth.idToken,
               );
-              talker.info('Current auth state before sign out: '
-                  'isAnonymous=${_auth.currentUser?.isAnonymous}, '
-                  'providers=${_auth.currentUser?.providerData.map((p) => p.providerId).join(", ")}');
-
               // Sign out from both services with delay
               await _googleSignIn.signOut();
               talker.debug('Signed out from Google.');
@@ -327,109 +450,24 @@ class AuthService {
                   .signInWithCredential(googleCredential)
                   .timeout(_timeout);
               talker.info(
-                  'Successfully signed back in with Google after linking. '
-                  'New auth state: isAnonymous=${userCredential.user?.isAnonymous}, '
-                  'providers=${userCredential.user?.providerData.map((p) => p.providerId).join(", ")}');
+                  'Successfully signed back in with Google after sign-in');
 
               // Reload one more time to ensure we have the latest state
               await userCredential.user?.reload();
               final finalUser = _auth.currentUser;
               if (finalUser != null) {
+                // ** ADDED DEBUG LOG **
+                talker.debug(
+                    'Attempting Firestore write with UID: ${finalUser.uid}');
+                // Create/update user document HERE, after state is settled
                 await _userRepository.createUserFromAuth(finalUser);
                 talker.info(
-                    'Final user state after Google linking: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
+                    'Final user state after Google sign-in: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
               }
             } catch (signInError) {
-              talker.error('Error during sign out/sign in after Google linking',
+              talker.error('Error during sign out/sign in after Google sign-in',
                   signInError);
               throw _handleAuthException(signInError);
-            }
-          }
-        }
-      } on FirebaseAuthException catch (e) {
-        if (e.code == 'credential-already-in-use') {
-          talker.warning(
-              'Credential already in use. Attempting sign-in instead.');
-          final signedInCredential =
-              await _auth.signInWithCredential(credential).timeout(_timeout);
-          talker.info(
-              'Signed in with Google instead of linking: ${signedInCredential.user?.uid}');
-
-          // Store the anonymous user's ID before signing in
-          final anonymousUserId = currentUser.uid;
-          userCredential = signedInCredential;
-
-          // First, prompt user to merge data before we sign out
-          if (context.mounted) {
-            final mergeAction = await showMergeDataDecisionDialog(context);
-            if (mergeAction != null) {
-              final collectionRepo = CollectionRepository();
-              final userRepo = UserRepository();
-
-              // Handle collection data
-              if (mergeAction == MergeAction.merge ||
-                  mergeAction == MergeAction.overwrite) {
-                await migrateCollectionData(
-                  collectionRepository: collectionRepo,
-                  fromUserId: anonymousUserId,
-                  toUserId: userCredential.user!.uid,
-                );
-              }
-
-              // Handle settings data
-              await migrateUserSettings(
-                userRepository: userRepo,
-                fromUserId: anonymousUserId,
-                toUserId: userCredential.user!.uid,
-                overwrite: mergeAction == MergeAction.overwrite,
-              );
-            }
-          }
-
-          // Now reload user and sign out/sign back in to ensure clean state
-          if (userCredential.user != null) {
-            await userCredential.user!.reload();
-            final refreshedUser = _auth.currentUser;
-            if (refreshedUser != null) {
-              await _userRepository.createUserFromAuth(refreshedUser);
-
-              try {
-                talker.debug(
-                    'Signing out and back in to ensure clean state after Google sign-in');
-                final googleCredential = GoogleAuthProvider.credential(
-                  accessToken: googleAuth.accessToken,
-                  idToken: googleAuth.idToken,
-                );
-                // Sign out from both services with delay
-                await _googleSignIn.signOut();
-                talker.debug('Signed out from Google.');
-                await Future.delayed(const Duration(milliseconds: 500));
-
-                await _auth.signOut();
-                talker.info('Signed out from Firebase.');
-                await Future.delayed(const Duration(milliseconds: 500));
-
-                // Sign back in with Google
-                userCredential = await _auth
-                    .signInWithCredential(googleCredential)
-                    .timeout(_timeout);
-                talker.info(
-                    'Successfully signed back in with Google after sign-in');
-
-                // Reload one more time to ensure we have the latest state
-                await userCredential.user?.reload();
-                final finalUser = _auth.currentUser;
-                if (finalUser != null) {
-                  await _userRepository.createUserFromAuth(finalUser);
-                  talker.info(
-                      'Final user state after Google sign-in: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
-                }
-              } catch (signInError) {
-                talker.error(
-                    'Error during sign out/sign in after Google sign-in',
-                    signInError);
-                throw _handleAuthException(signInError);
-              }
             }
           }
         } else {
@@ -501,6 +539,7 @@ class AuthService {
       }
 
       if (userCredential.user != null) {
+        // Create/update user document AFTER successful linking
         await _userRepository.createUserFromAuth(userCredential.user!);
       }
       return userCredential;
@@ -576,8 +615,9 @@ class AuthService {
       // Link credential
       final userCredential =
           await currentUser.linkWithCredential(credential).timeout(_timeout);
+      // Use the NEW user ID from the credential after successful link
       talker.info(
-          'Successfully linked Google to anonymous user: ${userCredential.user?.uid}');
+          'Successfully linked Google to Email/Password user: ${userCredential.user?.uid}');
 
       if (userCredential.user != null) {
         // Reload the user to ensure we have the latest provider data
@@ -585,6 +625,7 @@ class AuthService {
         // Get the refreshed user object
         final refreshedUser = _auth.currentUser;
         if (refreshedUser != null) {
+          // Create/update user document AFTER successful linking and reload
           await _userRepository.createUserFromAuth(refreshedUser);
         }
       }
@@ -691,6 +732,15 @@ class AuthService {
         talker.debug('Signed out from Google.');
         // Add a small delay to ensure Google sign out completes
         await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      // Reset the last shown timestamp for account limits dialog
+      // This ensures new anonymous users will see the dialog
+      final storage = HiveStorage();
+      final isBoxAvailable = await storage.isBoxAvailable('settings');
+      if (isBoxAvailable) {
+        await storage.put('last_limits_dialog_shown', 0, boxName: 'settings');
+        talker.debug('Reset account limits dialog timestamp');
       }
 
       // Then sign out from Firebase
@@ -915,6 +965,7 @@ class AuthService {
 
       // Update Firestore user data with the reloaded user
       if (reloadedUser != null) {
+        // Create/update user document AFTER successful unlink and reload
         await _userRepository.createUserFromAuth(reloadedUser);
       } else {
         // This case should ideally not happen if unlink succeeded, but handle defensively

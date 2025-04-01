@@ -56,6 +56,7 @@
    - [x] Fixed authentication method order consistency in UI
    - [x] Fixed UI updates after linking Google authentication
    - [x] Improved email update messaging based on auth methods
+   - [ ] **Critical:** Fix Firestore permission issues during data migration
    - [ ] **Ongoing:** Testing and troubleshooting edge cases (e.g., Google linking redirect)
    - [x] Implemented settings migration (theme, display preferences)
    - [ ] **Pending:** Expand data migration to include deck data
@@ -111,6 +112,7 @@
 - [x] Implement data migration for anonymous users (Rebuilt)
 - [x] Improved Google linking state management (Rebuilt)
 - [x] Fixed authentication method order consistency in UI
+- [ ] **Fix Firestore permission issues during data migration (Critical)**
 - [ ] **Ensure all edge cases and state transitions are handled correctly (Ongoing Testing)**
 - [ ] **Implement comprehensive data migration for all user data (Pending)**
 
@@ -137,7 +139,22 @@
 
 ### Recently Completed
 
-1. **Fixed Email Update Flow and UI Updates (Objective 26)**
+1. **Data Migration and Firestore Rules Updates (Objective 27)**
+    - Updated Firestore rules to handle migrations:
+        - Added special case for collection updates during migration
+        - Added permission for initial user document creation
+        - Relaxed validation during migration to allow transferring data
+    - Improved data migration process:
+        - Create user document before attempting data migration
+        - Handle all merge cases (discard, merge, overwrite)
+        - Add better error handling and logging
+        - Continue with sign-in even if migration fails
+    - **Critical Issues Remaining:**
+        - Permission denied errors during data migration
+        - Need to verify and fix Firestore rules for all migration scenarios
+        - Ensure proper user document creation timing
+
+2. **Fixed Email Update Flow and UI Updates (Objective 26)**
     - Fixed UI not updating after linking Google authentication:
         - Added explicit provider invalidation after successful Google linking
         - Ensured UI immediately reflects newly linked authentication methods
@@ -151,7 +168,14 @@
         - Messages adapt in real-time to authentication state changes
         - Clearer communication about email update consequences
 
-2. **Fixed Authentication State & UI Issues (Objective 26 - Ongoing Testing)**
+3. **Fixed Authentication State & UI Issues (Objective 26 - Ongoing Testing)**
+    - Implemented security enhancements and user notifications:
+        - Added 50-card limit for anonymous users with collectionCount tracking
+        - Added 7-day grace period for email verification
+        - Created daily account limits dialog to inform users about:
+          - Anonymous user card limits
+          - Email verification requirements
+          - Direct links to sign in, register, or resend verification
     - Fixed authentication method order consistency in UI:
         - Email/Password (or Add Email/Password) always appears first
         - Google (or Add Google) always appears second
@@ -199,20 +223,28 @@
 
 ### Next Steps
 
-1. **Continue testing and troubleshooting Authentication edge cases and flows (especially Google linking)**
-2. **Expand data migration to handle all user data:**
+1. **Fix Firestore permission issues during data migration (Critical)**
+   - [ ] Review and update Firestore rules for all migration scenarios
+   - [ ] Fix user document creation timing
+   - [ ] Add proper error handling for permission denied cases
+   - [ ] Test all data migration paths
+
+2. **Continue testing and troubleshooting Authentication edge cases and flows (especially Google linking)**
+
+3. **Expand data migration to handle all user data:**
    - [ ] Deck data migration
    - [ ] User settings migration
    - [ ] User preferences migration
    - [ ] Ensure data integrity during migration
-3. Implement deck builder feature
-4. Add card scanner functionality
-5. Develop price tracking system
-6. Add collection import/export
-7. Implement collection sharing
-8. Add favorites and wishlist
-9. Enhance filtering options
-10. Add batch operations
+
+4. Implement deck builder feature
+5. Add card scanner functionality
+6. Develop price tracking system
+7. Add collection import/export
+8. Implement collection sharing
+9. Add favorites and wishlist
+10. Enhance filtering options
+11. Add batch operations
 
 ### Future Considerations
 

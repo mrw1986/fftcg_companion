@@ -2,6 +2,19 @@
 
 ## Recent Changes
 
+### Firestore Permission Issues During Data Migration (Objective 27 - Fix Applied)
+
+- **Current Issues:**
+  - Encountered permission denied errors during initial user document creation/update (both anonymous and post-Google linking) due to Firestore writes violating specific rule conditions.
+- **Changes Made (Fix Attempt 4):**
+  - **Updated `firestore.rules`:** Identified that the `allow update` rule for `/users/{userId}` was too strict regarding the `collectionCount` field. It prevented updates (including those done via `set(..., merge: true)` when the document exists) if `collectionCount` was present in the request but its value was unchanged. Modified the rule to explicitly permit updates where `collectionCount` is unchanged (`request.resource.data.collectionCount == resource.data.collectionCount`).
+  - **Updated `UserRepository.createUserFromAuth` (Previous Fix Attempt 3):** Modified the code to initialize `collectionCount: 0` directly when creating a *new* user document, ensuring the field is included in the initial `create` operation and removing a problematic second write attempt.
+  - **Updated `AuthService.linkGoogleToAnonymous` (Previous Fix Attempt 2):** Moved the `_userRepository.createUserFromAuth` call to occur *only after* the sign-out/sign-in process completes, ensuring the correct user context.
+- **Pending Fixes:**
+  - **Testing:** Verify the combined fixes by testing anonymous sign-in, account deletion, and anonymous-to-Google linking flows, ensuring user documents are created/updated correctly.
+  - If issues persist during data *transfer* (not document creation), re-evaluate collection/settings rules.
+  - Expand data migration beyond collection data.
+
 ### Email Update Flow and UI Improvements (Objective 26)
 
 - Fixed UI not updating after linking Google authentication:
@@ -74,7 +87,15 @@
     - Tracks unique cards via user.collectionCount
     - Limits anonymous users to 50 unique cards
     - Enforces collectionCount increments/decrements in rules
+  - Email verification requirements:
+    - Users must verify email within 7 days
+    - After 7 days, unverified users cannot add cards
   - Other security validations and limits
+- Added user notification system:
+  - Daily dialog explains account limits
+  - Anonymous users see 50-card limit warning
+  - Unverified users see 7-day verification requirement
+  - Direct links to sign in, register, or resend verification
 - (AuthService logic related to security was handled within the rebuild).
 
 ### Google Authentication Flow Improvements (Superseded by Rebuild)
@@ -120,30 +141,22 @@
 
 - (Historical context retained) Enhanced email verification, account deletion, re-authentication, token refresh, error messages, and profile page structure.
 
-### Key Components
+## Key Components
 
-#### Auth Service (lib/core/services/auth_service.dart) - **(Rebuilt & Refined - Testing)**
+### Auth Service (lib/core/services/auth_service.dart)
 
-- **Status:** Rebuilt for simplicity and robustness, with recent refinements to Google linking state management. **Currently undergoing testing and troubleshooting.**
-- **Functionality:** Provides clear, direct methods for all core authentication flows using the `FirebaseAuth.instance` SDK.
-- **Error Handling:** Uses custom `AuthException` with `AuthErrorCategory`. Includes specific handling for `not-anonymous` errors during linking attempts.
-- **Dependencies:** Interacts with `UserRepository`, uses `Talker`.
-- **Data Migration:** Handles anonymous user data migration when linking with existing Google accounts:
-  - Stores anonymous user ID before sign-in
-  - Prompts for data migration after successful sign-in
-  - Uses `CollectionRepository` and `collection_merge_helper.dart` for collection data transfer
-  - Ensures BuildContext safety with mounted checks
-  - **Note:** Currently only handles collection data. Needs expansion to include:
-    - Deck data (lists, metadata, statistics)
-    - User settings (theme, display, layout preferences)
-    - User preferences (favorites, custom tags, search history)
-- **State Management:** Includes explicit sign-out from Google/Firebase with delays and detailed logging to manage state transitions during linking.
-- **Data Migration Needs:**
-  - Expand migration system to handle all user data types
-  - Support both merge and overwrite scenarios
-  - Implement proper error handling and rollback mechanisms
-  - Add progress indicators for larger migrations
-  - Ensure data integrity during migration process
+- **Status:** Logic updated to call `UserRepository.createUserFromAuth` *after* sign-out/sign-in during Google linking to ensure correct auth context.
+- **Pending:** Testing required to confirm Firestore permission issues are resolved.
+
+### User Repository (lib/features/profile/data/repositories/user_repository.dart)
+
+- **Status:** `createUserFromAuth` method updated to initialize `collectionCount: 0` directly when creating a *new* user document.
+- **Pending:** Testing required to confirm this resolves permission errors during initial user creation.
+
+### Firestore Rules (firestore.rules) - **(Fix Applied)**
+
+- **Status:** Updated the `allow update` rule for `/users/{userId}` to permit updates where `collectionCount` is present but unchanged, addressing a conflict with `set(..., merge: true)` operations.
+- **Pending:** Testing required to confirm this resolves permission errors during user document updates (e.g., post-linking).
 
 #### Riverpod Providers (lib/core/providers/)
 
@@ -167,7 +180,7 @@
 - **`login_page.dart`:** Handles login and linking anonymous users.
 - **`reset_password_page.dart`:** Handles password reset.
 
-### Data Flow
+## Data Flow
 
 - **Authentication Flow (Rebuilt & Refined - Testing)**
 
@@ -180,7 +193,8 @@ graph TD
 
     subgraph Anonymous Flow
         B -- No --> AnonSignIn[Sign In Anonymously];
-        AnonSignIn --> AuthState;
+        AnonSignIn --> CreateAnonDoc[Create Anon User Doc (incl. collectionCount=0)];
+        CreateAnonDoc --> AuthState;
         Anon[Anonymous User] -- Link --> LinkChoice{Link Email/Pass or Google?};
         LinkChoice -- Email/Pass --> LinkEmailPass[Link Email/Pass Credential];
         LinkChoice -- Google --> LinkGoogle[Link Google Credential];
@@ -189,24 +203,29 @@ graph TD
         MergePrompt -- No --> DiscardData[Keep Google Account Data];
         MigrateData --> SignOutSignIn[Sign Out & Sign In w/ Google];
         DiscardData --> SignOutSignIn;
-        LinkEmailPass --> AuthState;
+        LinkEmailPass --> CreateLinkedEmailDoc[Create/Update Linked User Doc];
+        CreateLinkedEmailDoc --> AuthState;
         LinkGoogle -- Success --> SignOutSignIn;
-        SignOutSignIn --> AuthState;
+        SignOutSignIn --> CreateGoogleDoc[Create/Update Google User Doc (incl. collectionCount)];
+        CreateGoogleDoc --> AuthState;
     end
 
     subgraph Email/Password Flow
         D -- Email/Pass --> EmailChoice{Register or Login?};
         EmailChoice -- Register --> RegisterEmail[Register + Send Verification];
         EmailChoice -- Login --> LoginEmail[Login Email/Pass];
-        RegisterEmail --> AuthState;
-        LoginEmail --> AuthState;
+        RegisterEmail --> CreateEmailDoc[Create User Doc (incl. collectionCount=0)];
+        CreateEmailDoc --> AuthState;
+        LoginEmail --> UpdateEmailDoc[Update User Doc];
+        UpdateEmailDoc --> AuthState;
         EmailUser[Email/Pass User] -- Forgot Password --> ResetPass[Password Reset Flow];
         EmailUser -- Update Email --> ReAuth1[Re-auth Needed];
         ReAuth1 -- Success --> UpdateEmail[Update Email Flow];
         EmailUser -- Update Password --> ReAuth2[Re-auth Needed];
         ReAuth2 -- Success --> UpdatePass[Update Password Flow];
         EmailUser -- Link Google --> LinkGoogle2[Link Google Credential];
-        LinkGoogle2 --> AuthState;
+        LinkGoogle2 --> UpdateLinkedGoogleDoc[Update Linked User Doc];
+        UpdateLinkedGoogleDoc --> AuthState;
         ResetPass --> LoginEmail;
         UpdateEmail --> AuthState;
         UpdatePass --> AuthState;
@@ -214,9 +233,11 @@ graph TD
 
     subgraph Google Flow
         D -- Google --> LoginGoogle[Login/Register with Google];
-        LoginGoogle --> AuthState;
+        LoginGoogle --> CreateOrUpdateGoogleDoc[Create/Update User Doc (incl. collectionCount)];
+        CreateOrUpdateGoogleDoc --> AuthState;
         GoogleUser[Google User] -- Link Email/Pass --> LinkEmailPass2[Link Email/Pass Credential];
-        LinkEmailPass2 --> AuthState;
+        LinkEmailPass2 --> UpdateLinkedEmailDoc2[Update Linked User Doc];
+        UpdateLinkedEmailDoc2 --> AuthState;
     end
 
     subgraph Common Actions
@@ -241,39 +262,50 @@ graph TD
     style MergePrompt fill:#9f9,stroke:#333,stroke-width:2px
     style MigrateData fill:#9f9,stroke:#333,stroke-width:2px
     style SignOutSignIn fill:#ffcc99,stroke:#333,stroke-width:2px
+    style CreateAnonDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
+    style CreateLinkedEmailDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
+    style CreateGoogleDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
+    style CreateEmailDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
+    style UpdateEmailDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
+    style UpdateLinkedGoogleDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
+    style CreateOrUpdateGoogleDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
+    style UpdateLinkedEmailDoc2 fill:#e6e6fa,stroke:#333,stroke-width:1px
 ```
 
 - State management relies on Riverpod providers (`authStateProvider`, `currentUserProvider`) watching changes from the rebuilt `AuthService`.
 - UI components react to state changes provided by these providers. `AccountSettingsPage` now explicitly watches `currentUserProvider` to ensure timely updates are passed down.
+- **Firestore writes (`createUserFromAuth`) are now timed correctly** (after auth state settles in linking flows) and **structured correctly** (initializing `collectionCount: 0` on creation) to align with Firestore rules and prevent permission errors during user document creation.
+- **Firestore rules (`allow update` for `/users/{userId}`) have been updated** to permit updates where `collectionCount` is present but unchanged.
 
-### External Dependencies
+## External Dependencies
 
-#### Firebase Authentication
+### Firebase Authentication
 
 - Core service for user management, verification, token handling, multiple providers, anonymous auth, and linking. Leveraged directly by the rebuilt `AuthService`.
 
 #### Firestore
 
 - Stores user profile data (`users` collection), managed by `UserRepository`.
-- `AuthService` interacts with `UserRepository` to ensure data consistency (e.g., creating user doc on sign-up/link, updating email, deleting user doc).
-- Security rules enforce access control based on authentication status and user roles.
+- `AuthService` interacts with `UserRepository` to ensure data consistency (e.g., creating user doc on sign-up/link, updating email, deleting user doc). **Timing and structure of these interactions have been corrected.**
+- Security rules enforce access control based on authentication status and user roles. **The `allow update` rule for `/users/{userId}` has been modified to correctly handle `collectionCount` updates.**
 
-### Recent Significant Changes (Consolidated)
+## Recent Significant Changes (Consolidated)
 
-1. **Authentication System Rebuild & Refinements (Objective 26 - Ongoing Testing):** Completed a full rebuild and subsequent fixes addressing state management, UI refresh issues (especially after unlinking), error handling edge cases (sign-in after sign-out), dialog behavior (email pre-population), data migration for anonymous users, and Google linking state management. **Currently testing and troubleshooting.**
-2. UI Improvements for Authentication (Logo, Google Icon).
-3. Email Display Simplification in Profile.
-4. Color Handling Improvements (`withValues`).
-5. Security Enhancements (Firestore Rules).
-6. Dialog Button Readability Improvements.
-7. Theme System Simplification.
-8. SnackBar Theming Consistency.
-9. AppBar and Navigation Bar Theming Consistency.
-10. Profile and Account Settings Consolidation.
+1. **Firestore Permission Fix (Objective 27 - Fix Applied):** Corrected Firestore rules (`allow update` for `/users/{userId}`) to permit updates where `collectionCount` is unchanged. Also corrected the structure of Firestore writes (`createUserFromAuth` in `UserRepository`) to initialize `collectionCount: 0` directly during new user creation. Ensured correct timing of writes during Google linking (in `AuthService`).
+2. **Authentication System Rebuild & Refinements (Objective 26 - Ongoing Testing):** Completed a full rebuild and subsequent fixes addressing state management, UI refresh issues (especially after unlinking), error handling edge cases (sign-in after sign-out), dialog behavior (email pre-population), data migration for anonymous users, and Google linking state management. **Currently testing and troubleshooting.**
+3. UI Improvements for Authentication (Logo, Google Icon).
+4. Email Display Simplification in Profile.
+5. Color Handling Improvements (`withValues`).
+6. Security Enhancements (Firestore Rules).
+7. Dialog Button Readability Improvements.
+8. Theme System Simplification.
+9. SnackBar Theming Consistency.
+10. AppBar and Navigation Bar Theming Consistency.
+11. Profile and Account Settings Consolidation.
 
 - *(Previous auth-specific fixes are now considered part of the rebuild context)*
 
-### User Feedback Integration
+## User Feedback Integration
 
 - (Remains largely unchanged, focusing on clear SnackBars, dialogs, and loading states, now driven by the rebuilt `AuthService`'s error handling and state updates).
 

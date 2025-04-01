@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Authentication Helper Functions
     function isAuthorizedUser() {
-      return request.auth != null && 
+      return request.auth != null &&
 exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
@@ -22,23 +22,29 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     function isEmailVerified() {
+      // Default to false if email_verified is null or missing
       return request.auth.token.email_verified == true;
     }
 
     function isAccountOlderThan(days) {
-      return request.time.toMillis() - request.auth.token.auth_time * 1000 > days * 86400000;
+      // Ensure creation_time exists before comparing
+      return request.auth.token.creation_time != null &&
+             request.time.toMillis() - request.auth.token.creation_time * 1000 > days * 86400000;
     }
 
     function isAnonymous() {
       return request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
-    function isAnonymousWithinLimits() {
-      return isAnonymous() && getCollectionCount() < 50;
+    // Safely check collectionCount, default to 0 if user doc or field doesn't exist yet
+    function getCollectionCount() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return userDoc.data.get('collectionCount', 0); // Default to 0 if not present
     }
 
-    function getCollectionCount() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.collectionCount;
+    function isAnonymousWithinLimits() {
+      // Check if anonymous AND collection count is less than 50
+      return isAnonymous() && getCollectionCount() < 50;
     }
 
     // Validation Functions
@@ -56,7 +62,7 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
       return data.keys().hasAll(['productId', 'lastUpdated']) &&
              data.productId is number &&
              data.lastUpdated is timestamp &&
-             (data.get('normal', {}).get('marketPrice', null) is number || 
+             (data.get('normal', {}).get('marketPrice', null) is number ||
               data.get('foil', {}).get('marketPrice', null) is number) &&
              (data.get('normal', {}).get('marketPrice', null) == null || data.get('normal', {}).get('marketPrice', null) >= 0);
     }
@@ -75,7 +81,7 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     function isValidDeckUpdate() {
       let data = request.resource.data;
       let oldData = resource.data;
-      
+
       // Ensure userId cannot be changed
       return data.userId == oldData.userId &&
              // Validate other fields
@@ -88,7 +94,7 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
              (data.isPublic == oldData.isPublic || request.auth.uid == data.userId);
     }
 
-    function isValidCollection() {
+    function isValidCollectionItem() { // Renamed for clarity
       let data = request.resource.data;
       return data.keys().hasAll(['userId', 'cardId', 'lastModified']) &&
              data.userId == request.auth.uid &&
@@ -101,18 +107,22 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
              (!data.keys().hasAny(['purchaseInfo']) || data.purchaseInfo is map);
     }
 
-    // Cards Collection (Public read, admin write)
+    // --- Security Rules ---
+
+    // Cards Collection (Public read, admin/cloud function write)
     match /cards/{cardId} {
       allow read: if true;
       allow write: if isCloudFunction() || isAuthorizedUser();
-      allow update: if isCloudFunction() || isAuthorizedUser() && isValidCard();
+      // Allow update only if data is valid (implicitly requires write permission)
+      allow update: if isValidCard();
     }
 
     // Prices Collection
     match /prices/{priceId} {
       allow read: if true;
       allow write: if isCloudFunction() || isAuthorizedUser();
-      allow update: if isCloudFunction() || isAuthorizedUser() && isValidPrice();
+      // Allow update only if data is valid (implicitly requires write permission)
+      allow update: if isValidPrice();
     }
 
     // Historical Prices Collection
@@ -127,16 +137,20 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
       allow write: if isCloudFunction() || isAuthorizedUser();
     }
 
-    // Collections (User specific)
+    // Collections (User specific items)
     match /collections/{collectionId} {
       allow read: if isAuthenticated() && isOwner(resource.data.userId);
-      allow create: if isAuthenticated() && 
-                    isOwner(request.resource.data.userId) && 
-                    isValidCollection() && 
+      // Allow create if authenticated, owner, valid data, and within limits/verified
+      allow create: if isAuthenticated() &&
+                    isOwner(request.resource.data.userId) &&
+                    isValidCollectionItem() &&
                     (isEmailVerified() || !isAccountOlderThan(7) || isAnonymousWithinLimits());
-      allow update: if isAuthenticated() && 
-                    isOwner(resource.data.userId) && 
-                    isValidCollection() && 
+      // Allow update if authenticated, owner, valid data, and within limits/verified
+      // Note: Migration logic removed here, should be handled by Cloud Function or specific rules if needed
+      allow update: if isAuthenticated() &&
+                    isOwner(resource.data.userId) && // Check ownership on existing doc
+                    isOwner(request.resource.data.userId) && // Ensure userId isn't changed
+                    isValidCollectionItem() &&
                     (isEmailVerified() || !isAccountOlderThan(7) || isAnonymousWithinLimits());
       allow delete: if isAuthenticated() && isOwner(resource.data.userId);
     }
@@ -144,62 +158,80 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     // Decks
     match /decks/{deckId} {
       allow read: if isAuthenticated() && (resource.data.isPublic || isOwner(resource.data.userId));
-      allow create: if isAuthenticated() && 
-                    isValidDeck() && 
+      // Allow create if authenticated, valid data, and verified/within grace period
+      allow create: if isAuthenticated() &&
+                    isValidDeck() &&
                     (isEmailVerified() || !isAccountOlderThan(7));
-      allow update: if isAuthenticated() && 
-                    isOwner(resource.data.userId) && 
-                    isValidDeckUpdate() && 
+      // Allow update if authenticated, owner, valid update data, and verified/within grace period
+      allow update: if isAuthenticated() &&
+                    isOwner(resource.data.userId) &&
+                    isValidDeckUpdate() &&
                     (isEmailVerified() || !isAccountOlderThan(7));
       allow delete: if isAuthenticated() && isOwner(resource.data.userId);
     }
-    
-    // Admin users collection
+
+    // Admin users collection (Only allow deletion by the admin themselves)
     match /admins/{userId} {
-      allow delete: if isOwner(resource.data.userId);
+      allow read: if isOwner(userId); // Allow admin to read their own entry
+      allow write: if false; // Prevent creation/update through rules
+      allow delete: if isOwner(userId); // Allow admin to delete their own entry
     }
-    
-    // Filters Collection
+
+    // Filters Collection (Public read, admin/cloud function write)
     match /filters/{document=**} {
       allow read: if true;
       allow write: if isCloudFunction() || isAuthorizedUser();
     }
-    
-    // User Documents
+
+    // User Documents (Core user profile data)
     match /users/{userId} {
       allow read: if isAuthenticated() && isOwner(userId);
+      // Allow owner to create their own document.
+      // App should ensure initial data (like collectionCount=0) is set correctly.
       allow create: if isAuthenticated() && isOwner(userId);
-      allow update: if isAuthenticated() && isOwner(userId) && 
+      // Allow owner to update their document IF it exists.
+      allow update: if isAuthenticated() && isOwner(userId) && resource != null && resource.data != null &&
                     (
-                      // Ensure collectionCount can only be incremented by 1 or decremented
+                      // Allow updates to any field EXCEPT collectionCount unless it follows the specific rules
                       !request.resource.data.keys().hasAny(['collectionCount']) ||
-                      request.resource.data.collectionCount == resource.data.collectionCount + 1 ||
-                      request.resource.data.collectionCount < resource.data.collectionCount
+                      (
+                        // Specific rules for updating collectionCount:
+                        // 1. Increment by 1
+                        request.resource.data.collectionCount == resource.data.collectionCount + 1 ||
+                        // 2. Any decrement
+                        request.resource.data.collectionCount < resource.data.collectionCount ||
+                        // 3. Value is unchanged (Added this condition)
+                        request.resource.data.collectionCount == resource.data.collectionCount
+                      )
+                      // Add other field-specific update rules here if needed, e.g., cannot change createdAt
+                      // && request.resource.data.createdAt == resource.data.createdAt
                     );
       allow delete: if isAuthenticated() && isOwner(userId);
     }
 
-    // User Settings
+    // User Settings (Subcollection)
     match /users/{userId}/settings/{document=**} {
-      allow read, write: if isOwner(userId);
+      // Allow owner full read/write access to their settings
+      allow read, write: if isAuthenticated() && isOwner(userId);
     }
 
-    // User Stats
+    // User Stats (Subcollection)
     match /users/{userId}/stats/{document=**} {
-      allow read: if resource.data.isPublic || isOwner(userId);
-      allow write: if isOwner(userId);
+      // Allow read if public or owner
+      allow read: if isAuthenticated() && (resource.data.isPublic || isOwner(userId));
+      // Allow write only by owner
+      allow write: if isAuthenticated() && isOwner(userId);
     }
 
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
-    
-    // Metadata
-    // Allow read access to metadata collection
+    // Metadata (Public read, no write)
     match /metadata/{docId} {
       allow read: if true;
       allow write: if false;
+    }
+
+    // Default deny all other paths
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

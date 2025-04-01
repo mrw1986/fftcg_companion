@@ -31,24 +31,41 @@ Future<void> migrateUserSettings({
     final fromUser = await userRepository.getUserById(fromUserId);
     final toUser = await userRepository.getUserById(toUserId);
 
+    // Initialize merged settings
+    Map<String, dynamic> mergedSettings = {};
+
+    // Handle different merge scenarios
     if (fromUser == null) {
-      talker.error('Source user not found during settings migration');
-      return;
+      talker.debug('Source user not found, using only target user settings');
+      if (toUser != null) {
+        mergedSettings = Map.from(toUser.settings);
+      }
+    } else if (toUser == null) {
+      talker.debug('Target user not found, creating with source user settings');
+      mergedSettings = Map.from(fromUser.settings);
+    } else {
+      // Both users exist, handle based on merge action
+      if (overwrite) {
+        talker.debug('Overwriting target settings with source settings');
+        mergedSettings = Map.from(fromUser.settings);
+      } else {
+        talker.debug('Merging source and target settings');
+        // Start with target settings
+        mergedSettings = Map.from(toUser.settings);
+        // Add source settings, overwriting only if value doesn't exist
+        fromUser.settings.forEach((key, value) {
+          if (!mergedSettings.containsKey(key)) {
+            mergedSettings[key] = value;
+          }
+        });
+      }
     }
-
-    // 2. Merge Firestore settings
-    final Map<String, dynamic> mergedSettings = {};
-
-    // If not overwriting, start with target user's settings
-    if (!overwrite && toUser != null) {
-      mergedSettings.addAll(toUser.settings);
-    }
-
-    // Add or overwrite with source user's settings
-    mergedSettings.addAll(fromUser.settings);
 
     // 3. Update Firestore settings for target user
-    await userRepository.updateUserSettings(toUserId, mergedSettings);
+    if (mergedSettings.isNotEmpty) {
+      await userRepository.updateUserSettings(toUserId, mergedSettings);
+      talker.debug('Successfully updated target user settings');
+    }
 
     // 4. Get local settings from Hive
     if (!Hive.isBoxOpen(SettingsKeys.boxName)) {

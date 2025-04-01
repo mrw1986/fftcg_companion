@@ -7,8 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
-import 'package:talker_flutter/talker_flutter.dart';
-
 import 'package:fftcg_companion/app/app.dart';
 import 'package:fftcg_companion/app/theme/theme_provider.dart';
 import 'package:fftcg_companion/firebase_options.dart';
@@ -19,15 +17,8 @@ import 'package:fftcg_companion/core/storage/cache_persistence.dart';
 final _container = ProviderContainer();
 
 Future<void> initializeApp() async {
-  // Configure Talker for logging
-  talker.configure(
-    settings: TalkerSettings(
-      enabled: true,
-      useHistory: true,
-      maxHistoryItems: 1000,
-      useConsoleLogs: false, // Disable console logs except for errors
-    ),
-  );
+  // Initialize Talker first
+  initializeTalker();
 
   try {
     // Initialize Hive first
@@ -36,8 +27,11 @@ Future<void> initializeApp() async {
     // Open required boxes before any other initialization
     await Future.wait([
       Hive.openBox<Map>('sort_cache'),
-      Hive.openBox(
-          'settings'), // Settings box should be dynamic to store different types
+      Hive.openBox('settings').then((box) {
+        talker.debug('Settings box opened successfully');
+        talker.debug('Settings box path: ${box.path}');
+        talker.debug('Settings box length: ${box.length}');
+      }),
       Hive.openBox('cache_metadata'),
     ]);
 
@@ -45,6 +39,7 @@ Future<void> initializeApp() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    talker.debug('Firebase initialized successfully');
     // Initialize CachePersistence
     await CachePersistence.initialize();
 
