@@ -1000,9 +1000,13 @@ class AuthService {
         talker.debug('Photo URL updated.');
       }
 
-      // Update Firestore user data
-      await _userRepository.createUserFromAuth(currentUser);
-      talker.info('Profile updated successfully.');
+      // Update Firestore user data using the specific profile update method
+      await _userRepository.updateUserProfileData(
+        currentUser.uid,
+        displayName: displayName,
+        photoURL: photoURL,
+      );
+      talker.info('Profile updated successfully (Auth & Firestore).');
     } catch (e) {
       talker.error('Failed to update profile: $e');
       throw _handleAuthException(e);

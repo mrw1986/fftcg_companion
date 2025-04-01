@@ -74,12 +74,19 @@ class UserRepository {
       final updatedUser = existingUser.copyWith(
         lastLogin: Timestamp.now(),
         lastAccessed: Timestamp.now(),
-        // Always use the latest info from Firebase Auth, even if it's null
-        // This ensures we don't have stale data
-        displayName: authUser.displayName,
-        email: authUser.email ?? existingUser.email,
-        photoURL: authUser.photoURL ?? existingUser.photoURL,
-        isVerified: authUser.emailVerified, // Update verification status
+        // Prioritize existing display name, otherwise use the one from authUser (e.g., Google)
+        displayName: (existingUser.displayName != null &&
+                existingUser.displayName!.isNotEmpty)
+            ? existingUser.displayName // Keep existing name
+            : authUser
+                .displayName, // Use name from linked provider if existing is empty
+        email: authUser.email ??
+            existingUser
+                .email, // Always update email from authUser if available
+        photoURL: authUser.photoURL ??
+            existingUser.photoURL, // Update photoURL similarly
+        isVerified: authUser
+            .emailVerified, // Always update verification status from authUser
         settings: updatedSettings,
         // Ensure collectionCount is preserved if it exists, otherwise default to 0
         collectionCount: existingUser.collectionCount,
@@ -194,6 +201,35 @@ class UserRepository {
       talker.debug('Updated collection count for user $userId: $newCount');
     } catch (e) {
       talker.error('Error updating collection count: $e');
+      rethrow;
+    }
+  }
+
+  /// Update specific user profile data fields in Firestore
+  Future<void> updateUserProfileData(
+    String userId, {
+    String? displayName,
+    String? photoURL,
+  }) async {
+    try {
+      final dataToUpdate = <String, dynamic>{};
+      if (displayName != null) {
+        dataToUpdate['displayName'] = displayName;
+      }
+      if (photoURL != null) {
+        dataToUpdate['photoURL'] = photoURL;
+      }
+
+      // Only update if there's data to change
+      if (dataToUpdate.isNotEmpty) {
+        await _usersCollection.doc(userId).update(dataToUpdate);
+        talker.debug(
+            'Updated Firestore profile data for user $userId: $dataToUpdate');
+      } else {
+        talker.debug('No profile data provided to update for user $userId.');
+      }
+    } catch (e) {
+      talker.error('Error updating user profile data: $e');
       rethrow;
     }
   }

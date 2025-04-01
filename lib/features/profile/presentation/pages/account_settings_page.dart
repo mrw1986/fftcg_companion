@@ -15,6 +15,8 @@ import 'package:fftcg_companion/features/profile/presentation/widgets/account_ac
 import 'package:fftcg_companion/features/profile/presentation/widgets/update_password_dialog.dart';
 // Import AuthException
 import 'package:fftcg_companion/core/services/auth_service.dart';
+// Import SnackBarHelper
+import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 
 class AccountSettingsPage extends ConsumerStatefulWidget {
   const AccountSettingsPage({super.key});
@@ -800,6 +802,107 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     }
   }
 
+  // --- NEW: Verification Banner Widget ---
+  Widget _buildVerificationBanner(
+      BuildContext context, ColorScheme colorScheme, User user) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.error,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: colorScheme.error),
+              const SizedBox(width: 8),
+              Text(
+                'Email Not Verified',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.error,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Please check your email (${user.email}) and click the verification link. Until verified, your account has the same limitations as a guest account (e.g., 50 unique card limit).',
+            style: TextStyle(color: colorScheme.onErrorContainer),
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                // Resend verification email
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                SnackBarHelper.showSnackBar(
+                  context: context,
+                  message: 'Sending verification email...',
+                  duration: const Duration(seconds: 2),
+                );
+
+                try {
+                  await ref.read(authServiceProvider).sendEmailVerification();
+                  if (context.mounted) {
+                    scaffoldMessenger.clearSnackBars();
+                    SnackBarHelper.showSuccessSnackBar(
+                      context: context,
+                      message:
+                          'Verification email resent. Please check your inbox.',
+                    );
+                  }
+                } catch (error) {
+                  talker.error('Error sending verification email', error);
+
+                  if (context.mounted) {
+                    scaffoldMessenger.clearSnackBars();
+
+                    String errorMessage =
+                        'Failed to resend verification email. Please try again later.';
+
+                    if (error is FirebaseAuthException) {
+                      if (error.code == 'too-many-requests') {
+                        errorMessage =
+                            'Too many requests. We have temporarily blocked email sending due to unusual activity. Please try again later.';
+                      }
+                    }
+
+                    SnackBarHelper.showErrorSnackBar(
+                      context: context,
+                      message: errorMessage,
+                    );
+                  }
+                }
+              },
+              icon: const Icon(Icons.email_outlined),
+              label: const Text('Resend Verification Email'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    colorScheme.surface, // Use surface for contrast
+                foregroundColor: colorScheme.error, // Keep error color for text
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  // --- END: Verification Banner Widget ---
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
@@ -825,8 +928,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     if (authState.isLoading ||
         (authState.isAuthenticated && userForUI == null)) {
       // Show loading if authState is loading OR if we expect an authenticated user but don't have one yet
-      return const Scaffold(
-        body: Center(child: LoadingIndicator()),
+      return Scaffold(
+        appBar: AppBarFactory.createAppBar(context, 'Account Settings'),
+        body: const Center(child: LoadingIndicator()),
       );
     }
 
@@ -859,6 +963,10 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       );
     }
 
+    // Determine if the email verification banner should be shown
+    final bool showVerificationBanner =
+        userForUI != null && !userForUI.emailVerified;
+
     return Scaffold(
       appBar: AppBarFactory.createAppBar(context, 'Account Settings'),
       backgroundColor: colorScheme.surface,
@@ -878,6 +986,12 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 children: [
+                  // --- NEW: Conditionally show Verification Banner ---
+                  if (showVerificationBanner)
+                    _buildVerificationBanner(context, colorScheme,
+                        userForUI), // Removed unnecessary '!'
+                  // --- END: Verification Banner ---
+
                   // Profile Header with display name
                   ProfileHeaderCard(
                     user: userForUI, // Use userForUI
@@ -888,9 +1002,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
                   // Account Information
                   AccountInfoCard(
-                    user: userForUI, // Pass userForUI down - FIXED LINTER ERROR
-                    isEmailNotVerified: authState
-                        .isEmailNotVerified, // Use the getter that checks user.emailVerified
+                    user: userForUI, // Pass userForUI down
+                    isEmailNotVerified: showVerificationBanner, // Pass the flag
                     emailController: _emailController,
                     showChangeEmail: _showChangeEmail,
                     onToggleChangeEmail: () {
