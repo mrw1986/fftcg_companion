@@ -20,19 +20,21 @@
 ### UI/UX Components
 
 - flutter_native_splash for branded launch screen
-- flex_color_scheme for comprehensive theming
-  - Material 3 design support
-  - Predefined color schemes
-  - Custom color scheme generation
+- Material 3 ColorScheme for comprehensive theming
+  - Dynamic color scheme generation using ColorScheme.fromSeed
+  - Custom color scheme support with ColorScheme.light/dark
+  - Built-in contrast handling and accessibility
   - Light and dark theme variants
-- flex_color_picker for theme color customization
-  - Color wheel selection
-  - Predefined color palettes
-  - Copy/paste color support
-  - Material design color selection
+  - Consistent Material Design 3 components
+- flex_color_picker for theme customization
+  - Interactive color wheel selection
+  - Material color palettes
+  - Tonal palette support
+  - Color shade variations
+  - Integrated with Material 3 theme system
 - Custom theme extensions
-  - ContrastExtension for ensuring text readability
-  - Automatic contrast adjustment for accessibility
+  - DialogButtonTheme for consistent dialog styling
+  - Proper contrast handling using onSurface colors
 - Shared loading indicators
 - Page-level loading states
 - Error handling components

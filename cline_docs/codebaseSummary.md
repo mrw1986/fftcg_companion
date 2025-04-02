@@ -2,202 +2,155 @@
 
 ## Recent Changes
 
+### Prevent Anonymous Dialog After Password Reset (Objective 40) - Completed
+
+- **Context:** Fixed issue where the "Account Limits" dialog appeared confusingly after an authenticated user initiated a password reset and was logged out.
+- **Changes:**
+  - Modified `AuthService.signOut` to accept a `skipAccountLimitsDialog` flag. When true, the Hive timestamp for the dialog is not reset.
+  - Updated the `signOut` call in `reset_password_page.dart` (after sending the reset email) to pass `skipAccountLimitsDialog: true`.
+- **Status:** Implemented.
+- **Next Steps:** Test the password reset flow for authenticated users as detailed in `currentTask.md`.
+
+### Email Verification Status Update Fix (Objective 39) - Completed
+
+- **Context:** Fixed inconsistency in Firestore `isVerified` field updates after email verification.
+- **Changes:**
+  - Enhanced `email_verification_checker.dart` to stop immediately after verification and pass the verified `User` object directly to `AuthService`.
+  - Modified `AuthService.handleEmailVerificationComplete` to accept the verified `User` object, ensuring consistent state for Firestore updates.
+- **Status:** Implemented.
+- **Next Steps:** Test email verification and email update flows as detailed in `currentTask.md`.
+
+### Authentication Flow and Firestore Data Issues (Objective 38) - In Progress
+
+- **Context:** Changes made during registration routing fix (Objective 36) have caused issues with user document creation and state management.
+- **Issues:**
+  - User document creation now occurs in multiple places:
+    - AuthService's createUserWithEmailAndPassword
+    - AuthService's signInWithGoogle
+    - Direct UserRepository calls in RegisterPage
+  - Potential race conditions between Auth state and Firestore updates
+  - UI state inconsistencies after registration
+- **Status:** Under investigation
+- **Next Steps:** Centralize user document creation in AuthService, remove direct repository calls
+
+### Fix Registration Routing Error (Objective 36) - Completed
+
+- **Context:** A `GoException: no routes for location: /profile/account-settings` error occurred after registration.
+- **Analysis:** Reviewed `app_router.dart` and found the correct path for `AccountSettingsPage` is `/profile/account`. Reviewed `register_page.dart` and found three instances where `context.go('/profile/account-settings')` was used incorrectly.
+- **Changes Made:** Corrected the navigation paths in `register_page.dart` to use `context.go('/profile/account')` in the `_registerWithEmailAndPassword` and `_signInWithGoogle` methods.
+- **Conclusion:** The navigation path after registration is now correct.
+
+### Update Registration Confirmation Text & Verify Navigation (Objective 35) - Completed
+
+- **Context:** The confirmation message after email/password registration was misleading, and navigation needed verification.
+- **Changes Made:**
+  - Updated the confirmation dialog text in `register_page.dart`'s `_registerWithEmailAndPassword` method to accurately state that the user is signed in but unverified with limited capabilities until verification, matching the text in `account_settings_page.dart`.
+- **Analysis:**
+  - Reviewed navigation logic in `register_page.dart` for both `_registerWithEmailAndPassword` and `_signInWithGoogle` methods.
+  - **Correction:** While Objective 32 aimed to fix navigation, the routing error persisted. Objective 36 correctly identified and fixed the path issue. Navigation logic now correctly targets `/profile/account`.
+- **Conclusion:** Registration confirmation text is consistent and accurate. Navigation logic is now confirmed correct after the fix in Objective 36.
+
+### Correct Account Deletion Order (Objective 34)
+
+- **Context:** The previous account deletion flow deleted Firestore data before the Firebase Auth user.
+- **Changes Made:**
+  - Modified `AuthService.deleteUser`: Reversed the order of operations (Auth delete first, then Firestore).
+- **Analysis:** Confirmed UI (`account_settings_page.dart`) handles re-authentication correctly before calling `deleteUser`.
+- **Conclusion:** Deletion flow is now safer. Testing recommended.
+
+### Ensure Firestore User Document is Fully Populated During Authentication (Objective 33)
+
+- **Context:** Verify `UserModel` data population during auth flows.
+- **Analysis:** Confirmed existing implementation correctly populates/updates user documents.
+- **Changes Made:** Refined `firestore.rules` to prevent `createdAt` updates.
+- **Conclusion:** Implementation largely correct. Testing recommended.
+
 ### Fixed Google Authentication Display Name Issue (Objective 30)
 
-- **Issue:**
-  - When a user created an account with Google authentication, the display name was correctly showing in the UI but was not being stored in Firestore.
-  - The `displayName` field in Firestore remained null despite the UI showing the correct name from Google.
-- **Changes Made:**
-  - **Enhanced Logging in `auth_service.dart`:** Added detailed logging to track the display name at various stages of the Google sign-in process (when Google user is obtained, when Firebase user is created, after user reload).
-  - **Modified `UserRepository.createUserFromAuth` Method:** Added code to extract the display name directly from the Google provider data and updated the logic to prioritize the Google provider display name over the auth user display name.
-- **Results:**
-  - The display name is now correctly extracted from the Google provider data.
-  - The display name is properly stored in the Firestore user document.
-  - The UI correctly displays the name from Google.
-- **Remaining Issue:**
-  - Account Limits dialog appears after Google sign-in (separate concern to be addressed).
+- **Issue:** Google display name wasn't storing in Firestore.
+- **Changes Made:** Enhanced logging, modified `UserRepository.createUserFromAuth`.
+- **Results:** Display name correctly stored.
 
 ### Firestore Permission Issues During Data Migration (Objective 27 - Fix Applied)
 
-- **Current Issues:**
-  - Encountered permission denied errors during initial user document creation/update (both anonymous and post-Google linking) due to Firestore writes violating specific rule conditions.
-- **Changes Made (Fix Attempt 4):**
-  - **Updated `firestore.rules`:** Identified that the `allow update` rule for `/users/{userId}` was too strict regarding the `collectionCount` field. It prevented updates (including those done via set(..., merge: true)` when the document exists) if `collectionCount` was present in the request but its value was unchanged. Modified the rule to explicitly permit updates where `collectionCount`is unchanged (`request.resource.data.collectionCount == resource.data.collectionCount`).
-  - **Updated `UserRepository.createUserFromAuth` (Previous Fix Attempt 3):** Modified the code to initialize `collectionCount: 0` directly when creating a *new* user document, ensuring the field is included in the initial `create` operation and removing a problematic second write attempt.
-  - **Updated `AuthService.linkGoogleToAnonymous` (Previous Fix Attempt 2):** Moved the `_userRepository.createUserFromAuth` call to occur *only after* the sign-out/sign-in process completes, ensuring the correct user context.
-- **Pending Fixes:**
-  - **Testing:** Verify the combined fixes by testing anonymous sign-in, account deletion, and anonymous-to-Google linking flows, ensuring user documents are created/updated correctly.
-  - If issues persist during data *transfer* (not document creation), re-evaluate collection/settings rules.
-  - Expand data migration beyond collection data.
+- **Issue:** Permission denied errors during user document creation/update.
+- **Changes Made:** Updated `firestore.rules`, `UserRepository.createUserFromAuth`, `AuthService.linkGoogleToAnonymous`.
+- **Pending Fixes:** Testing required.
 
 ### Email Update Flow and UI Improvements (Objective 26)
 
-- Fixed UI not updating after linking Google authentication:
-  - Added explicit provider invalidation in `_linkWithGoogle` method of `account_settings_page.dart`
-  - Ensured both `currentUserProvider` and `authStateProvider` are invalidated after successful linking
-  - UI now immediately reflects newly linked authentication methods
-- Improved email update messaging:
-  - Made note text and dialogs dynamic based on authentication methods
-  - Users with Google auth are informed they'll remain logged in
-  - Users with only email/password are informed they'll be logged out
-  - Messages adapt in real-time to authentication state changes
-- Enhanced user experience:
-  - UI updates immediately when linking/unlinking authentication methods
-  - Clearer communication about email update consequences
-  - Consistent messaging across all dialogs and UI elements
+- Fixed UI not updating after linking Google.
+- Improved email update messaging.
 
 ### Authentication State & UI Fixes (Objective 26 - Ongoing Testing)
 
-- Corrected provider unlinking logic in `AuthService` to prevent removing the last provider incorrectly.
-- Improved state invalidation in `auth_provider` for `unlinkProviderProvider` to ensure UI updates after unlinking.
-- Fixed state handling after account deletion in `account_settings_page` by removing the suppression of automatic anonymous sign-in, ensuring a consistent state for subsequent actions.
-- Corrected Google sign-in logic in `auth_page.dart` to handle state transitions after sign-out more robustly by adding a fallback from linking to standard sign-in if the user is not anonymous.
-- Fixed email display for the password provider in `ProfileAuthMethods`.
-- Ensured `AccountSettingsPage` watches `currentUserProvider` and passes the updated user object down to children (`AccountInfoCard`, `AccountActionsCard`) for reliable UI updates and data propagation.
-- Corrected email pre-population logic in `LinkEmailPasswordDialog` by having it receive the initialEmail via constructor parameter from `AccountInfoCard`, which now gets the latest user data from `AccountSettingsPage`.
-- Fixed profile page banner logic (`profile_page.dart`) to only show the email verification warning when the `authState.status` is specifically `AuthStatus.emailNotVerified`.
-- Implemented data migration for anonymous users linking with Google accounts:
-  - Added `merge_data_decision_dialog.dart` for user confirmation
-  - Created `collection_merge_helper.dart` for data migration logic
-  - Fixed timing of data migration to occur after successful sign-in
-  - Added proper BuildContext handling for async operations
-  - Ensured anonymous user data is preserved until migration decision
-- **Refined Google linking state management:**
-  - Updated `auth_page.dart` to set `skipAutoAuthProvider` flag during Google linking.
-  - Modified `auto_auth_provider.dart` to reset the flag only for fully authenticated users.
-  - Updated `auth_service.dart` to explicitly sign out from Google and Firebase with delays, and added more logging during the sign-out/sign-in process for linking.
-- **Note:** Authentication system is still undergoing testing and troubleshooting, particularly for edge cases like the Google linking redirect issue.
+- Corrected provider unlinking logic, state invalidation, state handling after deletion, Google sign-in fallback, email display/pre-population, profile banner logic.
+- Implemented anonymous-to-Google data migration (collection only).
+- Refined Google linking state management.
 
 ### Authentication System Rebuild (Completed - Objective 26)
 
-- **Completed a full rebuild of the authentication system** (`AuthService` and related UI/provider integrations) for simplicity, robustness, and adherence to best practices.
-- Implemented a clean foundation covering Anonymous, Email/Password, and Google providers, including all linking, update, re-authentication, and deletion flows as per the defined plan.
-- Preserved the existing UI/UX while refactoring the backend logic.
-- Corrected numerous method calls and provider interactions across the affected files (`auth_page.dart`, `register_page.dart`, `login_page.dart`, `account_settings_page.dart`, `reset_password_page.dart`, `link_accounts_dialog.dart`, `link_email_password_dialog.dart`, `auth_provider.dart`, `security_migration_provider.dart`, `email_verification_checker.dart`).
-- **This rebuild supersedes many previous incremental fixes** (Objectives 17, 18, 20, 21, 22, 23, 25). Details of those fixes are retained below for historical context but the core logic is now part of the unified rebuild.
-
-### Firebase Authentication Fixes (Superseded by Rebuild)
-
-- (Historical context retained) Fixed several issues with Firebase Authentication flows.
-
-### UI Improvements for Authentication
-
-- Updated logo display in authentication screens.
-- Updated Google authentication icon in profile page.
-
-### Email Display Simplification
-
-- Removed redundant email display under "Account Information".
-
-### Color Handling Improvements
-
-- Updated all instances of `withAlpha()` to use the modern `withValues(alpha: value)` approach.
-
-### Security Enhancements (Partially Superseded by Rebuild)
-
-- Implemented security improvements in Firestore rules:
-  - Role-based access control
-  - Data validation
-  - Anonymous user limits:
-    - Tracks unique cards via user.collectionCount
-    - Limits anonymous users to 50 unique cards
-    - Enforces collectionCount increments/decrements in rules
-  - Email verification requirements:
-    - Users must verify email within 7 days
-    - After 7 days, unverified users cannot add cards
-  - Other security validations and limits
-- Added user notification system:
-  - Daily dialog explains account limits
-  - Anonymous users see 50-card limit warning
-  - Unverified users see 7-day verification requirement
-  - Direct links to sign in, register, or resend verification
-- (AuthService logic related to security was handled within the rebuild).
-
-### Google Authentication Flow Improvements (Superseded by Rebuild)
-
-- (Historical context retained) Fixed issues with Google authentication flow.
-
-### Account Deletion Flow Improvements (Superseded by Rebuild)
-
-- (Historical context retained) Fixed issue where users still saw their display name after deletion.
-
-### Anonymous User Authentication Flow Improvements (Superseded by Rebuild)
-
-- (Historical context retained) Fixed Forgot Password flow and account linking for anonymous users.
-
-### Dialog Button Readability Improvements
-
-- Updated all dialog buttons to use theme's primary color.
-
-### Email Update Authentication Fix (Superseded by Rebuild)
-
-- (Historical context retained) Fixed issue with inconsistent email state.
-
-### Theme System Improvements
-
-- Removed ContrastExtension dependency.
-- Simplified theme handling using standard Material ColorScheme.
-
-### SnackBar Theming Improvements
-
-- Created centralized SnackBarHelper utility class.
-- Implemented consistent Material 3 container colors.
-
-### AppBar and Navigation Bar Theming Consistency
-
-- Created AppBarFactory utility class.
-- Updated AppBar and NavigationBar theming.
-
-### Profile and Account Settings Consolidation
-
-- Consolidated Profile and Account Settings pages.
-
-### Other Authentication Improvements (Superseded by Rebuild)
-
-- (Historical context retained) Enhanced email verification, account deletion, re-authentication, token refresh, error messages, and profile page structure.
+- Completed full rebuild of `AuthService` and related integrations.
 
 ## Key Components
 
-### Auth Service (lib/core/services/auth_service.dart)
+### Auth Service (lib/core/services/auth_service.dart) - **Updated**
 
-- **Status:** Enhanced with detailed logging to track display name at various stages of the Google sign-in process. Logic updated to call `UserRepository.createUserFromAuth` *after* sign-out/sign-in during Google linking to ensure correct auth context. Also updated to include `isInternalAuthFlow` parameter in `signInAnonymously` to prevent the Account Limits dialog from appearing during internal auth flows.
-- **Pending:** Testing required to confirm Firestore permission issues are resolved.
+- **Status:** `handleEmailVerificationComplete` now accepts a verified `User` object. `signOut` now accepts a `skipAccountLimitsDialog` flag to prevent resetting the dialog timestamp in specific scenarios (like password reset). `deleteUser` method now deletes Firebase Auth user *before* deleting Firestore data.
+- **Pending:** Testing required for deletion flow and Firestore permission fixes.
 
 ### User Repository (lib/features/profile/data/repositories/user_repository.dart)
 
-- **Status:** Modified `createUserFromAuth` method to extract the display name directly from the Google provider data and prioritize it over the auth user display name. Also updated to initialize `collectionCount: 0` directly when creating a *new* user document.
-- **Pending:** Testing required to confirm this resolves permission errors during initial user creation and ensures display names are correctly stored.
+- **Status:** `createUserFromAuth` handles initialization/updates, including `isVerified` status. `deleteUser` removes Firestore doc.
+- **Pending:** Testing required.
 
-### Firestore Rules (firestore.rules) - **Fix Applied**
+### Firestore Rules (firestore.rules) - **Refined**
 
-- **Status:** Updated the `allow update` rule for `/users/{userId}` to permit updates where `collectionCount` is present but unchanged, addressing a conflict with `set(..., merge: true)` operations.
-- **Pending:** Testing required to confirm this resolves permission errors during user document updates (e.g., post-linking).
+- **Status:** Updated `allow update` rule for `/users/{userId}`.
+- **Pending:** Testing required.
 
 #### Riverpod Providers (lib/core/providers/)
 
-- **`auth_provider.dart`:** Defines `authServiceProvider`, `currentUserProvider`, `authStateProvider`, and action providers (`unlinkProviderProvider`, etc.). `unlinkProviderProvider` now awaits the reloaded user before invalidating state. `authStateProvider` logic updated to prioritize `isAnonymous` check.
-- **`email_verification_checker.dart`:** Monitors verification status.
-- **`auto_auth_provider.dart`:** Handles automatic anonymous sign-in (no longer skipped during deletion). Logic updated to reset `skipAutoAuthProvider` flag only for fully authenticated users.
+- **`email_verification_checker.dart`:** **Updated** to stop timer immediately upon verification and pass the verified `User` object to `AuthService`.
+- Core auth state and action providers.
 
 #### Profile Page Components
 
-- **`profile_page.dart`:** Main profile view. Logic corrected to only show email verification banner when `authState.status == AuthStatus.emailNotVerified`.
-- **`account_settings_page.dart`:** Manages account details. Now watches `currentUserProvider` to ensure child widgets receive updated user data. Correctly handles state after account deletion (allows auto-anonymous sign-in).
-- **`AccountInfoCard.dart`:** Displays auth methods via `ProfileAuthMethods`. Now receives user object reliably from `AccountSettingsPage`. Passes correct email to `LinkEmailPasswordDialog`.
-- **`ProfileAuthMethods.dart`:** Displays individual auth methods. Fixed email display for password provider. Watches `currentUserProvider` for better reactivity after unlinks.
-- **`LinkEmailPasswordDialog.dart`:** Fixed to receive `initialEmail` via constructor and keep the field editable.
-- **Other Dialogs/Cards:** (`ProfileHeaderCard`, `AccountActionsCard`, `ProfileReauthDialog`, `UpdatePasswordDialog`, etc.)
+- **`account_settings_page.dart`:** Manages account details. Handles re-auth before deletion. Contains source-of-truth verification banner text. Route: `/profile/account`.
 
 #### Authentication Pages
 
-- **`auth_page.dart`:** Handles sign-in. Google sign-in logic improved to handle `not-anonymous` errors by falling back to standard sign-in and sets `skipAutoAuthProvider` flag during linking.
-- **`register_page.dart`:** Handles registration and linking anonymous users. Google linking logic improved to handle `not-anonymous` errors.
-- **`login_page.dart`:** Handles login and linking anonymous users.
-- **`reset_password_page.dart`:** Handles password reset.
+- **`register_page.dart`:** Handles registration/linking. **Confirmation text updated. Navigation logic corrected to use `/profile/account`.**
+- **`reset_password_page.dart`:** **Updated** to call `signOut` with `skipAccountLimitsDialog: true` to prevent the anonymous dialog from showing after reset for an authenticated user.
 
 ## Data Flow
 
 - **Authentication Flow (Rebuilt & Refined - Testing)**
+- **Email Verification Flow (Updated)**
+    1. User registers with Email/Password.
+    2. `email_verification_checker` starts polling `user.reload()` and `user.emailVerified`.
+    3. User clicks verification link in email.
+    4. `email_verification_checker` detects `refreshedUser.emailVerified == true`.
+    5. Checker cancels its timer.
+    6. Checker calls `AuthService.handleEmailVerificationComplete(refreshedUser)`.
+    7. `AuthService` calls `UserRepository.createUserFromAuth(refreshedUser)` using the passed-in verified user.
+    8. `UserRepository` updates Firestore document `isVerified` field to `true`.
+    9. Checker invalidates `authStateProvider` and refreshes router.
+- **Password Reset Flow (Updated)**
+    1. Authenticated user initiates reset from `reset_password_page.dart`.
+    2. UI calls `AuthService.sendPasswordResetEmail()`.
+    3. UI calls `AuthService.signOut(skipAccountLimitsDialog: true)`.
+    4. `AuthService` signs out Firebase/Google.
+    5. `AuthService` **skips** resetting the Hive timestamp for the limits dialog.
+    6. Auth state changes, app likely falls back to anonymous state.
+    7. Limits dialog condition is not met immediately due to timestamp not being reset.
+- **Account Deletion Flow (Updated)**
+    1. User initiates deletion.
+    2. UI calls `AuthService.deleteUser()`.
+    3. `AuthService` attempts Auth delete.
+    4. **If Auth fails (re-auth):** UI handles re-auth prompt -> Retry step 2.
+    5. **If Auth succeeds:** `AuthService` attempts Firestore delete (logs errors).
+    6. UI handles final state.
 
 ```mermaid
 graph TD
@@ -208,108 +161,111 @@ graph TD
 
     subgraph Anonymous Flow
         B -- No --> AnonSignIn[Sign In Anonymously];
-        AnonSignIn --> CreateAnonDoc[Create Anon User Doc (incl. collectionCount=0)];
+        AnonSignIn --> CreateAnonDoc[Create Anon User Doc];
         CreateAnonDoc --> AuthState;
         Anon[Anonymous User] -- Link --> LinkChoice{Link Email/Pass or Google?};
         LinkChoice -- Email/Pass --> LinkEmailPass[Link Email/Pass Credential];
         LinkChoice -- Google --> LinkGoogle[Link Google Credential];
         LinkGoogle -- Exists --> MergePrompt{Merge Data?};
-        MergePrompt -- Yes --> MigrateData[Migrate Collection Data];
-        MergePrompt -- No --> DiscardData[Keep Google Account Data];
+        MergePrompt -- Yes --> MigrateData[Migrate Data];
+        MergePrompt -- No --> DiscardData[Keep Google Data];
         MigrateData --> SignOutSignIn[Sign Out & Sign In w/ Google];
         DiscardData --> SignOutSignIn;
-        LinkEmailPass --> CreateLinkedEmailDoc[Create/Update Linked User Doc];
-        CreateLinkedEmailDoc --> AuthState;
+        LinkEmailPass --> UpdateLinkedEmailDoc[Update Linked User Doc];
+        UpdateLinkedEmailDoc --> NavigateToAccount1[Navigate to /profile/account];
+        NavigateToAccount1 --> AuthState;
         LinkGoogle -- Success --> SignOutSignIn;
-        SignOutSignIn --> CreateGoogleDoc[Create/Update Google User Doc (incl. collectionCount)];
-        CreateGoogleDoc --> AuthState;
+        SignOutSignIn --> UpdateGoogleDoc[Update Google User Doc];
+        UpdateGoogleDoc --> NavigateToAccount2[Navigate to /profile/account];
+        NavigateToAccount2 --> AuthState;
     end
 
     subgraph Email/Password Flow
         D -- Email/Pass --> EmailChoice{Register or Login?};
         EmailChoice -- Register --> RegisterEmail[Register + Send Verification];
         EmailChoice -- Login --> LoginEmail[Login Email/Pass];
-        RegisterEmail --> CreateEmailDoc[Create User Doc (incl. collectionCount=0)];
-        CreateEmailDoc --> AuthState;
+        RegisterEmail --> CreateEmailDoc[Create User Doc];
+        CreateEmailDoc --> ShowVerifyDialog[Show Verification Dialog (Updated Text)];
+        ShowVerifyDialog -- OK Clicked --> NavigateToAccount3[Navigate to /profile/account];
+        NavigateToAccount3 --> StartChecker[Start Email Verification Checker];
+        StartChecker --> AuthState;
         LoginEmail --> UpdateEmailDoc[Update User Doc];
         UpdateEmailDoc --> AuthState;
-        EmailUser[Email/Pass User] -- Forgot Password --> ResetPass[Password Reset Flow];
-        EmailUser -- Update Email --> ReAuth1[Re-auth Needed];
-        ReAuth1 -- Success --> UpdateEmail[Update Email Flow];
-        EmailUser -- Update Password --> ReAuth2[Re-auth Needed];
-        ReAuth2 -- Success --> UpdatePass[Update Password Flow];
-        EmailUser -- Link Google --> LinkGoogle2[Link Google Credential];
-        LinkGoogle2 --> UpdateLinkedGoogleDoc[Update Linked User Doc];
-        UpdateLinkedGoogleDoc --> AuthState;
-        ResetPass --> LoginEmail;
-        UpdateEmail --> AuthState;
-        UpdatePass --> AuthState;
+        EmailUser[Email/Pass User] -- Actions --> OtherActions[Other Account Actions];
+        EmailUser -- Unverified --> StartChecker2[Start Email Verification Checker];
+    end
+
+    subgraph Email Verification Check Flow
+        StartChecker --> LoopCheck{Checker: Periodically Reload User};
+        StartChecker2 --> LoopCheck;
+        LoopCheck -- Verified? --> IsVerified{emailVerified == true?};
+        IsVerified -- No --> LoopCheck;
+        IsVerified -- Yes --> CancelTimer[Checker: Cancel Timer];
+        CancelTimer --> CallHandler[Checker: Call AuthService.handleEmailVerificationComplete(verifiedUser)];
+        CallHandler --> UpdateFirestore[AuthService: Update Firestore 'isVerified'];
+        UpdateFirestore --> InvalidateProviders[Checker: Invalidate Auth Providers];
+        InvalidateProviders --> RefreshRouter[Checker: Refresh Router];
+        RefreshRouter --> AuthState;
     end
 
     subgraph Google Flow
         D -- Google --> LoginGoogle[Login/Register with Google];
-        LoginGoogle --> ExtractGoogleName[Extract Google Display Name];
-        ExtractGoogleName --> CreateOrUpdateGoogleDoc[Create/Update User Doc with Google Name];
-        CreateOrUpdateGoogleDoc --> AuthState;
-        GoogleUser[Google User] -- Link Email/Pass --> LinkEmailPass2[Link Email/Pass Credential];
-        LinkEmailPass2 --> UpdateLinkedEmailDoc2[Update Linked User Doc];
-        UpdateLinkedEmailDoc2 --> AuthState;
+        LoginGoogle --> ExtractGoogleName[Extract Google Name];
+        ExtractGoogleName --> CreateOrUpdateGoogleDoc[Create/Update User Doc];
+        CreateOrUpdateGoogleDoc --> NavigateToAccount4[Navigate to /profile/account];
+        NavigateToAccount4 --> AuthState;
+        GoogleUser[Google User] -- Actions --> OtherActions2[Other Account Actions];
+    end
+
+    subgraph Password Reset Flow
+        ResetPage[Reset Password Page] -- Authenticated User --> SendResetEmail[UI Calls AuthService.sendPasswordResetEmail];
+        SendResetEmail --> SignOutWithFlag[UI Calls AuthService.signOut(skipAccountLimitsDialog=true)];
+        SignOutWithFlag --> SkipTimestampReset[AuthService: Skips Hive Timestamp Reset];
+        SkipTimestampReset --> SignOutFirebase[AuthService: Signs out Firebase/Google];
+        SignOutFirebase --> AuthState;
+        ResetPage -- Unauthenticated User --> SendResetEmail2[UI Calls AuthService.sendPasswordResetEmail];
+        SendResetEmail2 --> ShowSuccessMessage[UI Shows Success Message];
     end
 
     subgraph Common Actions
         B -- Yes --> SignedInUser;
         SignedInUser --> ActionChoice{Choose Action};
-        ActionChoice -- Sign Out --> SignOut[Sign Out Flow];
-        ActionChoice -- Delete Account --> ReAuth3[Re-auth Needed];
-        ReAuth3 -- Success --> DeleteAcct[Delete Account Flow];
-        SignOut --> B;
-        DeleteAcct --> B;
+        ActionChoice -- Sign Out --> SignOutNormal[UI Calls AuthService.signOut];
+        SignOutNormal --> ResetTimestamp[AuthService: Resets Hive Timestamp];
+        ResetTimestamp --> SignOutFirebase2[AuthService: Signs out Firebase/Google];
+        SignOutFirebase2 --> AuthState;
+        ActionChoice -- Delete Account --> AttemptDelete[UI Calls AuthService.deleteUser];
+        AttemptDelete --> DeleteAuth{AuthService: Delete Auth User};
+        DeleteAuth -- Success --> DeleteFirestore[AuthService: Delete Firestore Doc];
+        DeleteAuth -- Failure (e.g. Re-auth Needed) --> HandleReauth[UI Handles Re-auth Prompt];
+        HandleReauth -- User Re-authenticates --> AttemptDelete;
+        HandleReauth -- User Cancels --> SignedInUser;
+        DeleteFirestore --> FinalSignOut[UI Signs Out User];
+        FinalSignOut --> AuthState;
     end
 
     subgraph State & UI
         AuthState[Update Auth State] --> UpdateUI[Update UI];
     end
 
-    style AnonSignIn fill:#f9f,stroke:#333,stroke-width:2px
-    style AuthState fill:#ccf,stroke:#333,stroke-width:2px
-    style ReAuth1 fill:#fdc,stroke:#333,stroke-width:1px
-    style ReAuth2 fill:#fdc,stroke:#333,stroke-width:1px
-    style ReAuth3 fill:#fdc,stroke:#333,stroke-width:1px
-    style MergePrompt fill:#9f9,stroke:#333,stroke-width:2px
-    style MigrateData fill:#9f9,stroke:#333,stroke-width:2px
-    style SignOutSignIn fill:#ffcc99,stroke:#333,stroke-width:2px
-    style ExtractGoogleName fill:#ffcc99,stroke:#333,stroke-width:2px
-    style CreateAnonDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
-    style CreateLinkedEmailDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
-    style CreateGoogleDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
-    style CreateEmailDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
-    style UpdateEmailDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
-    style UpdateLinkedGoogleDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
-    style CreateOrUpdateGoogleDoc fill:#e6e6fa,stroke:#333,stroke-width:1px
-    style UpdateLinkedEmailDoc2 fill:#e6e6fa,stroke:#333,stroke-width:1px
-</file_content>
-
-Now that you have the latest state of the file, try the operation again with fewer/more precise SEARCH blocks.
-(If you run into this error 3 times in a row, you may use the write_to_file tool as a fallback. Keep in mind, the write_to_file fallback is far from ideal, as this means you'll be re-writing the entire contents of the file just to make a few edits, which takes time and money. So let's bias towards using replace_in_file as effectively as possible)
-</error>
-<environment_details>
-# VSCode Visible Files
-cline_docs/codebaseSummary.md
-
-# VSCode Open Tabs
-lib/features/profile/presentation/pages/account_settings_page.dart
-lib/features/profile/presentation/pages/profile_page.dart
-lib/features/profile/data/repositories/user_repository.dart
-lib/core/services/auth_service.dart
-lib/core/providers/auto_auth_provider.dart
-cline_docs/projectRoadmap.md
-cline_docs/currentTask.md
-cline_docs/codebaseSummary.md
-firestore.rules
-
-# Current Time
-4/1/2025, 1:13:00 AM (America/New_York, UTC-4:00)
-
-# Current Mode
-ACT MODE
-</environment_details>
+    style NavigateToAccount1 fill:#c9ffc9,stroke:#333,stroke-width:1px
+    style NavigateToAccount2 fill:#c9ffc9,stroke:#333,stroke-width:1px
+    style NavigateToAccount3 fill:#c9ffc9,stroke:#333,stroke-width:1px
+    style NavigateToAccount4 fill:#c9ffc9,stroke:#333,stroke-width:1px
+    style ShowVerifyDialog fill:#ffffcc,stroke:#333,stroke-width:1px
+    style DeleteAuth fill:#ffcccc,stroke:#333,stroke-width:2px
+    style DeleteFirestore fill:#ffe6cc,stroke:#333,stroke-width:1px
+    style HandleReauth fill:#fdc,stroke:#333,stroke-width:2px
+    style LoopCheck fill:#e0f7fa,stroke:#00796b,stroke-width:1px
+    style IsVerified fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    style CancelTimer fill:#ffecb3,stroke:#ffa000,stroke-width:1px
+    style CallHandler fill:#ffecb3,stroke:#ffa000,stroke-width:1px
+    style UpdateFirestore fill:#ffecb3,stroke:#ffa000,stroke-width:1px
+    style InvalidateProviders fill:#ffecb3,stroke:#ffa000,stroke-width:1px
+    style RefreshRouter fill:#ffecb3,stroke:#ffa000,stroke-width:1px
+    style SignOutWithFlag fill:#cce5ff,stroke:#005cb2,stroke-width:1px
+    style SkipTimestampReset fill:#cce5ff,stroke:#005cb2,stroke-width:1px
+    style SignOutFirebase fill:#cce5ff,stroke:#005cb2,stroke-width:1px
+    style SignOutNormal fill:#e1f5fe,stroke:#0277bd,stroke-width:1px
+    style ResetTimestamp fill:#e1f5fe,stroke:#0277bd,stroke-width:1px
+    style SignOutFirebase2 fill:#e1f5fe,stroke:#0277bd,stroke-width:1px

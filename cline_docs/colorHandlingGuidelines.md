@@ -33,19 +33,32 @@ color: Colors.black.withValues(alpha: 0.5); // 50% opacity with 0.0-1.0 range
 - `withAlpha(179)` → `withValues(alpha: 0.7)` (70% opacity)
 - `withAlpha(204)` → `withValues(alpha: 0.8)` (80% opacity)
 
-## ColorScheme Usage Guidelines
+## Material 3 ColorScheme Guidelines
 
-### Avoid Using `surfaceVariant`
+### Dynamic Color Generation
 
-When working with our theme's ColorScheme, avoid using `surfaceVariant` as it doesn't provide enough contrast in some scenarios.
+Our theme uses ColorScheme.fromSeed for dynamic color generation:
 
-#### Alternatives
+```dart
+ColorScheme.fromSeed(
+  seedColor: primaryColor,
+  brightness: Brightness.light, // or dark
+)
+```
 
-- For container backgrounds, use `surface` or `primaryContainer` depending on context
-- For text on surfaces, use `onSurface` or `onPrimaryContainer` for better readability
-- For subtle UI elements, use `surface.withValues(alpha: 0.9)` to create a slight variation
+### Custom Color Selection
 
-### Preferred ColorScheme Properties
+Users can customize the theme color using flex_color_picker in theme_settings_page.dart:
+
+- Interactive color wheel
+- Material color palettes
+- Tonal palette support
+- Shade variations
+- Real-time theme preview
+
+### ColorScheme Properties
+
+Material 3 provides built-in contrast handling and accessibility features. Use these properties:
 
 Use these ColorScheme properties for consistent UI:
 

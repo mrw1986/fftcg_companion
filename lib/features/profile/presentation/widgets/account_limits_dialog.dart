@@ -104,7 +104,7 @@ class AccountLimitsDialog extends ConsumerWidget {
             const Text('• Some features may be restricted'),
             const SizedBox(height: 16),
             const Text(
-              'Create an account to remove these limits and save your collection securely.',
+              'Sign in or create an account to remove these limits and save your collection securely.',
             ),
           ] else if (!isEmailVerified) ...[
             const Text(

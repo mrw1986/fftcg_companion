@@ -69,7 +69,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   bool _isLoading = false;
   // bool _showPasswordRequirements = false; // Replaced by FocusNode listener
   bool _showPassword = false;
-  bool _registrationComplete = false;
   bool _showConfirmPassword = false;
   final FocusNode _passwordFocusNode = FocusNode(); // Add FocusNode
   bool _isPasswordFocused = false; // State to track focus
@@ -109,6 +108,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     try {
       final authService = ref.read(authServiceProvider);
       final authState = ref.read(authStateProvider);
+      final email = _emailController.text.trim();
 
       // If user is anonymous, link the account
       if (authState.isAnonymous) {
@@ -116,7 +116,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             'Register page: Linking anonymous account with email/password');
         // Corrected method call
         await authService.linkEmailAndPasswordToAnonymous(
-          _emailController.text.trim(),
+          email,
           _passwordController.text,
         );
         talker.debug('Register page: Email/password linking successful');
@@ -124,113 +124,155 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         // Otherwise create a new account
         talker.debug('Register page: Creating new account with email/password');
         await authService.createUserWithEmailAndPassword(
-          _emailController.text.trim(),
+          email,
           _passwordController.text,
         );
         talker.debug('Register page: Email/password registration successful');
       }
 
-      if (mounted) {
-        // Set registration complete flag to show verification message
-        setState(() {
-          _isLoading = false;
-          _registrationComplete = true;
-        });
+      if (!mounted) return;
 
-        // User will stay on this page with verification instructions
-      }
+      setState(() {
+        _isLoading = false;
+      });
+
+      // Show verification email sent dialog
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext dialogContext) {
+          final colorScheme = Theme.of(dialogContext).colorScheme;
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.mark_email_read_outlined,
+                    color: colorScheme.primary),
+                const SizedBox(width: 12),
+                const Text('Verification Email Sent'),
+              ],
+            ),
+            content: Text(
+              'A verification email has been sent to $email. Please check your inbox and click the verification link. Until verified, your account has the same limitations as a guest account (e.g., 50 unique card collection limit).', // Updated Text to match account_settings_page.dart
+              style: TextStyle(color: colorScheme.onSurface),
+            ),
+            actions: <Widget>[
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                ),
+                onPressed: () async {
+                  Navigator.of(dialogContext).pop();
+
+                  // Ensure the user object is fully updated before navigating
+                  final currentUser = FirebaseAuth.instance.currentUser;
+                  if (currentUser != null) {
+                    await currentUser.reload();
+                    // Get the refreshed user to ensure we have the latest data
+                    final refreshedUser = FirebaseAuth.instance.currentUser;
+                    if (refreshedUser != null) {
+                      // Invalidate providers to force a complete refresh
+                      ref.invalidate(currentUserProvider);
+                      ref.invalidate(authStateProvider);
+                      // Wait a moment for the providers to update
+                      await Future.delayed(const Duration(milliseconds: 100));
+                      if (mounted) {
+                        context.go('/profile/account');
+                      }
+                    }
+                  }
+                },
+                child: const Text('OK'),
+              ),
+            ],
+            actionsPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          );
+        },
+      );
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         _isLoading = false;
       });
 
       // Show user-friendly error message as SnackBar
-      if (mounted) {
-        String errorMessage = 'Failed to create account'; // Default message
-        bool showErrorSnackbar =
-            true; // Flag to control showing the final snackbar
+      String errorMessage = 'Failed to create account'; // Default message
+      bool showErrorSnackbar =
+          true; // Flag to control showing the final snackbar
 
-        if (e is AuthException) {
-          // Catch custom AuthException first
-          errorMessage = e.message; // Use the message from AuthException
-          talker.error('Error creating account: ${e.code} - ${e.message}');
+      if (e is AuthException) {
+        // Catch custom AuthException first
+        errorMessage = e.message; // Use the message from AuthException
+        talker.error('Error creating account: ${e.code} - ${e.message}');
 
-          // Special handling for email-already-in-use error
-          if (e.code == 'email-already-in-use') {
-            // Overwrite message for this specific case (though not strictly needed as dialog shows info)
-            // errorMessage =
-            //     'An account with this email address already exists. Please sign in instead.';
+        // Special handling for email-already-in-use error
+        if (e.code == 'email-already-in-use') {
+          // Show a dialog with options
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (!mounted) return;
+            showDialog(
+              context: context,
+              builder: (BuildContext dialogContext) {
+                final theme = Theme.of(dialogContext);
+                final colorScheme = theme.colorScheme;
 
-            // Don't show the snackbar, just show the dialog
-            // showThemedSnackBar(
-            //   context: context,
-            //   message: errorMessage,
-            //   isError: true,
-            //   duration: const Duration(seconds: 5),
-            // );
-
-            // Show a dialog with options
-            Future.delayed(const Duration(milliseconds: 100), () {
-              // Reduced delay slightly
-              if (mounted) {
-                showDialog(
-                  context: context,
-                  builder: (BuildContext context) {
-                    final theme = Theme.of(context);
-                    final colorScheme = theme.colorScheme;
-
-                    return AlertDialog(
-                      title: Text(
-                        'Account Already Exists',
-                        style: TextStyle(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
+                return AlertDialog(
+                  title: Text(
+                    'Account Already Exists',
+                    style: TextStyle(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  content: const Text(
+                      'An account with this email address already exists. Would you like to sign in instead?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                      },
+                      child: const Text('Try Again'),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: colorScheme.primary,
                       ),
-                      content: const Text(
-                          'An account with this email address already exists. Would you like to sign in instead?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: const Text('Try Again'),
-                        ),
-                        TextButton(
-                          style: TextButton.styleFrom(
-                            foregroundColor: colorScheme.primary,
-                          ),
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            context.go('/profile/auth');
-                          },
-                          child: const Text('Sign In'),
-                        ),
-                      ],
-                    );
-                  },
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                        if (mounted) {
+                          context.go('/profile/auth');
+                        }
+                      },
+                      child: const Text('Sign In'),
+                    ),
+                  ],
                 );
-              }
-            });
+              },
+            );
+          });
 
-            showErrorSnackbar =
-                false; // Don't show the final snackbar for this case
-          }
-        } else {
-          // Handle non-AuthException errors
-          talker.error('Error creating account: $e');
-          errorMessage = 'An unexpected error occurred. Please try again.';
+          showErrorSnackbar =
+              false; // Don't show the final snackbar for this case
         }
+      } else {
+        // Handle non-AuthException errors
+        talker.error('Error creating account: $e');
+        errorMessage = 'An unexpected error occurred. Please try again.';
+      }
 
-        // Show snackbar only if it wasn't handled by the special 'email-already-in-use' case
-        if (showErrorSnackbar) {
-          showThemedSnackBar(
-            context: context,
-            message: errorMessage,
-            isError: true,
-            duration: const Duration(seconds: 5),
-          );
-        }
+      // Show snackbar only if it wasn't handled by the special 'email-already-in-use' case
+      if (showErrorSnackbar) {
+        showThemedSnackBar(
+          context: context,
+          message: errorMessage,
+          isError: true,
+          duration: const Duration(seconds: 5),
+        );
       }
     }
   }
@@ -254,46 +296,60 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           talker.debug('Register page: Google linking successful');
 
           // Navigate to profile page after successful linking
-          if (mounted) {
-            context.go('/profile'); // Navigate after successful link
+          if (!mounted) return;
+
+          // Ensure the user object is fully updated before navigating
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser != null) {
+            await currentUser.reload();
+            // Get the refreshed user to ensure we have the latest data
+            final refreshedUser = FirebaseAuth.instance.currentUser;
+            if (refreshedUser != null) {
+              // Invalidate providers to force a complete refresh
+              ref.invalidate(currentUserProvider);
+              ref.invalidate(authStateProvider);
+              // Wait a moment for the providers to update
+              await Future.delayed(const Duration(milliseconds: 100));
+              if (mounted) {
+                context.go('/profile/account');
+              }
+            }
           }
         } catch (linkError) {
+          if (!mounted) return;
+
           // Catch AuthException specifically for linking errors handled by AuthService
           if (linkError is AuthException) {
             talker.warning(
                 'Register page: Google link failed - ${linkError.code}: ${linkError.message}');
-            if (mounted) {
-              // Show specific message from AuthException
-              showThemedSnackBar(
-                context: context,
-                message: linkError.message,
-                isError: true,
-                duration: const Duration(seconds: 8),
-              );
-              setState(() {
-                _isLoading = false;
-              });
-              return; // Stop further processing
-            }
+            // Show specific message from AuthException
+            showThemedSnackBar(
+              context: context,
+              message: linkError.message,
+              isError: true,
+              duration: const Duration(seconds: 8),
+            );
+            setState(() {
+              _isLoading = false;
+            });
+            return; // Stop further processing
           }
           // Catch potential FirebaseAuthException if not handled by AuthService (less likely now)
           else if (linkError is FirebaseAuthException) {
             talker.error(
                 'FirebaseAuthException during Google link: ${linkError.code}');
-            if (mounted) {
-              final authService = ref.read(authServiceProvider);
-              showThemedSnackBar(
-                context: context,
-                message: authService.getReadableAuthError(
-                    linkError.code, linkError.message),
-                isError: true,
-                duration: const Duration(seconds: 8),
-              );
-              setState(() {
-                _isLoading = false;
-              });
-              return;
-            }
+            final authService = ref.read(authServiceProvider);
+            showThemedSnackBar(
+              context: context,
+              message: authService.getReadableAuthError(
+                  linkError.code, linkError.message),
+              isError: true,
+              duration: const Duration(seconds: 8),
+            );
+            setState(() {
+              _isLoading = false;
+            });
+            return;
           } else {
             // Rethrow other non-FirebaseAuthException errors
             rethrow;
@@ -312,6 +368,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           await authService.signInWithGoogle();
           talker.debug('Register page: Google Sign-In successful');
 
+          if (!mounted) return;
+
           // Get the user ID after sign-in
           final afterUserId = FirebaseAuth.instance.currentUser?.uid;
 
@@ -320,21 +378,36 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           final isNewAccount = !wasAuthenticated && beforeUserId != afterUserId;
 
           // Navigate to profile page after successful sign-in
-          if (mounted) {
-            context.go(
-                '/profile'); // Navigate after successful sign-in/registration
+          // Ensure the user object is fully updated before navigating
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser != null) {
+            await currentUser.reload();
+            // Get the refreshed user to ensure we have the latest data
+            final refreshedUser = FirebaseAuth.instance.currentUser;
+            if (refreshedUser != null) {
+              // Invalidate providers to force a complete refresh
+              ref.invalidate(currentUserProvider);
+              ref.invalidate(authStateProvider);
+              // Wait a moment for the providers to update
+              await Future.delayed(const Duration(milliseconds: 100));
+              if (mounted) {
+                context.go('/profile/account');
 
-            // Only show success message if this appears to be a new account
-            if (isNewAccount) {
-              showThemedSnackBar(
-                context: context,
-                message: 'Account created successfully with Google',
-                isError: false,
-                duration: const Duration(seconds: 5),
-              );
+                // Only show success message if this appears to be a new account
+                if (isNewAccount) {
+                  showThemedSnackBar(
+                    context: context,
+                    message: 'Account created successfully with Google',
+                    isError: false,
+                    duration: const Duration(seconds: 5),
+                  );
+                }
+              }
             }
           }
         } catch (signInError) {
+          if (!mounted) return;
+
           // Handle conflict where Google email belongs to existing Email/Password account
           if (signInError is AuthException && // Catch AuthException
               (signInError.code == 'account-exists-with-different-credential' ||
@@ -342,51 +415,51 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             talker.debug(
                 'Register page: Google Sign-In failed - Email already exists with Email/Password.');
 
-            if (mounted) {
-              // Show a dialog explaining the situation and guiding user to sign in
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  final theme = Theme.of(context);
-                  final colorScheme = theme.colorScheme;
+            // Show a dialog explaining the situation and guiding user to sign in
+            showDialog(
+              context: context,
+              builder: (BuildContext dialogContext) {
+                final theme = Theme.of(dialogContext);
+                final colorScheme = theme.colorScheme;
 
-                  return AlertDialog(
-                    title: Text(
-                      'Account Already Exists',
-                      style: TextStyle(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
+                return AlertDialog(
+                  title: Text(
+                    'Account Already Exists',
+                    style: TextStyle(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.bold,
                     ),
-                    // Use the specific message from the exception
-                    content: Text(signInError.message),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        child: const Text('Cancel'),
+                  ),
+                  // Use the specific message from the exception
+                  content: Text(signInError.message),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: colorScheme.primary,
                       ),
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: colorScheme.primary,
-                        ),
-                        onPressed: () {
-                          Navigator.of(context).pop();
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                        if (mounted) {
                           context.go('/profile/auth'); // Go to Sign In page
-                        },
-                        child: const Text('Sign In'),
-                      ),
-                    ],
-                  );
-                },
-              );
-              // Stop loading
-              setState(() {
-                _isLoading = false;
-              });
-              return; // Stop further processing
-            }
+                        }
+                      },
+                      child: const Text('Sign In'),
+                    ),
+                  ],
+                );
+              },
+            );
+            // Stop loading
+            setState(() {
+              _isLoading = false;
+            });
+            return; // Stop further processing
           } else {
             // Rethrow other errors to be caught by the outer catch block
             rethrow;
@@ -394,38 +467,38 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         }
       }
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         _isLoading = false;
       });
 
       // Show user-friendly error message as SnackBar
-      if (mounted) {
-        String errorMessage = 'Failed to sign in with Google';
-        bool isError = true; // Default to error
+      String errorMessage = 'Failed to sign in with Google';
+      bool isError = true; // Default to error
 
-        if (e is AuthException) {
-          // Catch AuthException first
-          errorMessage = e.message;
-          isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled';
-        } else if (e is FirebaseAuthException) {
-          // Fallback for direct FirebaseAuthException
-          final authService = ref.read(authServiceProvider);
-          errorMessage = authService.getReadableAuthError(e.code, e.message);
-          isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled';
-        } else if (e.toString().contains('sign in was cancelled')) {
-          errorMessage = 'Google sign-in was cancelled';
-          isError = false; // Not an error
-        } else {
-          errorMessage = e.toString(); // Fallback for other errors
-        }
-
-        showThemedSnackBar(
-          context: context,
-          message: errorMessage,
-          isError: isError, // Use the flag determined above
-          duration: const Duration(seconds: 10),
-        );
+      if (e is AuthException) {
+        // Catch AuthException first
+        errorMessage = e.message;
+        isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled';
+      } else if (e is FirebaseAuthException) {
+        // Fallback for direct FirebaseAuthException
+        final authService = ref.read(authServiceProvider);
+        errorMessage = authService.getReadableAuthError(e.code, e.message);
+        isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled';
+      } else if (e.toString().contains('sign in was cancelled')) {
+        errorMessage = 'Google sign-in was cancelled';
+        isError = false; // Not an error
+      } else {
+        errorMessage = e.toString(); // Fallback for other errors
       }
+
+      showThemedSnackBar(
+        context: context,
+        message: errorMessage,
+        isError: isError, // Use the flag determined above
+        duration: const Duration(seconds: 10),
+      );
     }
   }
 
@@ -439,362 +512,278 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           context, isAnonymous ? 'Complete Registration' : 'Register'),
       body: _isLoading
           ? const Center(child: LoadingIndicator())
-          : _registrationComplete
-              ? Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 16),
-                        // Logo with rounded rectangle container using primary color
-                        Container(
-                          width: 240,
-                          height: 240,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          child: Center(
-                            child: Image.asset(
-                              'assets/images/logo_transparent.png',
-                              height: 200,
-                              width: 200,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
+          : Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 16),
+                    // Logo with rounded rectangle container using primary color
+                    Container(
+                      width: 240,
+                      height: 240,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Center(
+                        child: Image.asset(
+                          'assets/images/logo_transparent.png',
+                          height: 200,
+                          width: 200,
+                          fit: BoxFit.contain,
                         ),
-                        const SizedBox(height: 24),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.mark_email_read, size: 48),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Verification Email Sent',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'We\'ve sent a verification email to ${_emailController.text}. Please check your inbox and click the verification link before signing in.\n\nYou will be signed out until you verify your email address.',
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        StyledButton(
-                          onPressed: () {
-                            // Force a complete refresh of the auth state
-                            // First invalidate the currentUserProvider which authStateProvider depends on
-                            ref.invalidate(currentUserProvider);
-
-                            // Then refresh the authStateProvider itself
-                            ref.invalidate(authStateProvider);
-
-                            context.go('/profile');
-                          },
-                          text: 'Return to Profile',
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                )
-              : Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 16),
-                        // Logo with rounded rectangle container using primary color
-                        Container(
-                          width: 240,
-                          height: 240,
-                          decoration: BoxDecoration(
+                    const SizedBox(height: 16), // Reduced spacing
+                    if (isAnonymous)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        margin:
+                            const EdgeInsets.only(bottom: 16), // Reduced margin
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
                             color: Theme.of(context).colorScheme.primary,
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          child: Center(
-                            child: Image.asset(
-                              'assets/images/logo_transparent.png',
-                              height: 200,
-                              width: 200,
-                              fit: BoxFit.contain,
-                            ),
+                            width: 1,
                           ),
                         ),
-                        const SizedBox(height: 16), // Reduced spacing
-                        if (isAnonymous)
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            margin: const EdgeInsets.only(
-                                bottom: 16), // Reduced margin
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primaryContainer,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Theme.of(context).colorScheme.primary,
-                                width: 1,
-                              ),
-                            ),
-                            child: Text(
-                              'You\'re currently using the app without an account. Complete your registration to save your collection, decks, and settings.',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
-                              ),
-                            ),
-                          ),
-                        Form(
-                          key: _formKey,
-                          child: Column(
-                            children: [
-                              TextFormField(
-                                controller: _emailController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Email',
-                                  border: OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.emailAddress,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter your email';
-                                  }
-                                  if (!RegExp(
-                                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                      .hasMatch(value)) {
-                                    return 'Please enter a valid email';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _passwordController,
-                                decoration: InputDecoration(
-                                  labelText: 'Password (8+ characters)',
-                                  border: const OutlineInputBorder(),
-                                  helperText:
-                                      'Must include uppercase, lowercase, number, and special character',
-                                  helperMaxLines: 2,
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _showPassword
-                                          ? Icons.visibility_off
-                                          : Icons.visibility,
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                    ),
-                                    onPressed: () => setState(
-                                        () => _showPassword = !_showPassword),
-                                  ),
-                                ),
-                                obscureText: !_showPassword,
-                                focusNode:
-                                    _passwordFocusNode, // Assign FocusNode
-                                // onTap removed, focus handled by FocusNode listener
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter a password';
-                                  }
-                                  if (value.length < 8) {
-                                    return 'Password must be at least 8 characters long.';
-                                  }
-                                  // Check for uppercase letter
-                                  if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
-                                    return 'Password must contain an uppercase letter.';
-                                  }
-                                  // Check for lowercase letter
-                                  if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
-                                    return 'Password must contain a lowercase letter.';
-                                  }
-                                  // Check for numeric character
-                                  if (!RegExp(r'(?=.*[0-9])').hasMatch(value)) {
-                                    return 'Password must contain a number.';
-                                  }
-                                  // Check for special character
-                                  if (!RegExp(r'(?=.*[!@#$%^&*(),.?":{}|<>])')
-                                      .hasMatch(value)) {
-                                    return 'Password must contain a special character.';
-                                  }
-                                  return null; // Password is valid
-                                },
-                              ),
-                              // Conditionally show requirements based on focus state
-                              if (_isPasswordFocused) ...[
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        Theme.of(context).colorScheme.surface,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .outline
-                                          .withValues(
-                                              alpha: 0.5), // 0.5 * 255 = 128
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Password Requirements:',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text('• At least 8 characters long'),
-                                      Text(
-                                          '• At least one uppercase letter (A-Z)'),
-                                      Text(
-                                          '• At least one lowercase letter (a-z)'),
-                                      Text('• At least one number (0-9)'),
-                                      Text(
-                                          '• At least one special character (!@#\$%^&*(),.?":{}|<>)'),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _confirmPasswordController,
-                                decoration: InputDecoration(
-                                  labelText: 'Confirm Password',
-                                  border: const OutlineInputBorder(),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _showConfirmPassword
-                                          ? Icons.visibility_off
-                                          : Icons.visibility,
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                    ),
-                                    onPressed: () => setState(() =>
-                                        _showConfirmPassword =
-                                            !_showConfirmPassword),
-                                  ),
-                                ),
-                                obscureText: !_showConfirmPassword,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please confirm your password';
-                                  }
-                                  if (value != _passwordController.text) {
-                                    return 'Passwords do not match';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 24),
-                              Center(
-                                child: StyledButton(
-                                  onPressed: _registerWithEmailAndPassword,
-                                  text: isAnonymous
-                                      ? 'Complete Registration'
-                                      : 'Register',
-                                ),
-                              ),
-                            ],
+                        child: Text(
+                          'You\'re currently using the app without an account. Complete your registration to save your collection, decks, and settings.',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onPrimaryContainer,
                           ),
                         ),
-
-                        // Add Google Sign-In button below the Complete Registration button (no divider)
-                        const SizedBox(height: 16),
-                        GoogleSignInButton(
-                          onPressed: () async {
-                            await _signInWithGoogle();
-                          },
-                          onError: (e) {
-                            talker.error(
-                                'Google Sign-In error in register page: $e');
-
-                            // Show a user-friendly error message
-                            String errorMessage =
-                                'Failed to sign in with Google';
-                            bool isError = true; // Default to error
-
-                            if (e is AuthException) {
-                              // Catch AuthException first
-                              errorMessage = e.message;
-                              isError = e.code != 'cancelled' &&
-                                  e.code != 'sign-in-cancelled';
-                            } else if (e is FirebaseAuthException) {
-                              // Fallback for direct FirebaseAuthException
-                              final authService = ref.read(authServiceProvider);
-                              errorMessage = authService.getReadableAuthError(
-                                  e.code, e.message);
-                              isError = e.code != 'cancelled' &&
-                                  e.code != 'sign-in-cancelled';
-                            } else if (e
-                                .toString()
-                                .contains('sign in was cancelled')) {
-                              errorMessage = 'Google sign-in was cancelled';
-                              isError = false; // Not an error
-                            } else {
-                              errorMessage =
-                                  e.toString(); // Fallback for other errors
-                            }
-
-                            showThemedSnackBar(
-                              context: context,
-                              message: errorMessage,
-                              isError: isError, // Use the flag determined above
-                              duration: const Duration(seconds: 10),
-                            );
-                          },
-                          text: isAnonymous
-                              ? 'Continue with Google'
-                              : 'Register with Google',
-                        ),
-
-                        if (!isAnonymous) ...[
+                      ),
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _emailController,
+                            decoration: const InputDecoration(
+                              labelText: 'Email',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.emailAddress,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your email';
+                              }
+                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                  .hasMatch(value)) {
+                                return 'Please enter a valid email';
+                              }
+                              return null;
+                            },
+                          ),
                           const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              TextButton(
-                                onPressed: () => context.go('/profile/auth'),
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 8),
-                                  foregroundColor:
-                                      Theme.of(context).colorScheme.primary,
+                          TextFormField(
+                            controller: _passwordController,
+                            decoration: InputDecoration(
+                              labelText: 'Password (8+ characters)',
+                              border: const OutlineInputBorder(),
+                              helperText:
+                                  'Must include uppercase, lowercase, number, and special character',
+                              helperMaxLines: 2,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _showPassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Theme.of(context).colorScheme.primary,
                                 ),
-                                child: const Text(
-                                    'Already have an account? Login'),
+                                onPressed: () => setState(
+                                    () => _showPassword = !_showPassword),
                               ),
-                            ],
+                            ),
+                            obscureText: !_showPassword,
+                            focusNode: _passwordFocusNode, // Assign FocusNode
+                            // onTap removed, focus handled by FocusNode listener
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter a password';
+                              }
+                              if (value.length < 8) {
+                                return 'Password must be at least 8 characters long.';
+                              }
+                              // Check for uppercase letter
+                              if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
+                                return 'Password must contain an uppercase letter.';
+                              }
+                              // Check for lowercase letter
+                              if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
+                                return 'Password must contain a lowercase letter.';
+                              }
+                              // Check for numeric character
+                              if (!RegExp(r'(?=.*[0-9])').hasMatch(value)) {
+                                return 'Password must contain a number.';
+                              }
+                              // Check for special character
+                              if (!RegExp(r'(?=.*[!@#$%^&*(),.?":{}|<>])')
+                                  .hasMatch(value)) {
+                                return 'Password must contain a special character.';
+                              }
+                              return null; // Password is valid
+                            },
+                          ),
+                          // Conditionally show requirements based on focus state
+                          if (_isPasswordFocused) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .outline
+                                      .withValues(
+                                          alpha: 0.5), // 0.5 * 255 = 128
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Password Requirements:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text('• At least 8 characters long'),
+                                  Text('• At least one uppercase letter (A-Z)'),
+                                  Text('• At least one lowercase letter (a-z)'),
+                                  Text('• At least one number (0-9)'),
+                                  Text(
+                                      '• At least one special character (!@#\$%^&*(),.?":{}|<>)'),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _confirmPasswordController,
+                            decoration: InputDecoration(
+                              labelText: 'Confirm Password',
+                              border: const OutlineInputBorder(),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _showConfirmPassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                onPressed: () => setState(() =>
+                                    _showConfirmPassword =
+                                        !_showConfirmPassword),
+                              ),
+                            ),
+                            obscureText: !_showConfirmPassword,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please confirm your password';
+                              }
+                              if (value != _passwordController.text) {
+                                return 'Passwords do not match';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          Center(
+                            child: StyledButton(
+                              onPressed: _registerWithEmailAndPassword,
+                              text: isAnonymous
+                                  ? 'Complete Registration'
+                                  : 'Register',
+                            ),
                           ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
+
+                    // Add Google Sign-In button below the Complete Registration button (no divider)
+                    const SizedBox(height: 16),
+                    GoogleSignInButton(
+                      onPressed: () async {
+                        await _signInWithGoogle();
+                      },
+                      onError: (e) {
+                        talker
+                            .error('Google Sign-In error in register page: $e');
+
+                        // Show a user-friendly error message
+                        String errorMessage = 'Failed to sign in with Google';
+                        bool isError = true; // Default to error
+
+                        if (e is AuthException) {
+                          // Catch AuthException first
+                          errorMessage = e.message;
+                          isError = e.code != 'cancelled' &&
+                              e.code != 'sign-in-cancelled';
+                        } else if (e is FirebaseAuthException) {
+                          // Fallback for direct FirebaseAuthException
+                          final authService = ref.read(authServiceProvider);
+                          errorMessage = authService.getReadableAuthError(
+                              e.code, e.message);
+                          isError = e.code != 'cancelled' &&
+                              e.code != 'sign-in-cancelled';
+                        } else if (e
+                            .toString()
+                            .contains('sign in was cancelled')) {
+                          errorMessage = 'Google sign-in was cancelled';
+                          isError = false; // Not an error
+                        } else {
+                          errorMessage =
+                              e.toString(); // Fallback for other errors
+                        }
+
+                        showThemedSnackBar(
+                          context: context,
+                          message: errorMessage,
+                          isError: isError, // Use the flag determined above
+                          duration: const Duration(seconds: 10),
+                        );
+                      },
+                      text: isAnonymous
+                          ? 'Continue with Google'
+                          : 'Register with Google',
+                    ),
+
+                    if (!isAnonymous) ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          TextButton(
+                            onPressed: () => context.go('/profile/auth'),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                            ),
+                            child: const Text('Already have an account? Login'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
+              ),
+            ),
     );
   }
 }

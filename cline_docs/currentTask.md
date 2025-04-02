@@ -1,144 +1,116 @@
 # Current Task
 
-## Previous Objectives (Completed)
-
-1. **Improve Email Verification UI and Profile Page Aesthetics (Objective 28)**
-    * Updated `ProfilePage` to show standard account/app settings for unverified users, applied gradient background, and used Card widgets for structure. Fixed `withOpacity` usage.
-    * Updated `AccountSettingsPage` to display a prominent banner for unverified users with limitations and a "Resend Verification Email" button. Fixed unnecessary null assertion.
-
-2. **Data Migration and Firestore Rules Updates (Objective 27)**
-    * Updated `firestore.rules`: Modified the `allow update` rule for `/users/{userId}` to permit updates where `collectionCount` is present but unchanged.
-    * Updated `UserRepository.createUserFromAuth`: Modified the code to initialize `collectionCount: 0` directly when creating a *new* user document.
-    * Updated `AuthService.linkGoogleToAnonymous`: Moved the `_userRepository.createUserFromAuth` call to occur *only after* the sign-out/sign-in process completes.
-    * **Testing Still Required:** Verify fixes by testing anonymous sign-in, account deletion, and anonymous-to-Google linking flows.
-
-3. **Fixed Email Update Flow and UI Updates (Objective 26)**
-    * Fixed UI not updating after linking Google authentication.
-    * Improved email update messaging based on auth methods.
-    * Enhanced user experience with immediate UI updates and clearer messaging.
-
-4. **Fixed Authentication State & UI Issues (Objective 26 - Ongoing Testing)**
-    * Implemented security enhancements (50-card limit, 7-day verification grace period, daily limits dialog).
-    * Fixed authentication method order consistency in UI.
-    * Corrected provider unlinking logic and state invalidation.
-    * Fixed state handling after account deletion.
-    * Corrected Google sign-in logic fallback.
-    * Fixed email display and pre-population issues.
-    * Fixed profile page banner logic.
-    * Implemented data migration for anonymous users linking with Google (collection only).
-    * Refined Google linking state management.
-
-5. **Authentication System Rebuild**
-    * Completed full rebuild of authentication system.
-
-6. **UI/UX Improvements**
-    * Enhanced dialog styling, error messages, loading states.
-
-7. **Security Enhancements**
-    * Implemented proper Firestore rules, re-authentication flows.
-
-## Current Objective 30 (Completed - Google Auth Display Name Fix)
-
-Fix Google Authentication Display Name Not Storing in Firestore
+## Current Objective 40: Prevent Anonymous Dialog After Password Reset
 
 ### Context
 
-When a user creates an account with Google authentication, the display name is correctly showing in the UI but was not being stored in Firestore. The `displayName` field in Firestore remained null despite the UI showing the correct name from Google.
-
-### Goal
-
-Ensure that when a user signs in with Google, their display name from Google is properly stored in the Firestore user document.
+After initiating a password reset, authenticated users were logged out (for security) but then immediately shown the "Account Limits" dialog intended for new anonymous users. This was confusing as the user was managing their existing account.
 
 ### Changes Made
 
-1. **Enhanced Logging in `auth_service.dart`:**
-   * Added detailed logging to track the display name at various stages of the Google sign-in process:
-     * When the Google user is obtained: `talker.debug('Google user display name: ${googleUser.displayName}');`
-     * When the Firebase user is created: `talker.debug('Firebase user display name: ${userCredential.user?.displayName}');`
-     * After the user is reloaded: `talker.debug('Refreshed user display name: ${refreshedUser.displayName}');`
-   * Similar logging was added to the Google linking process.
+1. Modified `AuthService.signOut`:
+    * Added an optional boolean parameter `skipAccountLimitsDialog` (default: `false`).
+    * If `skipAccountLimitsDialog` is `true`, the method now skips resetting the `last_limits_dialog_shown` timestamp in Hive storage.
+2. Updated `reset_password_page.dart`:
+    * Modified the `_sendPasswordResetEmail` function.
+    * The call to `signOut` (which happens only if the user was authenticated) now passes `skipAccountLimitsDialog: true`.
 
-2. **Modified `UserRepository.createUserFromAuth` Method:**
-   * Added code to extract the display name directly from the Google provider data:
+### Result
 
-   ```dart
-   // Get the provider data to check for Google sign-in
-   final providerData = authUser.providerData;
-   String? googleDisplayName;
-   
-   // Check if user is signed in with Google
-   for (var provider in providerData) {
-     if (provider.providerId == 'google.com') {
-       // Log the provider display name
-       talker.debug('Google provider display name: ${provider.displayName}');
-       googleDisplayName = provider.displayName;
-       break;
-     }
-   }
-   ```
+Authenticated users who reset their password will still be logged out for security, but they will no longer see the "Account Limits" dialog immediately afterward, providing a less confusing user experience.
 
-   * Updated the logic to prioritize the Google provider display name:
-     * For existing users: `displayName: (existingUser.displayName != null && existingUser.displayName!.isNotEmpty) ? existingUser.displayName : googleDisplayName ?? authUser.displayName`
-     * For new users: `displayName: googleDisplayName ?? authUser.displayName`
-   * This ensures that the display name from Google is correctly used when creating or updating the user document in Firestore.
+### Testing Required
 
-### Testing Results
+1. Log in with an existing Email/Password account.
+2. Navigate to the Reset Password page (e.g., via Account Settings).
+3. Initiate the password reset for the logged-in user's email.
+4. Confirm the success SnackBar appears ("...You have been logged out...").
+5. **Confirm the "Account Limits" dialog does *not* appear.**
+6. Confirm the user is logged out and potentially redirected to the login page or shown an anonymous state UI.
 
-The changes were successful. When a user signs in with Google:
+## Previous Objectives (Completed)
 
-1. The display name is correctly extracted from the Google provider data
-2. The display name is properly stored in the Firestore user document
-3. The UI correctly displays the name from Google
+1. **Fix Email Verification Status Update (Objective 39)**
+    * **Context:** The application wasn't consistently updating the `isVerified` field in Firestore when users verified their email.
+    * **Changes Made:** Modified `email_verification_checker.dart` to stop timer on verification and pass verified `User` to `AuthService.handleEmailVerificationComplete`. Updated `AuthService` method to accept the `User` object.
+    * **Result:** Ensured Firestore `isVerified` field updates reliably using confirmed verified user state.
 
-There is a secondary issue with the Account Limits dialog appearing after Google sign-in, but that's a separate concern from the original display name problem which has been resolved.
+2. **Fix Authentication Flow and Firestore Data Issues (Objective 38)**
+    * **Context:** Changes during registration routing fix (Objective 36) caused issues with user document creation happening in multiple places (AuthService, RegisterPage).
+    * **Goal:** Centralize user document creation in AuthService and ensure proper order of operations.
+    * **Status:** This objective is superseded by ongoing reviews and fixes but remains relevant context. The core issue of centralizing user creation still needs verification.
+    * **Next Steps (Deferred/Ongoing):** Review AuthService/RegisterPage calls to UserRepository, ensure AuthService handles all creation/updates.
 
-## Next Steps
+3. **Fix Registration Routing Error (Objective 36)**
+    * **Context:** A `GoException: no routes for location: /profile/account-settings` error occurred after registration.
+    * **Analysis:** Reviewed `app_router.dart` and found the correct path for `AccountSettingsPage` is `/profile/account`. Reviewed `register_page.dart` and found three instances where `context.go('/profile/account-settings')` was used incorrectly.
+    * **Changes Made:** Corrected the navigation paths in `register_page.dart` to use `context.go('/profile/account')` in the `_registerWithEmailAndPassword` and `_signInWithGoogle` methods.
+    * **Conclusion:** The navigation path after registration is now correct.
+
+4. **Update Registration Confirmation Text (Objective 35)**
+    * **Context:** The confirmation message after email/password registration was misleading.
+    * **Changes Made:** Updated the confirmation dialog text in `register_page.dart` to accurately state the user is signed in but unverified with limited capabilities.
+    * **Conclusion:** Registration confirmation text is now consistent and accurate.
+
+5. **Correct Account Deletion Order (Objective 34)**
+    * Modified `AuthService.deleteUser` to delete Auth user first, then Firestore data.
+    * Confirmed UI handles re-authentication correctly before calling `deleteUser`.
+    * Updated documentation.
+
+6. **Ensure Firestore User Document is Fully Populated During Authentication (Objective 33)**
+    * Analyzed `UserModel`, `UserRepository`, `AuthService`, and `firestore.rules`.
+    * Confirmed existing implementation correctly populates/updates user documents.
+    * Refined `firestore.rules` to prevent `createdAt` updates.
+    * Recommended testing.
+
+7. **Fixed Registration Navigation (Objective 32)**
+    * Ensured users are navigated to the Account Settings page after email/password and Google registration/linking. *(Note: This objective was marked complete previously, but the routing error indicated it wasn't fully resolved until Objective 36)*
+
+8. **Fixed Account Limits Dialog Issue After Google Sign-In (Objective 31)**
+    * Prevented the Account Limits dialog from appearing after cancelling Google sign-in or linking by using an `isInternalAuthFlow` flag.
+
+9. **Fixed Google Authentication Display Name Issue (Objective 30)**
+    * Ensured Google display name is correctly extracted and stored in Firestore user document.
+
+10. **Improve Email Verification UI and Profile Page Aesthetics (Objective 28)**
+    * Updated `ProfilePage` and `AccountSettingsPage` for better UI/UX for unverified users.
+
+11. **Data Migration and Firestore Rules Updates (Objective 27 - Fix Applied)**
+    * Updated `firestore.rules` to allow `collectionCount` updates correctly.
+    * Updated `UserRepository.createUserFromAuth` to initialize `collectionCount: 0` on new user creation.
+    * Updated `AuthService.linkGoogleToAnonymous` to create user doc *after* sign-in.
+    * **Testing Still Required:** Verify fixes by testing anonymous sign-in, account deletion, and anonymous-to-Google linking flows.
+
+12. **Fixed Email Update Flow and UI Updates (Objective 26)**
+    * Fixed UI not updating after linking Google authentication.
+    * Improved email update messaging based on auth methods.
+
+13. **Fixed Authentication State & UI Issues (Objective 26 - Ongoing Testing)**
+    * Implemented security enhancements (limits, grace period, dialog).
+    * Fixed various UI and state management issues related to auth methods, linking, deletion, and data migration.
+
+14. **Authentication System Rebuild**
+    * Completed full rebuild of authentication system.
+
+### Previous Objective 37: Test Registration Flow
+
+[Previous content remains unchanged...]
+
+## Pending Tasks from Previous Objectives
 
 1. **Test Firestore Permission Fix (Critical - Objective 27):**
-   * [ ] Test account deletion flow (triggers anonymous sign-in, check for user doc creation with `collectionCount: 0`).
-   * [ ] **Test anonymous user linking to Google account (Primary test for this fix, check for user doc creation/update with `collectionCount`).**
-   * [ ] Verify user document creation for new anonymous users (initial app start).
-   * [ ] Test standard operations (collection add/update, settings changes) for both anonymous and authenticated users.
-   * [ ] Specifically check Firestore logs for permission errors during these tests.
+    * [ ] Test account deletion flow.
+    * [ ] **Test anonymous user linking to Google account (Primary test).**
+    * [ ] Verify user document creation for new anonymous users.
+    * [ ] Test standard operations for both user types.
+    * [ ] Check Firestore logs for permission errors.
 
-2. **Address Account Limits Dialog Issue (Completed - Objective 31):**
-   * The Account Limits dialog no longer appears after cancelling Google sign-in or linking.
-   * The fix involved modifying the auto-sign-in logic in `auto_auth_provider.dart` to pass `isInternalAuthFlow=true` when creating temporary anonymous users.
-   * This ensures the dialog timestamp isn't reset during internal auth flows like Google sign-in.
-   * The dialog now only appears for actual anonymous sign-ins, not during temporary auth state changes.
+2. **Continue Authentication System Testing:**
+    * [ ] Test Google linking flow thoroughly.
+    * [ ] Verify all edge cases are handled.
+    * [ ] Ensure proper state transitions.
 
-3. **Continue Authentication System Testing:**
-   * [ ] Test Google linking flow thoroughly.
-   * [ ] Verify all edge cases are handled.
-   * [ ] Ensure proper state transitions.
-
-4. **Expand Data Migration (If Step 1 Successful):**
-   * [ ] Implement deck data migration.
-   * [ ] Add user settings migration.
-   * [ ] Include user preferences migration.
-   * [ ] Add progress indicators.
-   * [ ] Implement rollback mechanisms.
-
-5. **Future Features (After Migration Fix):**
-   * Implement deck builder feature
-   * Add card scanner functionality
-   * Develop price tracking system
-   * Add collection import/export
-   * Implement collection sharing
-   * Add favorites and wishlist
-   * Enhance filtering options
-   * Add batch operations
-
-## Completed Objective 31 (Account Limits Dialog Issue)**
-
-Prevented the Account Limits dialog from appearing after cancelling Google sign-in or linking:
-
-* Modified the auto-sign-in logic in `auto_auth_provider.dart` to pass `isInternalAuthFlow=true` when creating temporary anonymous users.
-* This ensures the dialog timestamp isn't reset during internal auth flows like Google sign-in.
-* The dialog will now only appear for actual anonymous sign-ins, not during temporary auth state changes.
-
-Testing Results:
-
-* When cancelling Google sign-in, the "Google sign-in was cancelled" SnackBar appears.
-* The Account Limits dialog does not appear since the anonymous sign-in is part of an internal auth flow.
-* The dialog still appears normally for actual anonymous users.
+3. **Expand Data Migration (If Permission Fix Successful):**
+    * [ ] Implement deck data migration.
+    * [ ] Add user settings migration.
+    * [ ] Include user preferences migration.

@@ -57,6 +57,7 @@
    - [x] Fixed UI updates after linking Google authentication
    - [x] Improved email update messaging based on auth methods
    - [x] Fixed Google authentication display name not storing in Firestore
+   - [x] Fixed navigation after registration to show Account Settings page
    - [ ] **Critical:** Fix Firestore permission issues during data migration
    - [ ] **Ongoing:** Testing and troubleshooting edge cases (e.g., Google linking redirect)
    - [x] Implemented settings migration (theme, display preferences)
@@ -142,12 +143,13 @@
 
 ### Theme System ✓
 
-- [x] Support light/dark modes
-- [x] Allow custom colors
-- [x] Ensure text contrast
-- [x] Persist settings
-- [x] Support system theme
-- [x] Consistent dialog button styling
+- [x] Support light/dark modes with Material 3 ColorScheme
+- [x] Custom color selection with flex_color_picker integration
+- [x] Dynamic color generation using ColorScheme.fromSeed
+- [x] Built-in contrast handling with Material 3
+- [x] Theme persistence with Hive storage
+- [x] System theme support with automatic switching
+- [x] Consistent Material 3 dialog styling
 
 ## Progress Tracking
 

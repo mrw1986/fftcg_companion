@@ -191,6 +191,8 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
       allow create: if isAuthenticated() && isOwner(userId);
       // Allow owner to update their document IF it exists.
       allow update: if isAuthenticated() && isOwner(userId) && resource != null && resource.data != null &&
+                    // Ensure createdAt cannot be changed
+                    request.resource.data.createdAt == resource.data.createdAt &&
                     (
                       // Allow updates to any field EXCEPT collectionCount unless it follows the specific rules
                       !request.resource.data.keys().hasAny(['collectionCount']) ||
@@ -203,8 +205,6 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
                         // 3. Value is unchanged (Added this condition)
                         request.resource.data.collectionCount == resource.data.collectionCount
                       )
-                      // Add other field-specific update rules here if needed, e.g., cannot change createdAt
-                      // && request.resource.data.createdAt == resource.data.createdAt
                     );
       allow delete: if isAuthenticated() && isOwner(userId);
     }

@@ -805,6 +805,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   // --- NEW: Verification Banner Widget ---
   Widget _buildVerificationBanner(
       BuildContext context, ColorScheme colorScheme, User user) {
+    // Use a fallback text if email is null
+    final emailText = user.email ?? 'your email address';
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
@@ -835,7 +837,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Please check your email (${user.email}) and click the verification link. Until verified, your account has the same limitations as a guest account (e.g., 50 unique card limit).',
+            'Please check $emailText and click the verification link. Until verified, your account has the same limitations as a guest account (e.g., 50 unique card collection limit).', // Updated text with fallback
             style: TextStyle(color: colorScheme.onErrorContainer),
           ),
           const SizedBox(height: 16),
@@ -854,11 +856,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                   await ref.read(authServiceProvider).sendEmailVerification();
                   if (context.mounted) {
                     scaffoldMessenger.clearSnackBars();
-                    SnackBarHelper.showSuccessSnackBar(
-                      context: context,
-                      message:
-                          'Verification email resent. Please check your inbox.',
-                    );
+                    // Use the same fallback for the dialog
+                    await showVerificationEmailSentDialog(
+                        context, user.email ?? 'your email address');
                   }
                 } catch (error) {
                   talker.error('Error sending verification email', error);
@@ -987,7 +987,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 children: [
                   // --- NEW: Conditionally show Verification Banner ---
-                  if (showVerificationBanner)
+                  if (showVerificationBanner) // Removed redundant userForUI != null check
                     _buildVerificationBanner(context, colorScheme,
                         userForUI), // Removed unnecessary '!'
                   // --- END: Verification Banner ---
@@ -1076,7 +1076,10 @@ Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
                 const Text('Confirm Email Update'),
               ],
             ),
-            content: Text(message),
+            content: Text(
+              message,
+              style: TextStyle(color: colorScheme.onSurface),
+            ),
             actions: <Widget>[
               TextButton(
                 style: TextButton.styleFrom(
@@ -1134,7 +1137,10 @@ Future<void> showEmailUpdateInitiatedDialog(
             const Text('Verification Email Sent'),
           ],
         ),
-        content: Text(message),
+        content: Text(
+          message,
+          style: TextStyle(color: colorScheme.onSurface),
+        ),
         actions: <Widget>[
           FilledButton(
             style: FilledButton.styleFrom(
@@ -1241,6 +1247,46 @@ Future<bool> showReauthRequiredDialog(BuildContext context,
         },
       ) ??
       false;
+}
+
+// Helper function to show verification email sent dialog
+Future<void> showVerificationEmailSentDialog(
+    BuildContext context, String email) async {
+  final colorScheme = Theme.of(context).colorScheme;
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.mark_email_read_outlined, color: colorScheme.primary),
+            const SizedBox(width: 12),
+            const Text('Verification Email Sent'),
+          ],
+        ),
+        content: Text(
+          'A verification email has been sent to $email. Please check your inbox and click the link to finalize the email verification. Until verified, your account has the same limitations as a guest account.',
+          style: TextStyle(color: colorScheme.onSurface),
+        ),
+        actions: <Widget>[
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+            ),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+        actionsPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      );
+    },
+  );
 }
 
 // Helper function to show sign-out confirmation dialog

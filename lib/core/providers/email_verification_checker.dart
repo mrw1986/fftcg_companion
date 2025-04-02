@@ -20,11 +20,13 @@ final emailVerificationCheckerProvider = Provider.autoDispose<void>((ref) {
       talker.debug('Starting email verification checker for unverified user');
 
       // Check immediately first
-      await _checkEmailVerification(ref);
+      // Pass the timer so it can be cancelled inside if verification is detected
+      await _checkEmailVerification(ref, verificationTimer);
 
       // Then set up a timer to check periodically (every 3 seconds)
       verificationTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-        await _checkEmailVerification(ref);
+        // Pass the timer so it can be cancelled inside if verification is detected
+        await _checkEmailVerification(ref, verificationTimer);
       });
     }
   });
@@ -39,7 +41,8 @@ final emailVerificationCheckerProvider = Provider.autoDispose<void>((ref) {
 });
 
 /// Helper function to check email verification status
-Future<void> _checkEmailVerification(Ref ref) async {
+/// Accepts the Timer object to allow cancellation upon verification detection
+Future<void> _checkEmailVerification(Ref ref, Timer? verificationTimer) async {
   try {
     final authService = ref.read(authServiceProvider);
     final user = authService.currentUser;
@@ -75,15 +78,19 @@ Future<void> _checkEmailVerification(Ref ref) async {
       talker
           .info('Email verification detected for user: ${refreshedUser.email}');
 
+      // Cancel the verification timer since we've detected verification
+      verificationTimer?.cancel();
+      talker.debug('Cancelled verification timer after detecting verification');
+
       // Handle email verification completion
-      // This will update Firestore and refresh the auth state
-      await authService.handleEmailVerificationComplete();
+      // Pass the refreshed user directly to ensure we use the verified state
+      await authService.handleEmailVerificationComplete(refreshedUser);
 
       // Force a refresh of the auth state provider and currentUserProvider
       ref.invalidate(authStateProvider);
       ref.invalidate(currentUserProvider);
 
-      // Wait for the auth state to be updated.  A short delay helps ensure
+      // Wait for the auth state to be updated. A short delay helps ensure
       // that the providers have time to update before the router refresh.
       // Increased delay to ensure UI has time to update
       await Future.delayed(const Duration(milliseconds: 500));

@@ -87,7 +87,7 @@ class ProfileAuthSection extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Please check your email and verify your account. A verification email has been sent to ${user.email}. You will be signed out until you verify your email.',
+                    'Please check your email (${user.email}) and verify your account to access all features.',
                     style: TextStyle(color: colorScheme.onPrimaryContainer),
                   ),
                   const SizedBox(height: 16),
@@ -108,11 +108,45 @@ class ProfileAuthSection extends ConsumerWidget {
                           if (context.mounted) {
                             // Clear any existing SnackBars
                             scaffoldMessenger.clearSnackBars();
-                            showThemedSnackBar(
+                            // Show verification email sent dialog
+                            await showDialog<void>(
                               context: context,
-                              message:
-                                  'Verification email resent. Please check your inbox.',
-                              isError: false,
+                              barrierDismissible: false,
+                              builder: (BuildContext context) {
+                                final colorScheme =
+                                    Theme.of(context).colorScheme;
+                                return AlertDialog(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  title: Row(
+                                    children: [
+                                      Icon(Icons.mark_email_read_outlined,
+                                          color: colorScheme.primary),
+                                      const SizedBox(width: 12),
+                                      const Text('Verification Email Sent'),
+                                    ],
+                                  ),
+                                  content: Text(
+                                    'A verification email has been sent to ${user.email}. Please check your inbox and click the link to finalize the email verification. Until verified, your account has the same limitations as a guest account.',
+                                    style:
+                                        TextStyle(color: colorScheme.onSurface),
+                                  ),
+                                  actions: <Widget>[
+                                    FilledButton(
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: colorScheme.primary,
+                                        foregroundColor: colorScheme.onPrimary,
+                                      ),
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      child: const Text('OK'),
+                                    ),
+                                  ],
+                                  actionsPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 12),
+                                );
+                              },
                             );
                           }
                         } catch (error) {

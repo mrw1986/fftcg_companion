@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart'; // Import logger
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
+import 'package:fftcg_companion/shared/utils/snackbar_helper.dart'; // Import SnackBarHelper
 
 class ResetPasswordPage extends ConsumerStatefulWidget {
   const ResetPasswordPage({super.key});
@@ -58,7 +59,10 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
 
       // Only sign out if the user is authenticated
       if (isUserAuthenticated) {
-        await ref.read(authServiceProvider).signOut();
+        // Pass the flag to skip the dialog timestamp reset
+        await ref
+            .read(authServiceProvider)
+            .signOut(skipAccountLimitsDialog: true);
       }
 
       setState(() {
@@ -73,10 +77,11 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
 
       // Show success message as SnackBar with action button
       if (mounted) {
-        showThemedSnackBar(
+        SnackBarHelper.showSnackBar(
+          // Use SnackBarHelper
           context: context,
           message: successMessage,
-          isError: false,
+          // Removed isError parameter
           duration: const Duration(seconds: 10),
         );
       }
@@ -96,10 +101,10 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
           errorMessage = authService.getReadableAuthError(e.code, e.message);
         }
 
-        showThemedSnackBar(
+        SnackBarHelper.showErrorSnackBar(
+          // Use SnackBarHelper
           context: context,
           message: errorMessage,
-          isError: true,
           duration: const Duration(seconds: 10),
         );
       }
@@ -133,7 +138,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
                         color: Theme.of(context)
                             .colorScheme
                             .primary
-                            .withValues(alpha: 0.1),
+                            .withAlpha(25), // Use withAlpha for clarity
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(

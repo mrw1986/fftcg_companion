@@ -729,7 +729,10 @@ class AuthService {
   ///
   /// [isInternalAuthFlow] indicates whether this sign out is part of an internal auth flow
   /// (like Google sign-in clean up) rather than an actual user-initiated sign out.
-  Future<void> signOut({bool isInternalAuthFlow = false}) async {
+  /// [skipAccountLimitsDialog] prevents the anonymous account limits dialog timestamp from being reset.
+  Future<void> signOut(
+      {bool isInternalAuthFlow = false,
+      bool skipAccountLimitsDialog = false}) async {
     talker.info('Attempting sign out...');
     try {
       // Check which providers are linked to sign out appropriately
@@ -749,14 +752,16 @@ class AuthService {
       await _auth.signOut();
       talker.info('Signed out from Firebase.');
 
-      // Only reset the dialog timestamp for actual sign outs, not during auth flows
-      if (!isInternalAuthFlow) {
+      // Only reset the dialog timestamp for actual sign outs, not during auth flows or if skipped
+      if (!isInternalAuthFlow && !skipAccountLimitsDialog) {
         final storage = HiveStorage();
         final isBoxAvailable = await storage.isBoxAvailable('settings');
         if (isBoxAvailable) {
           await storage.put('last_limits_dialog_shown', 0, boxName: 'settings');
           talker.debug('Reset account limits dialog timestamp');
         }
+      } else if (skipAccountLimitsDialog) {
+        talker.debug('Skipped resetting account limits dialog timestamp.');
       }
 
       // Add a small delay to ensure auth state updates properly
@@ -778,19 +783,27 @@ class AuthService {
           message: 'No user is currently signed in.',
           category: AuthErrorCategory.authentication);
     }
-    final userId = currentUser.uid;
+    final userId = currentUser.uid; // Store userId before potential deletion
 
     try {
-      // Delete Firestore data first
-      await _userRepository.deleteUser(userId);
-      talker.debug('Firestore data deleted for user: $userId');
-
-      // Delete Firebase Auth user
+      // Delete Firebase Auth user FIRST
       await currentUser.delete();
       talker.warning('Firebase Auth user deleted: $userId');
+
+      // If Auth deletion succeeds, then delete Firestore data
+      try {
+        await _userRepository.deleteUser(userId);
+        talker.debug('Firestore data deleted for user: $userId');
+      } catch (firestoreError) {
+        // Log Firestore deletion error but don't rethrow if Auth deletion succeeded
+        talker.error(
+            'Auth user deleted, but failed to delete Firestore data for user $userId: $firestoreError');
+        // Optionally, queue this for cleanup later or notify admin
+      }
     } catch (e) {
-      talker.error('Account deletion failed: $e');
-      throw _handleAuthException(e);
+      // Handle Auth deletion errors (e.g., requires-recent-login)
+      talker.error('Firebase Auth user deletion failed: $e');
+      throw _handleAuthException(e); // Rethrow the original Auth error
     }
   }
 
@@ -1030,28 +1043,21 @@ class AuthService {
   }
 
   /// Called when email verification is likely complete (e.g., after user returns to app).
-  /// Reloads the user and updates Firestore if verified.
-  Future<void> handleEmailVerificationComplete() async {
-    talker.info('Handling potential email verification completion...');
-    final currentUser = _auth.currentUser;
-    if (currentUser == null || currentUser.emailVerified) {
+  /// Uses the provided verified user to update Firestore.
+  Future<void> handleEmailVerificationComplete(User verifiedUser) async {
+    talker.info('Handling email verification completion...');
+    // Check the passed-in user object directly
+    if (!verifiedUser.emailVerified) {
       talker.debug(
-          'No user or email already verified, skipping Firestore update.');
-      return; // No action needed if no user or already verified
+          'User object passed is not verified, skipping Firestore update.');
+      return; // No action needed if not verified
     }
 
     try {
-      await currentUser.reload();
-      final refreshedUser = _auth.currentUser; // Get user again after reload
-      if (refreshedUser != null && refreshedUser.emailVerified) {
-        talker.info(
-            'Email verification confirmed for user: ${refreshedUser.uid}');
-        // Update Firestore to reflect verified status
-        await _userRepository.createUserFromAuth(refreshedUser);
-        talker.debug('Firestore updated with verified status.');
-      } else {
-        talker.debug('Email still not verified after reload.');
-      }
+      talker.info('Email verification confirmed for user: ${verifiedUser.uid}');
+      // Update Firestore to reflect verified status using the verified user object
+      await _userRepository.createUserFromAuth(verifiedUser);
+      talker.debug('Firestore updated with verified status.');
     } catch (e) {
       talker.error('Error during email verification handling: $e');
       // Don't throw, as this is often called passively
