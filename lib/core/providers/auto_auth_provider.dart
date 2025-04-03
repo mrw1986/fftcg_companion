@@ -14,7 +14,7 @@ final autoAuthProvider = Provider.autoDispose<void>((ref) {
   Timer? debounceTimer;
 
   // Listen to auth state changes
-  ref.listen(authStateProvider, (previous, next) async {
+  ref.listen<AuthState>(authStateProvider, (previous, next) async {
     // Cancel any pending timer
     debounceTimer?.cancel();
 
@@ -22,7 +22,8 @@ final autoAuthProvider = Provider.autoDispose<void>((ref) {
     final skipAutoAuth = ref.read(skipAutoAuthProvider);
 
     // If the user is not authenticated (and not anonymous), sign in anonymously
-    if (next.isUnauthenticated && !skipAutoAuth) {
+    // Added null-aware checks and default value
+    if ((next.isUnauthenticated) && !skipAutoAuth) {
       // If this is the initial load, sign in immediately
       // Otherwise, add a delay to prevent rapid creation of anonymous users
       if (isInitialLoad) {
@@ -39,7 +40,10 @@ final autoAuthProvider = Provider.autoDispose<void>((ref) {
 
     // Only reset the skip flag if we're transitioning to a fully authenticated state
     // Do not reset for anonymous or email not verified states
-    if (next.isAuthenticated && !next.isAnonymous && !next.isEmailNotVerified) {
+    // Added null-aware checks and default values
+    if ((next.isAuthenticated) &&
+        !(next.isAnonymous) &&
+        !(next.isEmailNotVerified)) {
       ref.read(skipAutoAuthProvider.notifier).state = false;
     }
   });

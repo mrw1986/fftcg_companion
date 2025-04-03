@@ -46,6 +46,7 @@ class AccountInfoCard extends StatelessWidget {
 
     showDialog(
       context: context,
+      barrierDismissible: false, // Added this line
       builder: (context) => LinkEmailPasswordDialog(
         initialEmail: initialEmailValue, // Pass the email from user prop
         onSuccess:

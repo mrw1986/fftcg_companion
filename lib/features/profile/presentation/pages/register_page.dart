@@ -4,7 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
-// Removed unused import: import 'package:fftcg_companion/features/profile/presentation/widgets/link_accounts_dialog.dart';
+// Import LinkAccountsDialog to use it directly
+import 'package:fftcg_companion/features/profile/presentation/widgets/link_accounts_dialog.dart';
 import 'package:fftcg_companion/shared/widgets/google_sign_in_button.dart';
 import 'package:fftcg_companion/shared/widgets/app_bar_factory.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
@@ -98,7 +99,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     });
   }
 
-  Future<void> _registerWithEmailAndPassword() async {
+  // Renamed from _registerWithEmailAndPassword to handle both linking and registration
+  Future<void> _submitEmailPasswordForm() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -109,28 +111,29 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       final authService = ref.read(authServiceProvider);
       final authState = ref.read(authStateProvider);
       final email = _emailController.text.trim();
+      final password = _passwordController.text;
+      bool isLinking = authState.isAnonymous; // Check if linking or registering
 
-      // If user is anonymous, link the account
-      if (authState.isAnonymous) {
+      if (isLinking) {
         talker.debug(
             'Register page: Linking anonymous account with email/password');
-        // Corrected method call
-        await authService.linkEmailAndPasswordToAnonymous(
-          email,
-          _passwordController.text,
-        );
+        await authService.linkEmailAndPasswordToAnonymous(email, password);
         talker.debug('Register page: Email/password linking successful');
       } else {
-        // Otherwise create a new account
         talker.debug('Register page: Creating new account with email/password');
-        await authService.createUserWithEmailAndPassword(
-          email,
-          _passwordController.text,
-        );
+        await authService.createUserWithEmailAndPassword(email, password);
         talker.debug('Register page: Email/password registration successful');
       }
 
       if (!mounted) return;
+
+      // Invalidate providers to ensure state is refreshed
+      // The router redirect logic will handle navigation based on the new state.
+      ref.invalidate(firebaseUserProvider);
+      ref.invalidate(authStateProvider);
+      ref.invalidate(currentUserProvider);
+
+      // No longer need delay or manual navigation here
 
       setState(() {
         _isLoading = false;
@@ -155,7 +158,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               ],
             ),
             content: Text(
-              'A verification email has been sent to $email. Please check your inbox and click the verification link. Until verified, your account has the same limitations as a guest account (e.g., 50 unique card collection limit).', // Updated Text to match account_settings_page.dart
+              'A verification email has been sent to $email. Please check your inbox and click the verification link. Until verified, your account has the same limitations as a guest account (e.g., 50 unique card collection limit).',
               style: TextStyle(color: colorScheme.onSurface),
             ),
             actions: <Widget>[
@@ -164,26 +167,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   backgroundColor: colorScheme.primary,
                   foregroundColor: colorScheme.onPrimary,
                 ),
-                onPressed: () async {
+                onPressed: () {
                   Navigator.of(dialogContext).pop();
-
-                  // Ensure the user object is fully updated before navigating
-                  final currentUser = FirebaseAuth.instance.currentUser;
-                  if (currentUser != null) {
-                    await currentUser.reload();
-                    // Get the refreshed user to ensure we have the latest data
-                    final refreshedUser = FirebaseAuth.instance.currentUser;
-                    if (refreshedUser != null) {
-                      // Invalidate providers to force a complete refresh
-                      ref.invalidate(currentUserProvider);
-                      ref.invalidate(authStateProvider);
-                      // Wait a moment for the providers to update
-                      await Future.delayed(const Duration(milliseconds: 100));
-                      if (mounted) {
-                        context.go('/profile/account');
-                      }
-                    }
-                  }
+                  // REMOVED manual navigation: context.go('/profile/account');
+                  // Router redirect will handle navigation based on state change.
                 },
                 child: const Text('OK'),
               ),
@@ -201,14 +188,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       });
 
       // Show user-friendly error message as SnackBar
-      String errorMessage = 'Failed to create account'; // Default message
+      String errorMessage = 'Failed to complete action'; // Default message
       bool showErrorSnackbar =
           true; // Flag to control showing the final snackbar
 
       if (e is AuthException) {
         // Catch custom AuthException first
         errorMessage = e.message; // Use the message from AuthException
-        talker.error('Error creating account: ${e.code} - ${e.message}');
+        talker
+            .error('Error during email/pass submit: ${e.code} - ${e.message}');
 
         // Special handling for email-already-in-use error
         if (e.code == 'email-already-in-use') {
@@ -217,30 +205,46 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             if (!mounted) return;
             showDialog(
               context: context,
+              barrierDismissible: false, // Make this non-dismissible
               builder: (BuildContext dialogContext) {
                 final theme = Theme.of(dialogContext);
                 final colorScheme = theme.colorScheme;
 
                 return AlertDialog(
-                  title: Text(
-                    'Account Already Exists',
-                    style: TextStyle(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  shape: RoundedRectangleBorder(
+                    // Added shape
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  content: const Text(
-                      'An account with this email address already exists. Would you like to sign in instead?'),
+                  title: Row(
+                    // Changed title
+                    children: [
+                      Icon(Icons.error_outline, color: colorScheme.error),
+                      const SizedBox(width: 12),
+                      const Text('Account Already Exists'),
+                    ],
+                  ),
+                  content: const SingleChildScrollView(
+                    // Wrapped content
+                    child: Text(
+                        'An account with this email address already exists. Would you like to sign in instead?'),
+                  ),
                   actions: [
                     TextButton(
+                      // Styled Cancel/Try Again
+                      style: TextButton.styleFrom(
+                        foregroundColor:
+                            colorScheme.onSurface.withValues(alpha: 0.8),
+                      ),
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
                       },
                       child: const Text('Try Again'),
                     ),
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        foregroundColor: colorScheme.primary,
+                    FilledButton(
+                      // Changed to FilledButton
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
                       ),
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
@@ -251,6 +255,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       child: const Text('Sign In'),
                     ),
                   ],
+                  actionsPadding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12), // Added padding
                 );
               },
             );
@@ -261,7 +267,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         }
       } else {
         // Handle non-AuthException errors
-        talker.error('Error creating account: $e');
+        talker.error('Error during email/pass submit: $e');
         errorMessage = 'An unexpected error occurred. Please try again.';
       }
 
@@ -298,23 +304,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           // Navigate to profile page after successful linking
           if (!mounted) return;
 
-          // Ensure the user object is fully updated before navigating
-          final currentUser = FirebaseAuth.instance.currentUser;
-          if (currentUser != null) {
-            await currentUser.reload();
-            // Get the refreshed user to ensure we have the latest data
-            final refreshedUser = FirebaseAuth.instance.currentUser;
-            if (refreshedUser != null) {
-              // Invalidate providers to force a complete refresh
-              ref.invalidate(currentUserProvider);
-              ref.invalidate(authStateProvider);
-              // Wait a moment for the providers to update
-              await Future.delayed(const Duration(milliseconds: 100));
-              if (mounted) {
-                context.go('/profile/account');
-              }
-            }
-          }
+          // Invalidate providers and let router handle navigation
+          ref.invalidate(firebaseUserProvider);
+          ref.invalidate(authStateProvider);
+          ref.invalidate(currentUserProvider);
+          // REMOVED manual navigation: context.go('/profile/account');
+          // Router redirect will handle navigation based on state change.
         } catch (linkError) {
           if (!mounted) return;
 
@@ -377,33 +372,21 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           // this is likely a new account creation rather than signing in to an existing account
           final isNewAccount = !wasAuthenticated && beforeUserId != afterUserId;
 
-          // Navigate to profile page after successful sign-in
-          // Ensure the user object is fully updated before navigating
-          final currentUser = FirebaseAuth.instance.currentUser;
-          if (currentUser != null) {
-            await currentUser.reload();
-            // Get the refreshed user to ensure we have the latest data
-            final refreshedUser = FirebaseAuth.instance.currentUser;
-            if (refreshedUser != null) {
-              // Invalidate providers to force a complete refresh
-              ref.invalidate(currentUserProvider);
-              ref.invalidate(authStateProvider);
-              // Wait a moment for the providers to update
-              await Future.delayed(const Duration(milliseconds: 100));
-              if (mounted) {
-                context.go('/profile/account');
+          // Invalidate providers and let router handle navigation
+          ref.invalidate(firebaseUserProvider);
+          ref.invalidate(authStateProvider);
+          ref.invalidate(currentUserProvider);
+          // REMOVED manual navigation: context.go('/profile/account');
+          // Router redirect will handle navigation based on state change.
 
-                // Only show success message if this appears to be a new account
-                if (isNewAccount) {
-                  showThemedSnackBar(
-                    context: context,
-                    message: 'Account created successfully with Google',
-                    isError: false,
-                    duration: const Duration(seconds: 5),
-                  );
-                }
-              }
-            }
+          // Only show success message if this appears to be a new account
+          if (isNewAccount && mounted) {
+            showThemedSnackBar(
+              context: context,
+              message: 'Account created successfully with Google',
+              isError: false,
+              duration: const Duration(seconds: 5),
+            );
           }
         } catch (signInError) {
           if (!mounted) return;
@@ -415,43 +398,27 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             talker.debug(
                 'Register page: Google Sign-In failed - Email already exists with Email/Password.');
 
-            // Show a dialog explaining the situation and guiding user to sign in
+            // Show the LinkAccountsDialog
+            final emailForDialog =
+                _emailController.text.trim(); // Get email from controller
             showDialog(
               context: context,
+              barrierDismissible: false, // Make non-dismissible
               builder: (BuildContext dialogContext) {
-                final theme = Theme.of(dialogContext);
-                final colorScheme = theme.colorScheme;
-
-                return AlertDialog(
-                  title: Text(
-                    'Account Already Exists',
-                    style: TextStyle(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  // Use the specific message from the exception
-                  content: Text(signInError.message),
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                      },
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        foregroundColor: colorScheme.primary,
-                      ),
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                        if (mounted) {
-                          context.go('/profile/auth'); // Go to Sign In page
-                        }
-                      },
-                      child: const Text('Sign In'),
-                    ),
-                  ],
+                return LinkAccountsDialog(
+                  email: emailForDialog, // Pass the email
+                  onComplete: (success) {
+                    if (success) {
+                      // Invalidate providers and let router handle navigation
+                      ref.invalidate(firebaseUserProvider);
+                      ref.invalidate(authStateProvider);
+                      ref.invalidate(currentUserProvider);
+                      // REMOVED manual navigation: context.go('/profile/account');
+                    } else {
+                      // Handle cancellation or failure if needed
+                      talker.debug('LinkAccountsDialog cancelled or failed.');
+                    }
+                  },
                 );
               },
             );
@@ -499,6 +466,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         isError: isError, // Use the flag determined above
         duration: const Duration(seconds: 10),
       );
+    } finally {
+      // Ensure loading state is reset even if navigation happens
+      if (mounted && _isLoading) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -704,7 +678,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           const SizedBox(height: 24),
                           Center(
                             child: StyledButton(
-                              onPressed: _registerWithEmailAndPassword,
+                              onPressed:
+                                  _submitEmailPasswordForm, // Updated onPressed
                               text: isAnonymous
                                   ? 'Complete Registration'
                                   : 'Register',

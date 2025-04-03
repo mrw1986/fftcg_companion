@@ -9,7 +9,7 @@ import 'package:fftcg_companion/core/utils/logger.dart';
 class AccountLimitsDialog extends ConsumerWidget {
   const AccountLimitsDialog({super.key});
 
-  // TODO: Set to false before release
+  // Set to false before release
   static final bool _debugDisableTimeCheck = false;
   static bool _isShowing = false;
 
@@ -56,6 +56,7 @@ class AccountLimitsDialog extends ConsumerWidget {
       try {
         await showDialog(
           context: context,
+          barrierDismissible: false, // Added this line
           builder: (context) => const AccountLimitsDialog(),
         );
         talker.debug('Dialog shown successfully');
@@ -82,6 +83,7 @@ class AccountLimitsDialog extends ConsumerWidget {
     final isAnonymous = authService.isAnonymous();
     final user = authService.currentUser;
     final isEmailVerified = user?.emailVerified ?? false;
+    final colorScheme = Theme.of(context).colorScheme; // Get colorScheme
 
     talker.debug('Building AccountLimitsDialog:');
     talker.debug('User: ${user?.email}');
@@ -89,59 +91,87 @@ class AccountLimitsDialog extends ConsumerWidget {
     talker.debug('Is email verified: $isEmailVerified');
 
     return AlertDialog(
-      title: const Text('Account Limits'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      shape: RoundedRectangleBorder(
+        // Added shape
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: Row(
+        // Changed title
         children: [
-          if (isAnonymous) ...[
-            const Text(
-              'You are using an anonymous account, which has the following limits:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text('• Maximum of 50 unique cards in your collection'),
-            const Text('• Some features may be restricted'),
-            const SizedBox(height: 16),
-            const Text(
-              'Sign in or create an account to remove these limits and save your collection securely.',
-            ),
-          ] else if (!isEmailVerified) ...[
-            const Text(
-              'Please verify your email to unlock full access:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-                '• After 7 days, email verification will be required to:'),
-            const Text('  - Add new cards to your collection'),
-            const Text('  - Create and share decks'),
-            const Text('  - Access premium features'),
-            const SizedBox(height: 16),
-            const Text(
-              'Check your email for a verification link, or request a new one in your profile settings.',
-            ),
-          ],
+          Icon(Icons.info_outline, color: colorScheme.primary),
+          const SizedBox(width: 12),
+          const Text('Account Information'), // Changed title text
         ],
+      ),
+      content: SingleChildScrollView(
+        // Wrapped content
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isAnonymous) ...[
+              const Text(
+                'You are using an anonymous account, which has the following limits:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text('• Maximum of 50 unique cards in your collection'),
+              const Text('• Some features may be restricted'),
+              const SizedBox(height: 16),
+              const Text(
+                'Sign in or create an account to remove these limits and save your collection securely.',
+              ),
+            ] else if (!isEmailVerified) ...[
+              const Text(
+                'Please verify your email to unlock full access:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                  '• After 7 days, email verification will be required to:'),
+              const Text('  - Add new cards to your collection'),
+              const Text('  - Create and share decks'),
+              const Text('  - Access premium features'),
+              const SizedBox(height: 16),
+              const Text(
+                'Check your email for a verification link, or request a new one in your profile settings.',
+              ),
+            ],
+          ],
+        ),
       ),
       actions: [
         if (isAnonymous) ...[
-          TextButton(
+          // Changed to FilledButton for primary actions
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+            ),
             onPressed: () {
-              Navigator.of(context).pop();
-              context.go('/profile/auth');
-            },
-            child: const Text('Sign In'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
+              context.pop(); // Use context.pop()
               context.go('/profile/register');
             },
             child: const Text('Create Account'),
           ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+            ),
+            onPressed: () {
+              context.pop(); // Use context.pop()
+              context.go('/profile/auth');
+            },
+            child: const Text('Sign In'),
+          ),
         ] else if (!isEmailVerified)
-          TextButton(
+          // Changed to FilledButton
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+            ),
             onPressed: () async {
               try {
                 await authService.sendEmailVerification();
@@ -164,16 +194,22 @@ class AccountLimitsDialog extends ConsumerWidget {
                 }
               }
               if (context.mounted) {
-                Navigator.of(context).pop();
+                context.pop(); // Use context.pop()
               }
             },
             child: const Text('Resend Verification'),
           ),
+        // Standard Close button (styled like Cancel)
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(
+            foregroundColor: colorScheme.onSurface.withValues(alpha: 0.8),
+          ),
+          onPressed: () => context.pop(), // Use context.pop()
           child: const Text('Close'),
         ),
       ],
+      actionsPadding: const EdgeInsets.symmetric(
+          horizontal: 16, vertical: 12), // Added padding
     );
   }
 }

@@ -20,18 +20,79 @@ import '../../features/collection/presentation/pages/collection_item_detail_page
 import '../../features/collection/presentation/pages/collection_edit_page.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/collection/domain/models/collection_item.dart';
+// Import auth provider for redirect logic
+import 'package:fftcg_companion/core/providers/auth_provider.dart';
+// Import AppBarFactory for error page
+import 'package:fftcg_companion/shared/widgets/app_bar_factory.dart';
 
 final rootNavigatorKeyProvider = Provider<GlobalKey<NavigatorState>>((ref) {
   return GlobalKey<NavigatorState>(debugLabel: 'root');
 });
 final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
+// Provider for the GoRouter instance
 final routerProvider = Provider<GoRouter>((ref) {
   final rootNavigatorKey = ref.watch(rootNavigatorKeyProvider);
+  // Listen to auth state changes to trigger redirects
+  final authStateListenable =
+      ValueNotifier<AuthState>(const AuthState.loading());
+  ref.listen(authStateProvider, (_, next) {
+    authStateListenable.value = next;
+  });
+
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     debugLogDiagnostics: true,
+    // Add refreshListenable to react to auth state changes
+    refreshListenable: authStateListenable,
+    // Add redirect logic
+    redirect: (BuildContext context, GoRouterState state) {
+      final authState = ref.read(authStateProvider); // Read current auth state
+      final location = state.uri.toString(); // Use full path with query params
+
+      talker.debug(
+          'Router Redirect Check: Location="$location", AuthStatus=${authState.status}');
+
+      // Define public routes accessible without full authentication
+      final publicRoutes = [
+        '/profile/auth',
+        '/profile/register',
+        '/profile/reset-password',
+      ];
+
+      // Check if the current route is one of the public routes
+      final isPublicRoute =
+          publicRoutes.any((route) => location.startsWith(route));
+
+      // If loading, don't redirect yet
+      if (authState.isLoading) {
+        talker.debug('Router Redirect: Auth loading, no redirect.');
+        return null;
+      }
+
+      // If unauthenticated or anonymous AND trying to access a protected route
+      if ((authState.isUnauthenticated || authState.isAnonymous) &&
+          !isPublicRoute) {
+        talker.debug(
+            'Router Redirect: Unauthenticated/Anonymous on protected route -> /profile/auth');
+        return '/profile/auth'; // Redirect to login/auth page
+      }
+
+      // If authenticated or emailNotVerified AND currently on a public auth route
+      if ((authState.isAuthenticated || authState.isEmailNotVerifiedState) &&
+          isPublicRoute) {
+        talker.debug(
+            'Router Redirect: Authenticated/EmailNotVerified on public auth route -> /profile/account');
+        return '/profile/account'; // Redirect to account settings page
+      }
+
+      // No redirect needed
+      talker.debug('Router Redirect: No redirect needed.');
+      return null;
+    },
+    // Add error handler
+    errorBuilder: (context, state) => ErrorPage(error: state.error),
     routes: [
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
@@ -138,8 +199,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                 ),
               ),
               GoRoute(
-                path: 'login',
-                redirect: (_, __) => '/profile/auth',
+                path: 'login', // Keep for potential old links/bookmarks
+                redirect: (_, __) =>
+                    '/profile/auth', // Redirect to the correct auth path
               ),
               GoRoute(
                 path: 'auth',
@@ -169,6 +231,38 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+// Simple Error Page Widget
+class ErrorPage extends StatelessWidget {
+  final Exception? error;
+  const ErrorPage({super.key, this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBarFactory.createAppBar(context, 'Page Not Found'),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Oops! Page not found.'),
+            const SizedBox(height: 10),
+            if (error != null)
+              Text(
+                'Error: ${error.toString()}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => context.go('/'),
+              child: const Text('Go Home'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class NavigationDestinationItem {
   final Key key;

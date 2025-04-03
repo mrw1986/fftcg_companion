@@ -1,112 +1,101 @@
 # Current Task
 
-## Current Objective 40: Prevent Anonymous Dialog After Password Reset
+## Current Objective 46: Fix Riverpod Error After Google Linking & Subsequent Analyzer Issues
 
 ### Context
 
-After initiating a password reset, authenticated users were logged out (for security) but then immediately shown the "Account Limits" dialog intended for new anonymous users. This was confusing as the user was managing their existing account.
+1. **Original Issue:** After successfully linking a Google account, a Riverpod error occurred: `Providers are not allowed to modify other providers during their initialization`. This happened because `authStateProvider` tried to modify `emailVerificationDetectedProvider` during its build phase.
+2. **Initial Fix Attempt:** Introduced `authStateListenerProvider` to handle the side effect, but this created a dependency cycle.
+3. **Subsequent Analyzer Errors:** Fixing the cycle revealed other analyzer errors related to null safety and type inference in `auto_auth_provider.dart`, `email_verification_checker.dart`, and a lint warning in `account_settings_page.dart`.
 
-### Changes Made
+### Fix Applied (Objective 46)
 
-1. Modified `AuthService.signOut`:
-    * Added an optional boolean parameter `skipAccountLimitsDialog` (default: `false`).
-    * If `skipAccountLimitsDialog` is `true`, the method now skips resetting the `last_limits_dialog_shown` timestamp in Hive storage.
-2. Updated `reset_password_page.dart`:
-    * Modified the `_sendPasswordResetEmail` function.
-    * The call to `signOut` (which happens only if the user was authenticated) now passes `skipAccountLimitsDialog: true`.
+1. **Riverpod Cycle Fix:**
+    * Removed the incorrect `authStateListenerProvider`.
+    * Integrated the logic for resetting `emailVerificationDetectedProvider` into the `ref.listen` callback within `firestoreUserSyncProvider`. This provider already listens to the source `firebaseUserProvider` and can safely perform the side effect after the state change.
+2. **Analyzer Error Fixes:**
+    * Added null-aware checks (`?.`) and default values (`?? false`) in `auto_auth_provider.dart`'s listener.
+    * Added explicit type annotations (`AuthState? previous, AuthState next`) and null checks in `email_verification_checker.dart`'s listener.
+    * Added an additional `if (mounted)` check immediately before `context.go()` in `_handleSuccessfulDeletion` within `account_settings_page.dart` to resolve the `use_build_context_synchronously` lint warning.
 
-### Result
+### Next Steps
 
-Authenticated users who reset their password will still be logged out for security, but they will no longer see the "Account Limits" dialog immediately afterward, providing a less confusing user experience.
+1. **Test Google Linking:** Verify that linking a Google account no longer causes the Riverpod error.
+2. **Test Email Verification Flow:** Ensure the `emailVerificationDetectedProvider` is correctly reset by the updated logic in `firestoreUserSyncProvider` when the user becomes verified or signs out.
+3. **Test Account Deletion Flow:** Re-test account deletion (Objective 45) to ensure the `BuildContext` fix didn't introduce regressions.
+4. **Test "Unverified" Chip Logic (Objective 44):** Test if the chip updates consistently with the banner after email verification.
+5. Update `codebaseSummary.md` to reflect this objective's completion.
+6. Proceed with testing other pending tasks (e.g., anonymous linking from Objective 27).
 
-### Testing Required
+## Previous Objectives (Completed - Pending Testing)
 
-1. Log in with an existing Email/Password account.
-2. Navigate to the Reset Password page (e.g., via Account Settings).
-3. Initiate the password reset for the logged-in user's email.
-4. Confirm the success SnackBar appears ("...You have been logged out...").
-5. **Confirm the "Account Limits" dialog does *not* appear.**
-6. Confirm the user is logged out and potentially redirected to the login page or shown an anonymous state UI.
+### Objective 45: Refine Account Deletion Flow & Add Confirmation
+
+* **Context:** Account deletion flow simplified, confirmation added, "Account Limits" dialog issue fixed. `use_build_context_synchronously` lint appeared.
+* **Fix Applied:** Simplified `AuthService.deleteUser`, updated re-auth logic, added `_handleSuccessfulDeletion` helper with `skipAccountLimitsDialog: true` and Snackbar workaround. **Added extra `if (mounted)` check before navigation in helper (Obj 46).**
+* **Status:** Fixes applied. **Testing required.**
+
+### Objective 44: Fix "Unverified" Chip Logic
+
+* **Context:** "Unverified" chip in `AccountSettingsPage` didn't update immediately after email verification.
+* **Fix Applied:** Aligned chip logic with banner logic using `authState.status == AuthStatus.emailNotVerified && !verificationDetected`.
+* **Status:** Fix applied. **Testing required.**
+
+### Objective 42: Fix Email Verification UI Update Delay
+
+* **Context:** Verification banner in `AccountSettingsPage` didn't update immediately.
+* **Fix Applied (Attempt 2):** Implemented hybrid approach using immediate Firestore update and `emailVerificationDetectedProvider`.
+* **Status:** Fix applied. **Testing required.** (Chip logic addressed in Obj 44)
 
 ## Previous Objectives (Completed)
 
-1. **Fix Email Verification Status Update (Objective 39)**
-    * **Context:** The application wasn't consistently updating the `isVerified` field in Firestore when users verified their email.
-    * **Changes Made:** Modified `email_verification_checker.dart` to stop timer on verification and pass verified `User` to `AuthService.handleEmailVerificationComplete`. Updated `AuthService` method to accept the `User` object.
-    * **Result:** Ensured Firestore `isVerified` field updates reliably using confirmed verified user state.
+1. **Diagnose Google Linking Error and Consolidate User Creation Logic (Objective 41)**
+    * **Context:** Google linking failed (`credential-already-in-use`), duplicated Firestore update logic identified.
+    * **Changes:** Centralized most Firestore updates via `firestoreUserSyncProvider`. Reverted immediate update for `linkEmailAndPasswordToAnonymous`. Added router `redirect` and `errorBuilder`. Standardized `context.pop()`.
+    * **Result:** Google linking error resolved. Navigation after linking/registration fixed. Router best practices improved. Revealed email verification UI delay (Obj 42). **Riverpod error during linking fixed in Obj 46.**
 
-2. **Fix Authentication Flow and Firestore Data Issues (Objective 38)**
-    * **Context:** Changes during registration routing fix (Objective 36) caused issues with user document creation happening in multiple places (AuthService, RegisterPage).
-    * **Goal:** Centralize user document creation in AuthService and ensure proper order of operations.
-    * **Status:** This objective is superseded by ongoing reviews and fixes but remains relevant context. The core issue of centralizing user creation still needs verification.
-    * **Next Steps (Deferred/Ongoing):** Review AuthService/RegisterPage calls to UserRepository, ensure AuthService handles all creation/updates.
+2. **Prevent Anonymous Dialog After Password Reset (Objective 40)**
+    * **Status:** Completed.
 
-3. **Fix Registration Routing Error (Objective 36)**
-    * **Context:** A `GoException: no routes for location: /profile/account-settings` error occurred after registration.
-    * **Analysis:** Reviewed `app_router.dart` and found the correct path for `AccountSettingsPage` is `/profile/account`. Reviewed `register_page.dart` and found three instances where `context.go('/profile/account-settings')` was used incorrectly.
-    * **Changes Made:** Corrected the navigation paths in `register_page.dart` to use `context.go('/profile/account')` in the `_registerWithEmailAndPassword` and `_signInWithGoogle` methods.
-    * **Conclusion:** The navigation path after registration is now correct.
+3. **Fix Email Verification Status Update (Objective 39)**
+    * **Status:** Implemented (UI timing addressed in Obj 42/44, state reset logic refined in Obj 46).
 
-4. **Update Registration Confirmation Text (Objective 35)**
-    * **Context:** The confirmation message after email/password registration was misleading.
-    * **Changes Made:** Updated the confirmation dialog text in `register_page.dart` to accurately state the user is signed in but unverified with limited capabilities.
-    * **Conclusion:** Registration confirmation text is now consistent and accurate.
+4. **Authentication Flow and Firestore Data Issues (Objective 38)**
+    * **Status:** Superseded by Objective 41.
 
-5. **Correct Account Deletion Order (Objective 34)**
-    * Modified `AuthService.deleteUser` to delete Auth user first, then Firestore data.
-    * Confirmed UI handles re-authentication correctly before calling `deleteUser`.
-    * Updated documentation.
+5. **Fix Registration Routing Error (Objective 36)**
+    * **Status:** Completed.
 
-6. **Ensure Firestore User Document is Fully Populated During Authentication (Objective 33)**
-    * Analyzed `UserModel`, `UserRepository`, `AuthService`, and `firestore.rules`.
-    * Confirmed existing implementation correctly populates/updates user documents.
-    * Refined `firestore.rules` to prevent `createdAt` updates.
-    * Recommended testing.
+6. **Update Registration Confirmation Text & Verify Navigation (Objective 35)**
+    * **Status:** Completed.
 
-7. **Fixed Registration Navigation (Objective 32)**
-    * Ensured users are navigated to the Account Settings page after email/password and Google registration/linking. *(Note: This objective was marked complete previously, but the routing error indicated it wasn't fully resolved until Objective 36)*
+7. **Correct Account Deletion Order (Objective 34)**
+    * **Status:** Superseded by Objective 45.
 
-8. **Fixed Account Limits Dialog Issue After Google Sign-In (Objective 31)**
-    * Prevented the Account Limits dialog from appearing after cancelling Google sign-in or linking by using an `isInternalAuthFlow` flag.
+8. **Ensure Firestore User Document is Fully Populated During Authentication (Objective 33)**
+    * **Status:** Completed. Testing recommended.
 
 9. **Fixed Google Authentication Display Name Issue (Objective 30)**
-    * Ensured Google display name is correctly extracted and stored in Firestore user document.
+    * **Status:** Completed.
 
-10. **Improve Email Verification UI and Profile Page Aesthetics (Objective 28)**
-    * Updated `ProfilePage` and `AccountSettingsPage` for better UI/UX for unverified users.
+10. **Firestore Permission Issues During Data Migration (Objective 27 - Fix Applied)**
+    * **Status:** Completed. Testing still recommended.
 
-11. **Data Migration and Firestore Rules Updates (Objective 27 - Fix Applied)**
-    * Updated `firestore.rules` to allow `collectionCount` updates correctly.
-    * Updated `UserRepository.createUserFromAuth` to initialize `collectionCount: 0` on new user creation.
-    * Updated `AuthService.linkGoogleToAnonymous` to create user doc *after* sign-in.
-    * **Testing Still Required:** Verify fixes by testing anonymous sign-in, account deletion, and anonymous-to-Google linking flows.
+11. **Fixed Email Update Flow and UI Updates (Objective 26)**
+    * **Status:** Completed.
 
-12. **Fixed Email Update Flow and UI Updates (Objective 26)**
-    * Fixed UI not updating after linking Google authentication.
-    * Improved email update messaging based on auth methods.
-
-13. **Fixed Authentication State & UI Issues (Objective 26 - Ongoing Testing)**
-    * Implemented security enhancements (limits, grace period, dialog).
-    * Fixed various UI and state management issues related to auth methods, linking, deletion, and data migration.
-
-14. **Authentication System Rebuild**
-    * Completed full rebuild of authentication system.
-
-### Previous Objective 37: Test Registration Flow
-
-[Previous content remains unchanged...]
+12. **Authentication System Rebuild**
+    * **Status:** Completed.
 
 ## Pending Tasks from Previous Objectives
 
 1. **Test Firestore Permission Fix (Critical - Objective 27):**
-    * [ ] Test account deletion flow.
     * [ ] **Test anonymous user linking to Google account (Primary test).**
     * [ ] Verify user document creation for new anonymous users.
     * [ ] Test standard operations for both user types.
     * [ ] Check Firestore logs for permission errors.
 
 2. **Continue Authentication System Testing:**
-    * [ ] Test Google linking flow thoroughly.
     * [ ] Verify all edge cases are handled.
     * [ ] Ensure proper state transitions.
 

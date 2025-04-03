@@ -38,53 +38,58 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   bool _showReauthPassword = false;
   final _reauthPasswordController = TextEditingController();
 
+  // Keep track if controllers have been initialized to prevent unnecessary updates
+  bool _controllersInitialized = false;
+
   @override
   void initState() {
     super.initState();
-    // Initial population might still happen here, but build method will override
-    _initializeUserDataFromState(ref.read(authStateProvider).user);
+    // Initial read might get null if provider is still loading
+    // We'll primarily rely on the build method for initialization now.
   }
 
   // Initialize controllers based on user data
   void _initializeUserDataFromState(User? user) {
     if (user != null) {
       // For display name:
-      // 1. If current display name is empty, try to get it from:
-      //    a. User's display name
-      //    b. Google provider's display name
-      if (_displayNameController.text.isEmpty) {
-        String? newDisplayName = user.displayName;
+      String? currentDisplayName = _displayNameController.text;
+      String? newDisplayName = user.displayName;
 
-        if (newDisplayName == null || newDisplayName.isEmpty) {
-          // Try to get display name from Google provider
-          try {
-            final googleProvider = user.providerData.firstWhere(
-              (element) => element.providerId == 'google.com',
-            );
-            newDisplayName = googleProvider.displayName;
-          } catch (_) {
-            // No Google provider found, continue with null display name
-          }
-        }
-
-        if (newDisplayName != null && newDisplayName.isNotEmpty) {
-          _displayNameController.text = newDisplayName;
+      // Try Google provider name if Firebase display name is empty
+      if (newDisplayName == null || newDisplayName.isEmpty) {
+        try {
+          final googleProvider = user.providerData.firstWhere(
+            (element) => element.providerId == 'google.com',
+          );
+          newDisplayName = googleProvider.displayName;
+        } catch (_) {
+          // No Google provider found
         }
       }
-      // Otherwise, only update if the text is different to avoid cursor jumps
-      else if (user.displayName != null &&
-          _displayNameController.text != user.displayName) {
-        _displayNameController.text = user.displayName!;
+
+      // Update controller only if needed
+      if (newDisplayName != null &&
+          newDisplayName.isNotEmpty &&
+          currentDisplayName != newDisplayName) {
+        _displayNameController.text = newDisplayName;
+        talker.debug('Initialized display name controller: $newDisplayName');
       }
 
       // For email:
-      if (user.email != null && _emailController.text != user.email) {
-        _emailController.text = user.email!;
+      String? currentEmail = _emailController.text;
+      String? newUserEmail = user.email;
+
+      if (newUserEmail != null && currentEmail != newUserEmail) {
+        _emailController.text = newUserEmail;
+        talker.debug('Initialized email controller: $newUserEmail');
         // Also update reauth email only if different
-        if (_reauthEmailController.text != user.email) {
-          _reauthEmailController.text = user.email!;
+        if (_reauthEmailController.text != newUserEmail) {
+          _reauthEmailController.text = newUserEmail;
+          talker.debug('Initialized reauth email controller: $newUserEmail');
         }
       }
+      // Mark as initialized
+      _controllersInitialized = true;
     }
   }
 
@@ -270,6 +275,33 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     }
   }
 
+  // Helper function for successful deletion cleanup
+  Future<void> _handleSuccessfulDeletion() async {
+    talker.info(
+        'Account deletion successful, showing confirmation and signing out.');
+    // Add mounted check before showing snackbar and navigating
+    if (mounted) {
+      // Show success snackbar using the imported display_name alias
+      display_name.showThemedSnackBar(
+          context: context,
+          message: 'Account deleted successfully.',
+          isError: false);
+
+      // Sign out, skipping the dialog trigger
+      await ref
+          .read(authServiceProvider)
+          .signOut(skipAccountLimitsDialog: true);
+
+      // Add another mounted check immediately before using context after await
+      if (mounted) {
+        context.go('/profile');
+      }
+    } else {
+      talker.debug(
+          'Widget not mounted after successful deletion, skipping snackbar/navigation.');
+    }
+  }
+
   Future<void> _signOut() async {
     // Show confirmation dialog
     final shouldSignOut = await showSignOutConfirmationDialog(context);
@@ -289,17 +321,11 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       });
 
       await ref.read(authServiceProvider).deleteUser();
-      await ref.read(authServiceProvider).signOut(); // Sign out after deletion
 
-      setState(() {
-        _isLoading = false;
-      });
-      talker.info('Account deleted successfully');
+      // Call the helper function for cleanup
+      await _handleSuccessfulDeletion();
 
-      // Navigate back to profile page after successful deletion
-      if (mounted) {
-        context.go('/profile');
-      }
+      // No need for setState or navigation here anymore, handled by helper
     } on AuthException catch (e) {
       // Catch custom AuthException
       setState(() {
@@ -433,9 +459,33 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
         _showReauthDialog = false;
       });
       if (_isAccountDeletion) {
-        talker
-            .debug('Proceeding with account deletion after re-authentication');
-        await _deleteAccount();
+        talker.debug(
+            'Proceeding with account deletion after Google re-authentication');
+        // Retry deletion after successful Google re-auth
+        try {
+          await ref.read(authServiceProvider).deleteUser();
+          // Call the helper function for cleanup
+          await _handleSuccessfulDeletion();
+        } catch (deleteError) {
+          // Handle potential errors during the deletion *after* re-auth
+          talker.error(
+              'Error deleting account after Google re-authentication: $deleteError');
+          if (mounted) {
+            display_name.showThemedSnackBar(
+                context: context,
+                message: deleteError is AuthException
+                    ? deleteError.message
+                    : 'Failed to delete account after re-authentication.',
+                isError: true);
+          }
+          // Ensure loading state is reset even on secondary failure
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _showReauthDialog = false; // Close re-auth dialog on error too
+            });
+          }
+        }
       } else if (_showChangeEmail) {
         talker.debug('Proceeding with email update after re-authentication');
         await _updateEmail();
@@ -480,40 +530,54 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     if (_reauthEmailController.text.isEmpty ||
         _reauthPasswordController.text.isEmpty) {
       talker.debug('Email or password empty in reauthentication dialog');
-      display_name.showThemedSnackBar(
-          context: context,
-          message: 'Please enter your email and password',
-          isError: true,
-          duration: const Duration(seconds: 5));
+      // Add mounted check before showing snackbar
+      if (mounted) {
+        display_name.showThemedSnackBar(
+            context: context,
+            message: 'Please enter your email and password',
+            isError: true,
+            duration: const Duration(seconds: 5));
+      }
       return;
     }
-
-    setState(() {
-      _isLoading = true;
-    });
+    // Removed duplicated duration line and moved setState inside try block
 
     try {
+      // Moved setState inside the try block and added mounted check
+      if (mounted) {
+        setState(() {
+          _isLoading = true;
+        });
+      } else {
+        // If not mounted, don't proceed with the operation
+        talker.debug(
+            'Widget not mounted, aborting reauthenticateAndDeleteAccount');
+        return;
+      }
       await ref.read(authServiceProvider).reauthenticateWithEmailAndPassword(
             _reauthEmailController.text.trim(),
             _reauthPasswordController.text,
           );
       talker.debug(
           'Re-authentication successful, proceeding with account deletion');
+
+      // Retry deletion
       await ref.read(authServiceProvider).deleteUser();
-      await ref.read(authServiceProvider).signOut();
-      setState(() {
-        _isLoading = false;
-        _showReauthDialog = false;
-      });
-      if (mounted) {
-        context.go('/profile');
-      }
+
+      // Call the helper function for cleanup
+      await _handleSuccessfulDeletion();
+
+      // No need for setState or navigation here anymore, handled by helper
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _showReauthDialog = true;
-      });
+      // Ensure mounted check exists before setState
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _showReauthDialog = true; // Keep dialog open on error
+        });
+      }
       talker.error('Error during re-authentication or account deletion: $e');
+      // Ensure mounted check exists before showing dialog
       if (mounted) {
         showDialog(
             context: context,
@@ -678,7 +742,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     try {
       await ref.read(linkGoogleToEmailPasswordProvider.future);
       // Explicitly invalidate providers to ensure UI updates
-      ref.invalidate(currentUserProvider);
+      ref.invalidate(firebaseUserProvider); // Use the base stream provider
       ref.invalidate(authStateProvider);
       setState(() {
         _isLoading = false;
@@ -715,7 +779,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           ) ??
           false;
 
-      if (hasGoogleProvider && !user!.isAnonymous) {
+      if (hasGoogleProvider && user != null && !user.isAnonymous) {
+        // Added null check for user
         await ref.read(linkEmailPasswordToGoogleProvider(
                 EmailPasswordCredentials(email: email, password: password))
             .future);
@@ -752,6 +817,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   void _showUpdatePasswordDialog() {
     showDialog(
       context: context,
+      barrierDismissible: false, // Added this line
       builder: (context) => UpdatePasswordDialog(
         onUpdatePassword: (newPassword) async {
           await _updatePassword(newPassword);
@@ -906,34 +972,57 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
-    // Watch currentUserProvider to trigger rebuilds on user data changes (like unlink)
-    final currentUserAsyncValue = ref.watch(currentUserProvider);
+    // Watch the base stream provider to get AsyncValue
+    final currentUserAsyncValue = ref.watch(firebaseUserProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Update controllers whenever currentUser changes
-    // Use addPostFrameCallback to avoid calling setState during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        // Ensure widget is still mounted
-        _initializeUserDataFromState(currentUserAsyncValue.value);
-      }
-    });
+    // **NEW:** Watch the immediate verification detection provider
+    final verificationDetected = ref.watch(emailVerificationDetectedProvider);
 
     // Determine the user object to use for the UI
     // Prioritize the direct user stream value if available, fallback to authState
     final userForUI = currentUserAsyncValue.value ?? authState.user;
 
-    // Handle loading state more robustly
-    if (authState.isLoading ||
-        (authState.isAuthenticated && userForUI == null)) {
-      // Show loading if authState is loading OR if we expect an authenticated user but don't have one yet
+    // Initialize controllers *inside* build when user data is available
+    if (userForUI != null && !_controllersInitialized) {
+      _initializeUserDataFromState(userForUI);
+    }
+    // Handle case where user signs out - reset controllers and flag
+    else if (userForUI == null && _controllersInitialized) {
+      _displayNameController.clear();
+      _emailController.clear();
+      _reauthEmailController.clear();
+      _controllersInitialized = false;
+      talker.debug('User signed out, controllers cleared.');
+    }
+
+    // Handle loading state based on the AsyncValue
+    if (currentUserAsyncValue.isLoading) {
       return Scaffold(
         appBar: AppBarFactory.createAppBar(context, 'Account Settings'),
         body: const Center(child: LoadingIndicator()),
       );
     }
 
+    // Handle error state based on the AsyncValue
+    if (currentUserAsyncValue.hasError) {
+      return Scaffold(
+        appBar: AppBarFactory.createAppBar(context, 'Account Settings'),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Error loading user data: ${currentUserAsyncValue.error}',
+              style: TextStyle(color: colorScheme.error),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Handle data state (user can be null here if signed out)
     // Show re-authentication dialog if needed
     if (_showReauthDialog) {
       return Scaffold(
@@ -964,8 +1053,16 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     }
 
     // Determine if the email verification banner should be shown
+    // **UPDATED LOGIC:** Show if auth state is emailNotVerified AND verification hasn't been immediately detected yet.
     final bool showVerificationBanner =
-        userForUI != null && !userForUI.emailVerified;
+        authState.status == AuthStatus.emailNotVerified &&
+            !verificationDetected;
+
+    // Determine if the AccountInfoCard should show the "Email Not Verified" text/chip
+    // Use the same logic as the banner for consistency
+    final bool showUnverifiedChip =
+        authState.status == AuthStatus.emailNotVerified &&
+            !verificationDetected;
 
     return Scaffold(
       appBar: AppBarFactory.createAppBar(context, 'Account Settings'),
@@ -986,10 +1083,10 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 children: [
-                  // --- NEW: Conditionally show Verification Banner ---
-                  if (showVerificationBanner) // Removed redundant userForUI != null check
-                    _buildVerificationBanner(context, colorScheme,
-                        userForUI), // Removed unnecessary '!'
+                  // --- Conditionally show Verification Banner ---
+                  // Use the updated showVerificationBanner logic
+                  if (showVerificationBanner && userForUI != null)
+                    _buildVerificationBanner(context, colorScheme, userForUI),
                   // --- END: Verification Banner ---
 
                   // Profile Header with display name
@@ -1003,7 +1100,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                   // Account Information
                   AccountInfoCard(
                     user: userForUI, // Pass userForUI down
-                    isEmailNotVerified: showVerificationBanner, // Pass the flag
+                    // Use the consistent logic for showing the unverified state
+                    isEmailNotVerified: showUnverifiedChip,
                     emailController: _emailController,
                     showChangeEmail: _showChangeEmail,
                     onToggleChangeEmail: () {

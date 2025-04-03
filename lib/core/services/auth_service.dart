@@ -44,25 +44,28 @@ class AuthException implements Exception {
 class AuthService {
   final FirebaseAuth _auth;
   final GoogleSignIn _googleSignIn;
-  final UserRepository _userRepository;
+  final UserRepository _userRepository; // Keep for profile updates/deletion
   final Talker talker;
   final Duration _timeout = const Duration(seconds: 30);
 
   AuthService()
       : _auth = FirebaseAuth.instance,
         _googleSignIn = GoogleSignIn(),
-        _userRepository = UserRepository(),
+        _userRepository =
+            UserRepository(), // Still needed for deleteUser/updateProfile
         talker = Talker();
 
   /// Get the current authenticated user.
   User? get currentUser => _auth.currentUser;
 
   /// Stream of authentication state changes.
+  /// This stream should be listened to elsewhere (e.g., a Riverpod provider)
+  /// to trigger Firestore user document creation/updates via UserRepository.
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   // --- Core Sign-in/Registration Methods ---
 
-  /// Signs in a user anonymously. Creates a corresponding Firestore document.
+  /// Signs in a user anonymously.
   Future<UserCredential> signInAnonymously(
       {bool isInternalAuthFlow = false}) async {
     talker.info('Attempting anonymous sign-in...');
@@ -81,16 +84,9 @@ class AuthService {
 
       final userCredential = await _auth.signInAnonymously().timeout(_timeout);
       talker.info('Anonymous sign-in successful: ${userCredential.user?.uid}');
-      if (userCredential.user != null) {
-        // Reload the user to ensure we have the latest provider data
-        await userCredential.user!.reload();
-        // Get the refreshed user object
-        final refreshedUser = _auth.currentUser;
-        if (refreshedUser != null) {
-          // Create user document AFTER successful sign-in and reload
-          await _userRepository.createUserFromAuth(refreshedUser);
-        }
-      }
+      // Reload the user to ensure we have the latest provider data
+      // Firestore update will be handled by the authStateChanges listener
+      await userCredential.user?.reload();
       return userCredential;
     } catch (e) {
       talker.error('Anonymous sign-in failed: $e');
@@ -98,7 +94,7 @@ class AuthService {
     }
   }
 
-  /// Signs in a user with email and password. Updates Firestore document on success.
+  /// Signs in a user with email and password.
   Future<UserCredential> signInWithEmailAndPassword(
       String email, String password) async {
     talker.info('Attempting email/password sign-in for: $email');
@@ -109,13 +105,8 @@ class AuthService {
       talker.info(
           'Email/password sign-in successful: ${userCredential.user?.uid}');
       // Reload to ensure latest state (e.g., emailVerified) is fetched
+      // Firestore update will be handled by the authStateChanges listener
       await userCredential.user?.reload();
-      final refreshedUser = _auth.currentUser;
-      if (refreshedUser != null) {
-        // Create/update user document AFTER successful sign-in and reload
-        await _userRepository.createUserFromAuth(refreshedUser);
-      }
-      // Return the original credential as it contains the user object
       return userCredential;
     } catch (e) {
       talker.error('Email/password sign-in failed: $e');
@@ -123,7 +114,7 @@ class AuthService {
     }
   }
 
-  /// Creates a new user with email and password, sends verification email, and creates Firestore document.
+  /// Creates a new user with email and password, sends verification email.
   Future<UserCredential> createUserWithEmailAndPassword(
       String email, String password) async {
     talker.info('Attempting to create email/password user for: $email');
@@ -144,10 +135,8 @@ class AuthService {
         // Proceed even if email sending fails
       }
 
-      if (userCredential.user != null) {
-        // Create user document AFTER successful creation
-        await _userRepository.createUserFromAuth(userCredential.user!);
-      }
+      // Firestore creation will be handled by the authStateChanges listener
+      // triggered by the createUserWithEmailAndPassword call itself.
       return userCredential;
     } catch (e) {
       talker.error('Email/password user creation failed: $e');
@@ -155,7 +144,7 @@ class AuthService {
     }
   }
 
-  /// Signs in or registers a user with Google. Creates/updates Firestore document.
+  /// Signs in or registers a user with Google.
   Future<UserCredential> signInWithGoogle() async {
     talker.info('Attempting Google sign-in...');
     try {
@@ -189,14 +178,8 @@ class AuthService {
           'Firebase user display name: ${userCredential.user?.displayName}');
 
       // Reload to ensure latest state is fetched
+      // Firestore update will be handled by the authStateChanges listener
       await userCredential.user?.reload();
-      final refreshedUser = _auth.currentUser;
-      if (refreshedUser != null) {
-        talker
-            .debug('Refreshed user display name: ${refreshedUser.displayName}');
-        // Create/update user document AFTER successful sign-in and reload
-        await _userRepository.createUserFromAuth(refreshedUser);
-      }
       return userCredential;
     } catch (e) {
       // Handle potential conflict where Google email matches existing Email/Password account
@@ -253,10 +236,14 @@ class AuthService {
             'Failed to send verification email after linking (non-fatal): $verificationError');
       }
 
+      // **REVERTED CHANGE:** Update Firestore immediately after linking for this specific flow
+      // to ensure state consistency before navigation.
       if (userCredential.user != null) {
-        // Create/update user document AFTER successful linking
         await _userRepository.createUserFromAuth(userCredential.user!);
+        talker.debug(
+            'Firestore updated immediately after linking anonymous to email/pass.');
       }
+
       return userCredential;
     } catch (e) {
       // Handle case where email is already in use by another account
@@ -356,14 +343,10 @@ class AuthService {
                 'providers=${userCredential.user?.providerData.map((p) => p.providerId).join(", ")}');
 
             // Reload one more time to ensure we have the latest state
+            // Firestore update will be handled by the authStateChanges listener
             await userCredential.user?.reload();
             final finalUser = _auth.currentUser;
             if (finalUser != null) {
-              // ** ADDED DEBUG LOG **
-              talker.debug(
-                  'Attempting Firestore write with UID: ${finalUser.uid}');
-              // Create/update user document HERE, after state is settled
-              await _userRepository.createUserFromAuth(finalUser);
               talker.info(
                   'Final user state after Google linking: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
             }
@@ -461,14 +444,10 @@ class AuthService {
                   'Successfully signed back in with Google after sign-in');
 
               // Reload one more time to ensure we have the latest state
+              // Firestore update will be handled by the authStateChanges listener
               await userCredential.user?.reload();
               final finalUser = _auth.currentUser;
               if (finalUser != null) {
-                // ** ADDED DEBUG LOG **
-                talker.debug(
-                    'Attempting Firestore write with UID: ${finalUser.uid}');
-                // Create/update user document HERE, after state is settled
-                await _userRepository.createUserFromAuth(finalUser);
                 talker.info(
                     'Final user state after Google sign-in: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
               }
@@ -546,10 +525,7 @@ class AuthService {
             'Failed to send verification email after linking to Google (non-fatal): $verificationError');
       }
 
-      if (userCredential.user != null) {
-        // Create/update user document AFTER successful linking
-        await _userRepository.createUserFromAuth(userCredential.user!);
-      }
+      // Firestore update will be handled by the authStateChanges listener
       return userCredential;
     } catch (e) {
       if (e is FirebaseAuthException) {
@@ -627,16 +603,9 @@ class AuthService {
       talker.info(
           'Successfully linked Google to Email/Password user: ${userCredential.user?.uid}');
 
-      if (userCredential.user != null) {
-        // Reload the user to ensure we have the latest provider data
-        await userCredential.user!.reload();
-        // Get the refreshed user object
-        final refreshedUser = _auth.currentUser;
-        if (refreshedUser != null) {
-          // Create/update user document AFTER successful linking and reload
-          await _userRepository.createUserFromAuth(refreshedUser);
-        }
-      }
+      // Reload the user to ensure we have the latest provider data
+      // Firestore update will be handled by the authStateChanges listener
+      await userCredential.user?.reload();
       return userCredential;
     } catch (e) {
       if (e is FirebaseAuthException) {
@@ -783,27 +752,39 @@ class AuthService {
           message: 'No user is currently signed in.',
           category: AuthErrorCategory.authentication);
     }
-    final userId = currentUser.uid; // Store userId before potential deletion
+    final userId = currentUser.uid; // Store userId for logging
 
     try {
-      // Delete Firebase Auth user FIRST
+      // Attempt to delete the Auth user directly.
+      // The Firebase "Delete User Data" extension will handle Firestore data.
+      talker.debug('Attempting to delete Firebase Auth user: $userId');
       await currentUser.delete();
-      talker.warning('Firebase Auth user deleted: $userId');
-
-      // If Auth deletion succeeds, then delete Firestore data
-      try {
-        await _userRepository.deleteUser(userId);
-        talker.debug('Firestore data deleted for user: $userId');
-      } catch (firestoreError) {
-        // Log Firestore deletion error but don't rethrow if Auth deletion succeeded
+      talker.warning('Firebase Auth user deleted successfully: $userId');
+    } catch (authError) {
+      // Handle Auth deletion errors
+      if (authError is FirebaseAuthException) {
+        // Specifically ignore 'user-not-found' as it likely means deletion already occurred or is completing via extension.
+        if (authError.code == 'user-not-found') {
+          talker.warning(
+              'Firebase Auth user deletion failed with user-not-found (likely already deleted or handled by extension): $authError');
+          // Do not rethrow this specific error, as the user is effectively gone.
+        } else {
+          // For other Auth errors (like requires-recent-login), rethrow them.
+          talker.error('Firebase Auth user deletion failed: $authError');
+          throw _handleAuthException(
+              authError); // Rethrow categorized exception
+        }
+      } else {
+        // Handle non-Firebase errors during the deletion attempt
         talker.error(
-            'Auth user deleted, but failed to delete Firestore data for user $userId: $firestoreError');
-        // Optionally, queue this for cleanup later or notify admin
+            'Account deletion process failed with unexpected error: $authError');
+        throw AuthException(
+            code: 'delete-failed',
+            message:
+                'Failed to delete account. Please try again. ${authError.toString()}',
+            category: AuthErrorCategory.unknown,
+            originalException: authError);
       }
-    } catch (e) {
-      // Handle Auth deletion errors (e.g., requires-recent-login)
-      talker.error('Firebase Auth user deletion failed: $e');
-      throw _handleAuthException(e); // Rethrow the original Auth error
     }
   }
 
@@ -992,14 +973,7 @@ class AuthService {
       await currentUser.reload();
       final reloadedUser = _auth.currentUser; // Get the refreshed user object
 
-      // Update Firestore user data with the reloaded user
-      if (reloadedUser != null) {
-        // Create/update user document AFTER successful unlink and reload
-        await _userRepository.createUserFromAuth(reloadedUser);
-      } else {
-        // This case should ideally not happen if unlink succeeded, but handle defensively
-        talker.warning('User object was null after reload post-unlink.');
-      }
+      // Firestore update will be handled by the authStateChanges listener
       return reloadedUser; // Return the reloaded user object
     } catch (e) {
       talker.error('Failed to unlink provider $providerId: $e');
@@ -1008,6 +982,7 @@ class AuthService {
   }
 
   /// Update user profile (displayName, photoURL).
+  /// This method still needs direct access to UserRepository for profile-specific updates.
   Future<void> updateProfile({String? displayName, String? photoURL}) async {
     talker.info('Attempting to update profile...');
     final currentUser = _auth.currentUser;
@@ -1044,6 +1019,8 @@ class AuthService {
 
   /// Called when email verification is likely complete (e.g., after user returns to app).
   /// Uses the provided verified user to update Firestore.
+  /// NOTE: This method is kept for potential direct use by the verification checker,
+  /// but the primary Firestore update mechanism should be the authStateChanges listener.
   Future<void> handleEmailVerificationComplete(User verifiedUser) async {
     talker.info('Handling email verification completion...');
     // Check the passed-in user object directly
@@ -1055,9 +1032,9 @@ class AuthService {
 
     try {
       talker.info('Email verification confirmed for user: ${verifiedUser.uid}');
-      // Update Firestore to reflect verified status using the verified user object
-      await _userRepository.createUserFromAuth(verifiedUser);
-      talker.debug('Firestore updated with verified status.');
+      // **REMOVED:** await _userRepository.createUserFromAuth(verifiedUser);
+      talker.debug(
+          'Firestore update for verified status will be handled by firestoreUserSyncProvider.');
     } catch (e) {
       talker.error('Error during email verification handling: $e');
       // Don't throw, as this is often called passively
@@ -1230,9 +1207,9 @@ class AuthService {
       case 'wrong-account': // Custom code
         return 'Please use the same account you originally signed in with.';
       case 'not-anonymous': // Custom code
-      case 'not-authenticated': // Custom code
-      case 'not-google-user': // Custom code
-      case 'not-email-user': // Custom code
+      case 'not-authenticated': // Added custom code
+      case 'not-google-user': // Added custom code
+      case 'not-email-user': // Added custom code
         // These are internal logic errors, show a generic message to the user
         return 'An unexpected authentication error occurred. Please try again.';
 

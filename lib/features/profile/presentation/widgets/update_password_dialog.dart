@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart'; // Import GoRouter
 
 class UpdatePasswordDialog extends ConsumerStatefulWidget {
   final Function(String) onUpdatePassword;
@@ -64,7 +65,7 @@ class _UpdatePasswordDialogState extends ConsumerState<UpdatePasswordDialog> {
       await widget.onUpdatePassword(_passwordController.text);
 
       if (mounted) {
-        Navigator.of(context).pop(); // Close the dialog on success
+        context.pop(); // Use context.pop()
       }
     } catch (e) {
       // Error handling is likely done in the parent widget where the actual
@@ -213,7 +214,7 @@ class _UpdatePasswordDialogState extends ConsumerState<UpdatePasswordDialog> {
           style: TextButton.styleFrom(
             foregroundColor: colorScheme.onSurface.withValues(alpha: 0.8),
           ),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => context.pop(), // Use context.pop()
           child: const Text('Cancel'),
         ),
         FilledButton(

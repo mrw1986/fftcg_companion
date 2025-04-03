@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:go_router/go_router.dart'; // Import GoRouter
 
 /// Dialog for linking accounts when a Google account's email is already in use
 class LinkAccountsDialog extends ConsumerStatefulWidget {
@@ -69,7 +70,7 @@ class _LinkAccountsDialogState extends ConsumerState<LinkAccountsDialog> {
         talker.debug('Successfully linked with Google');
 
         if (mounted) {
-          Navigator.of(context).pop();
+          context.pop(); // Use context.pop()
           widget.onComplete(true);
         }
       } catch (linkError) {
@@ -171,7 +172,7 @@ class _LinkAccountsDialogState extends ConsumerState<LinkAccountsDialog> {
           onPressed: _isLoading
               ? null
               : () {
-                  Navigator.of(context).pop();
+                  context.pop(); // Use context.pop()
                   widget.onComplete(false); // Indicate cancellation/failure
                 },
           child: const Text('Cancel'),

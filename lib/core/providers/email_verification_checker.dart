@@ -3,37 +3,75 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
-import 'package:fftcg_companion/core/routing/app_router.dart';
+// Import UserRepository to update Firestore
+// Removed unused imports
+// import 'package:fftcg_companion/core/routing/app_router.dart';
 
 /// Provider that checks for email verification when the app is in the foreground
 /// and the user has an unverified email
 final emailVerificationCheckerProvider = Provider.autoDispose<void>((ref) {
   Timer? verificationTimer;
 
-  // Listen to auth state changes
-  ref.listen(authStateProvider, (previous, next) async {
-    // Cancel any existing timer
+  void startVerificationCheck() {
+    // Cancel any existing timer before starting a new one
     verificationTimer?.cancel();
+    talker.debug('Starting email verification checker timer...');
 
-    // If the user has an unverified email, start checking for verification
-    if (next.isEmailNotVerified) {
-      talker.debug('Starting email verification checker for unverified user');
+    // Check immediately first, and cancel timer if verified
+    _checkEmailVerification(ref).then((verified) {
+      if (verified) {
+        verificationTimer?.cancel();
+        talker
+            .debug('Verification detected on initial check, timer cancelled.');
+      } else if (verificationTimer == null || !verificationTimer!.isActive) {
+        // If not verified initially AND timer isn't already running, set up the periodic timer
+        verificationTimer =
+            Timer.periodic(const Duration(seconds: 3), (_) async {
+          final isVerifiedNow = await _checkEmailVerification(ref);
+          if (isVerifiedNow) {
+            // Cancel the timer explicitly when verification is detected
+            verificationTimer?.cancel();
+            talker.debug('Verification detected in timer, cancelling timer.');
+          }
+        });
+      }
+    });
+  }
 
-      // Check immediately first
-      // Pass the timer so it can be cancelled inside if verification is detected
-      await _checkEmailVerification(ref, verificationTimer);
+  void stopVerificationCheck() {
+    if (verificationTimer?.isActive ?? false) {
+      verificationTimer?.cancel();
+      talker.debug('Stopped email verification checker timer.');
+    }
+  }
 
-      // Then set up a timer to check periodically (every 3 seconds)
-      verificationTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-        // Pass the timer so it can be cancelled inside if verification is detected
-        await _checkEmailVerification(ref, verificationTimer);
-      });
+  // Listen to auth state changes with explicit types
+  ref.listen<AuthState>(authStateProvider,
+      (AuthState? previous, AuthState next) {
+    // Start checking only if the specific state is emailNotVerified
+    // Added explicit null check for 'next'
+    if (next.status == AuthStatus.emailNotVerified) {
+      // Check if the previous state was also emailNotVerified to avoid restarting unnecessarily
+      // Type annotation for 'previous' should help analyzer here
+      if (previous?.status != AuthStatus.emailNotVerified) {
+        startVerificationCheck();
+      }
+    } else {
+      // Stop checking if the state is anything else
+      stopVerificationCheck();
     }
   });
 
+  // Initial check in case the provider initializes when already in the target state
+  final initialAuthState = ref.read(authStateProvider);
+  // Added null check for initialAuthState as well, though read should provide non-null
+  if (initialAuthState.status == AuthStatus.emailNotVerified) {
+    startVerificationCheck();
+  }
+
   // Clean up timer when provider is disposed
   ref.onDispose(() {
-    verificationTimer?.cancel();
+    stopVerificationCheck();
     talker.debug('Email verification checker disposed');
   });
 
@@ -41,36 +79,37 @@ final emailVerificationCheckerProvider = Provider.autoDispose<void>((ref) {
 });
 
 /// Helper function to check email verification status
-/// Accepts the Timer object to allow cancellation upon verification detection
-Future<void> _checkEmailVerification(Ref ref, Timer? verificationTimer) async {
+/// Returns true if email is verified, false otherwise.
+Future<bool> _checkEmailVerification(Ref ref) async {
+  final authService = ref.read(authServiceProvider);
+  final user = authService.currentUser;
+
+  // Exit early if no user or user is already verified
+  if (user == null || user.emailVerified) {
+    talker.debug(
+        'Skipping verification check: User is null or already verified.');
+    // Ensure the detected flag is false if already verified or no user
+    ref.read(emailVerificationDetectedProvider.notifier).state = false;
+    return user?.emailVerified ??
+        false; // Return true if verified, false if null
+  }
+
+  // Also exit if user doesn't have an email provider (e.g., only Google linked)
+  if (!user.providerData.any((element) => element.providerId == 'password')) {
+    talker.debug(
+        'Skipping verification check: User does not have email/password provider.');
+    // Ensure the detected flag is false if not applicable
+    ref.read(emailVerificationDetectedProvider.notifier).state = false;
+    return false; // Not applicable for verification check
+  }
+
+  talker.debug('Checking email verification status for: ${user.email}');
+
   try {
-    final authService = ref.read(authServiceProvider);
-    final user = authService.currentUser;
-
-    // If no user or user is not using email/password auth, do nothing
-    if (user == null ||
-        !user.providerData.any((element) => element.providerId == 'password')) {
-      return;
-    }
-
-    talker.debug('Checking email verification status for: ${user.email}');
-
-    // Get the ID token before reload to compare later
-    final beforeToken = await user.getIdToken();
-
     // Force refresh the user to get the latest verification status
     await user.reload();
 
-    // Get a fresh ID token after reload
-    final afterToken = await user.getIdToken(true);
-
-    // Check if the token has changed, which indicates a state change
-    final tokenChanged = beforeToken != afterToken;
-    if (tokenChanged) {
-      talker.debug('ID token changed, state may have updated');
-    }
-
-    // Get the refreshed user through the auth service
+    // Get the refreshed user directly from FirebaseAuth instance after reload
     final refreshedUser = FirebaseAuth.instance.currentUser;
 
     // Check if the email is now verified
@@ -78,30 +117,40 @@ Future<void> _checkEmailVerification(Ref ref, Timer? verificationTimer) async {
       talker
           .info('Email verification detected for user: ${refreshedUser.email}');
 
-      // Cancel the verification timer since we've detected verification
-      verificationTimer?.cancel();
-      talker.debug('Cancelled verification timer after detecting verification');
+      // **Update Firestore Immediately:** Ensure DB reflects verified status.
+      try {
+        talker
+            .debug('Verification detected, updating Firestore immediately...');
+        await ref
+            .read(userRepositoryProvider)
+            .createUserFromAuth(refreshedUser);
+        talker.debug(
+            'Firestore updated immediately after verification detection.');
+      } catch (firestoreError, stackTrace) {
+        talker.error('Error updating Firestore immediately after verification',
+            firestoreError, stackTrace);
+        // Continue even if Firestore update fails, but log the error
+      }
 
-      // Handle email verification completion
-      // Pass the refreshed user directly to ensure we use the verified state
-      await authService.handleEmailVerificationComplete(refreshedUser);
+      // **Set the immediate detection flag:** Signal to UI to hide banner.
+      ref.read(emailVerificationDetectedProvider.notifier).state = true;
+      talker.debug('Set emailVerificationDetectedProvider to true.');
 
-      // Force a refresh of the auth state provider and currentUserProvider
-      ref.invalidate(authStateProvider);
-      ref.invalidate(currentUserProvider);
-
-      // Wait for the auth state to be updated. A short delay helps ensure
-      // that the providers have time to update before the router refresh.
-      // Increased delay to ensure UI has time to update
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Refresh the router to update the UI.
-      final router = ref.read(routerProvider);
-      router.refresh();
-
-      talker.debug('Router refreshed after email verification');
+      // **KEEP INVALIDATION REMOVED:** Let the stream propagate naturally.
+      talker.debug(
+          'Verification detected, Firestore updated, and flag set. Stream should propagate state naturally.');
+      return true; // Indicate verification was detected
+    } else {
+      talker.debug('Email still not verified.');
+      // Ensure the detected flag is false if still not verified
+      ref.read(emailVerificationDetectedProvider.notifier).state = false;
+      return false; // Indicate still not verified
     }
   } catch (e) {
+    // Handle potential errors during reload or token fetching
     talker.error('Error checking email verification status', e);
+    // Ensure the detected flag is false on error
+    ref.read(emailVerificationDetectedProvider.notifier).state = false;
+    return false; // Assume not verified on error
   }
 }
