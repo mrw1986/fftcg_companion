@@ -84,6 +84,8 @@ final firestoreUserSyncProvider = Provider<void>((ref) {
           await userRepository.createUserFromAuth(nextUser);
           talker.debug(
               'FirestoreUserSync: Successfully synced user ${nextUser.uid} to Firestore.');
+          // Verify and correct collection count after ensuring user doc exists
+          await userRepository.verifyAndCorrectCollectionCount(nextUser.uid);
         } catch (e, s) {
           talker.error(
               'FirestoreUserSync: Error syncing user ${nextUser.uid} to Firestore',

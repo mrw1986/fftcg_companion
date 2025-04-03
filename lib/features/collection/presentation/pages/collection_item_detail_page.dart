@@ -477,7 +477,8 @@ class CollectionItemDetailPage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                label,
+                label[0].toUpperCase() +
+                    label.substring(1), // Capitalize first letter
                 style: theme.textTheme.titleSmall,
               ),
               Text(

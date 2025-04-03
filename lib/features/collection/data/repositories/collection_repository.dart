@@ -81,11 +81,25 @@ class CollectionRepository {
           lastModified: Timestamp.now(),
         );
 
-        await _collectionRef.doc(existingCard.id).update(updatedCard.toMap());
-        return updatedCard;
+        // Check if update results in zero quantity
+        if (updatedCard.regularQty == 0 && updatedCard.foilQty == 0) {
+          talker
+              .debug('Quantities are zero, removing card: ${existingCard.id}');
+          // Call removeCard, which handles deletion and decrementing user collectionCount
+          await removeCard(existingCard.id);
+          // Return the card state *before* deletion, quantities are 0
+          return updatedCard;
+        } else {
+          // Otherwise, update the card as usual
+          final dataToSendUpdate = updatedCard.toMap(); // Get the map
+          talker.debug(
+              'Data being sent to Firestore (update): $dataToSendUpdate'); // Log the map
+          await _collectionRef.doc(existingCard.id).update(dataToSendUpdate);
+          return updatedCard;
+        }
       } else {
         // Increment the user's collection count
-        await _userRepository.updateCollectionCount(userId, 1, increment: true);
+        await _userRepository.updateCollectionCount(userId, 1);
 
         // Create new card
         final newCard = CollectionItem(
@@ -100,6 +114,9 @@ class CollectionRepository {
           lastModified: Timestamp.now(),
         );
 
+        final dataToSend = newCard.toMap(); // Get the map
+        talker.debug(
+            'Data being sent to Firestore (create): $dataToSend'); // Log the map
         final docRef = await _collectionRef.add(newCard.toMap());
         // We can't use copyWith for id since it's final and not included in copyWith
         return CollectionItem(
@@ -132,8 +149,7 @@ class CollectionRepository {
         await _collectionRef.doc(documentId).delete();
 
         // Decrement the user's collection count
-        await _userRepository.updateCollectionCount(card.userId, -1,
-            increment: true);
+        await _userRepository.updateCollectionCount(card.userId, -1);
       } else {
         talker.warning('Card not found for deletion: $documentId');
       }
@@ -193,8 +209,8 @@ class CollectionRepository {
       // If there are new cards, update the collection count
       if (newCardCount > 0 && cards.isNotEmpty) {
         final userId = cards.first.userId;
-        await _userRepository.updateCollectionCount(userId, newCardCount,
-            increment: true);
+        // Assuming batchUpdateCards only adds NEW unique cards, so increment count
+        await _userRepository.updateCollectionCount(userId, newCardCount);
       }
 
       final batch = _firestore.batch();

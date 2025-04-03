@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -42,6 +43,8 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
   final _regularCertNumberController = TextEditingController();
   final _foilCertNumberController = TextEditingController();
   final _searchController = TextEditingController();
+  final _regularQtyController = TextEditingController();
+  final _foilQtyController = TextEditingController();
 
   DateTime? _regularPurchaseDate;
   DateTime? _foilPurchaseDate;
@@ -105,6 +108,10 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
     // Set the selected card ID if provided
     _selectedCardId = widget.cardId;
 
+    // Initialize quantity controllers
+    _regularQtyController.text = regularQty.toString();
+    _foilQtyController.text = foilQty.toString();
+
     // If we have a card ID from the route, start in edit mode
     // Otherwise, check if we should start with search
     _isSearching = _selectedCardId == null || widget.startWithSearch == true;
@@ -117,6 +124,8 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
     _regularCertNumberController.dispose();
     _foilCertNumberController.dispose();
     _searchController.dispose();
+    _regularQtyController.dispose();
+    _foilQtyController.dispose();
     super.dispose();
   }
 
@@ -383,16 +392,61 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
                                 IconButton(
                                   icon: const Icon(Icons.remove),
                                   onPressed: regularQty > 0
-                                      ? () => setState(() => regularQty--)
+                                      ? () {
+                                          setState(() {
+                                            regularQty--;
+                                            _regularQtyController.text =
+                                                regularQty.toString();
+                                          });
+                                        }
                                       : null,
                                 ),
-                                Text(
-                                  regularQty.toString(),
-                                  style: theme.textTheme.titleLarge,
+                                // Replace Text with TextField
+                                SizedBox(
+                                  width: 60, // Adjust width as needed
+                                  child: TextField(
+                                    controller: _regularQtyController,
+                                    textAlign: TextAlign.center,
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly
+                                    ],
+                                    style: theme.textTheme.titleLarge,
+                                    decoration: const InputDecoration(
+                                      border: InputBorder.none,
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        regularQty = int.tryParse(value) ?? 0;
+                                        // Optional: Clamp value if needed, e.g., regularQty = regularQty.clamp(0, 9999);
+                                        if (regularQty < 0) {
+                                          regularQty = 0; // Ensure non-negative
+                                        }
+                                      });
+                                    },
+                                    // Update state when focus is lost or submitted
+                                    onSubmitted: (value) {
+                                      setState(() {
+                                        regularQty = int.tryParse(value) ?? 0;
+                                        if (regularQty < 0) {
+                                          regularQty = 0;
+                                        }
+                                        _regularQtyController.text = regularQty
+                                            .toString(); // Ensure controller matches state
+                                      });
+                                    },
+                                  ),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.add),
-                                  onPressed: () => setState(() => regularQty++),
+                                  onPressed: () {
+                                    setState(() {
+                                      regularQty++;
+                                      _regularQtyController.text =
+                                          regularQty.toString();
+                                    });
+                                  },
                                 ),
                               ],
                             ),
@@ -409,16 +463,61 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
                                 IconButton(
                                   icon: const Icon(Icons.remove),
                                   onPressed: foilQty > 0
-                                      ? () => setState(() => foilQty--)
+                                      ? () {
+                                          setState(() {
+                                            foilQty--;
+                                            _foilQtyController.text =
+                                                foilQty.toString();
+                                          });
+                                        }
                                       : null,
                                 ),
-                                Text(
-                                  foilQty.toString(),
-                                  style: theme.textTheme.titleLarge,
+                                // Replace Text with TextField
+                                SizedBox(
+                                  width: 60, // Adjust width as needed
+                                  child: TextField(
+                                    controller: _foilQtyController,
+                                    textAlign: TextAlign.center,
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly
+                                    ],
+                                    style: theme.textTheme.titleLarge,
+                                    decoration: const InputDecoration(
+                                      border: InputBorder.none,
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        foilQty = int.tryParse(value) ?? 0;
+                                        // Optional: Clamp value
+                                        if (foilQty < 0) {
+                                          foilQty = 0; // Ensure non-negative
+                                        }
+                                      });
+                                    },
+                                    // Update state when focus is lost or submitted
+                                    onSubmitted: (value) {
+                                      setState(() {
+                                        foilQty = int.tryParse(value) ?? 0;
+                                        if (foilQty < 0) {
+                                          foilQty = 0;
+                                        }
+                                        _foilQtyController.text = foilQty
+                                            .toString(); // Ensure controller matches state
+                                      });
+                                    },
+                                  ),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.add),
-                                  onPressed: () => setState(() => foilQty++),
+                                  onPressed: () {
+                                    setState(() {
+                                      foilQty++;
+                                      _foilQtyController.text =
+                                          foilQty.toString();
+                                    });
+                                  },
                                 ),
                               ],
                             ),

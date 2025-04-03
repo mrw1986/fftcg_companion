@@ -204,16 +204,26 @@ class CollectionItem {
       gradingInfoMap['foil'] = gradingInfo['foil']!.toMap();
     }
 
-    return {
+    final mapData = {
       'userId': userId,
-      'cardId': cardId,
+      'cardId': cardId.toString(), // Ensure cardId is a string
       'regularQty': regularQty,
       'foilQty': foilQty,
-      'condition': conditionMap.isEmpty ? null : conditionMap,
-      'purchaseInfo': purchaseInfoMap.isEmpty ? null : purchaseInfoMap,
-      'gradingInfo': gradingInfoMap.isEmpty ? null : gradingInfoMap,
       'lastModified': lastModified,
     };
+
+    // Conditionally add maps only if they are not empty
+    if (conditionMap.isNotEmpty) {
+      mapData['condition'] = conditionMap;
+    }
+    if (purchaseInfoMap.isNotEmpty) {
+      mapData['purchaseInfo'] = purchaseInfoMap;
+    }
+    if (gradingInfoMap.isNotEmpty) {
+      mapData['gradingInfo'] = gradingInfoMap;
+    }
+
+    return mapData;
   }
 
   /// Create a copy of CollectionItem with some fields updated

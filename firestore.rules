@@ -101,8 +101,8 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
              data.cardId is string &&
              data.lastModified is timestamp &&
              (data.regularQty is number || data.foilQty is number) &&
-             (data.regularQty == null || (data.regularQty is number && data.regularQty >= 0 && data.regularQty <= 100)) &&
-             (data.foilQty == null || (data.foilQty is number && data.foilQty >= 0 && data.foilQty <= 100)) &&
+             (data.regularQty == null || (data.regularQty is number && data.regularQty >= 0)) && // Removed upper bound
+             (data.foilQty == null || (data.foilQty is number && data.foilQty >= 0)) && // Removed upper bound
              (!data.keys().hasAny(['condition']) || data.condition is map) &&
              (!data.keys().hasAny(['purchaseInfo']) || data.purchaseInfo is map);
     }

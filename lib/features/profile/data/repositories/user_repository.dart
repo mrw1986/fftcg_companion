@@ -213,30 +213,32 @@ class UserRepository {
   ///
   /// This method is used to increment or set the collection count for a user
   /// It's used by the CollectionRepository when adding or removing items
-  Future<void> updateCollectionCount(String userId, int count,
-      {bool increment = false}) async {
+  Future<void> updateCollectionCount(String userId, int countChange) async {
+    // Note: 'increment' parameter removed, logic now always increments/decrements
+    // countChange should be +1 for adding a unique card, -1 for removing
+    final userDocRef = _usersCollection.doc(userId);
+
     try {
-      final user = await getUserById(userId);
-      if (user == null) throw Exception('User not found');
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(userDocRef);
 
-      int newCount;
-      if (increment) {
-        // Increment the current count
-        newCount = user.collectionCount + count;
-      } else {
-        // Set to the specified count
-        newCount = count;
-      }
+        if (!snapshot.exists) {
+          throw Exception("User document $userId does not exist!");
+        }
 
-      // Ensure count is never negative
-      newCount = newCount < 0 ? 0 : newCount;
+        // Default to 0 if collectionCount doesn't exist
+        final currentCount = snapshot.data()?['collectionCount'] as int? ?? 0;
+        int newCount = currentCount + countChange;
 
-      final updatedUser = user.copyWith(collectionCount: newCount);
-      await createOrUpdateUser(updatedUser);
+        // Ensure count is never negative
+        newCount = newCount < 0 ? 0 : newCount;
 
-      talker.debug('Updated collection count for user $userId: $newCount');
+        transaction.update(userDocRef, {'collectionCount': newCount});
+        talker.debug(
+            'Transactionally updated collection count for user $userId to: $newCount');
+      });
     } catch (e) {
-      talker.error('Error updating collection count: $e');
+      talker.error('Error updating collection count via transaction: $e');
       rethrow;
     }
   }
@@ -268,5 +270,46 @@ class UserRepository {
       talker.error('Error updating user profile data: $e');
       rethrow;
     }
-  }
-}
+  } // End of updateUserProfileData
+
+  /// Verifies the stored collectionCount against the actual count in Firestore
+  /// and corrects it if necessary.
+  Future<void> verifyAndCorrectCollectionCount(String userId) async {
+    final userDocRef = _usersCollection.doc(userId);
+    final collectionQuery =
+        _firestore.collection('collections').where('userId', isEqualTo: userId);
+
+    try {
+      // Get the actual count using an efficient aggregation query
+      final aggregateQuerySnapshot = await collectionQuery.count().get();
+      final actualCount = aggregateQuerySnapshot.count;
+
+      // Run a transaction to read the stored count and update if needed
+      await _firestore.runTransaction((transaction) async {
+        final userSnapshot = await transaction.get(userDocRef);
+
+        if (!userSnapshot.exists) {
+          talker.warning(
+              'User document $userId not found during collection count verification.');
+          return; // Cannot correct count if user doc doesn't exist
+        }
+
+        final storedCount =
+            userSnapshot.data()?['collectionCount'] as int? ?? 0;
+
+        if (actualCount != storedCount) {
+          talker.info(
+              'Correcting collectionCount for user $userId. Stored: $storedCount, Actual: $actualCount');
+          transaction.update(userDocRef, {'collectionCount': actualCount});
+        } else {
+          talker.verbose(
+              'CollectionCount for user $userId is already correct ($storedCount).');
+        }
+      });
+    } catch (e) {
+      talker.error('Error verifying/correcting collection count: $e');
+      // Decide if you want to rethrow or just log the error
+      // rethrow;
+    }
+  } // End of verifyAndCorrectCollectionCount
+} // End of UserRepository class
