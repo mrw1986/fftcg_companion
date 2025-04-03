@@ -2,6 +2,12 @@
 
 ## Recent Changes
 
+### Fix Initialization Error During Set Count Preload (Objective 47) - Completed (Testing Needed)
+
+- **Context:** App initialization failed with `NoSuchMethodError: Class 'Future<int>' has no instance method 'ignore'.` when preloading set card counts in `initializationProvider`.
+- **Changes:** Modified `lib/features/cards/presentation/providers/initialization_provider.dart`. Replaced `.ignore()` with `await` on the `filteredSetCardCountCacheProvider(setId).future` call within the loop.
+- **Status:** Fix applied. Testing required to ensure initialization completes without error.
+
 ### Fix Riverpod Error After Google Linking & Subsequent Analyzer Issues (Objective 46) - Completed (Testing Needed)
 
 - **Context:** Google linking caused a Riverpod error (`Providers are not allowed to modify...`) due to `authStateProvider` modifying `emailVerificationDetectedProvider` during build. Fixing this revealed a dependency cycle and other analyzer errors.

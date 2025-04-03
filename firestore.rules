@@ -137,7 +137,7 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
       allow write: if isCloudFunction() || isAuthorizedUser();
     }
 
-    // Collections (User specific items)
+    // Collections (User specific items) - Restored top-level path
     match /collections/{collectionId} {
       allow read: if isAuthenticated() && isOwner(resource.data.userId);
       // Allow create if authenticated, owner, valid data, and within limits/verified
@@ -207,20 +207,20 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
                       )
                     );
       allow delete: if isAuthenticated() && isOwner(userId);
-    }
 
-    // User Settings (Subcollection)
-    match /users/{userId}/settings/{document=**} {
-      // Allow owner full read/write access to their settings
-      allow read, write: if isAuthenticated() && isOwner(userId);
-    }
+      // User Settings (Subcollection)
+      match /settings/{document=**} {
+        // Allow owner full read/write access to their settings
+        allow read, write: if isAuthenticated() && isOwner(userId);
+      }
 
-    // User Stats (Subcollection)
-    match /users/{userId}/stats/{document=**} {
-      // Allow read if public or owner
-      allow read: if isAuthenticated() && (resource.data.isPublic || isOwner(userId));
-      // Allow write only by owner
-      allow write: if isAuthenticated() && isOwner(userId);
+      // User Stats (Subcollection)
+      match /stats/{document=**} {
+        // Allow read if public or owner
+        allow read: if isAuthenticated() && (resource.data.isPublic || isOwner(userId));
+        // Allow write only by owner
+        allow write: if isAuthenticated() && isOwner(userId);
+      }
     }
 
     // Metadata (Public read, no write)

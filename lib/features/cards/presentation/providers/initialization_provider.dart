@@ -57,7 +57,8 @@ Future<void> initialization(ref) async {
     talker.debug('Preloading first 5 sets: ${allSetIds.take(5).join(", ")}');
     for (final setId in allSetIds.take(5)) {
       // Force load each set to populate the cache
-      ref.read(filteredSetCardCountCacheProvider(setId).future).ignore();
+      // Await the future to trigger execution and ignore the int result
+      await ref.read(filteredSetCardCountCacheProvider(setId).future);
     }
 
     talker.debug('Set card count preload started');

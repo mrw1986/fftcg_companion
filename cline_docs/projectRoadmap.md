@@ -49,7 +49,7 @@
    - [x] Fixed provider unlinking logic and UI refresh
    - [x] Fixed email pre-population in link dialog
    - [x] Fixed state handling after sign-out/deletion
-   - [x] Implemented data migration for anonymous users linking with Google accounts
+   - [x] Implemented data migration for anonymous users linking with Google accounts (Collection only)
    - [x] Added merge confirmation dialog for data preservation
    - [x] Fixed BuildContext handling in async operations
    - [x] Improved Google linking state management (skipAutoAuth flag, sign-out/sign-in process)
@@ -61,7 +61,7 @@
    - [ ] **Critical:** Fix Firestore permission issues during data migration
    - [ ] **Ongoing:** Testing and troubleshooting edge cases (e.g., Google linking redirect)
    - [x] Implemented settings migration (theme, display preferences)
-   - [ ] **Pending:** Expand data migration to include deck data
+   - [ ] **Pending:** Expand data migration to include deck data (See Phase 3, Item 17)
 
 2. Card Database
    - [x] Card browsing
@@ -77,6 +77,8 @@
    - [ ] Deck analysis
    - [ ] Deck sharing
    - [ ] Deck statistics
+   - [ ] Deck Export (CSV, XML, JSON)
+   - [ ] Advanced Deck Export (HTML/PDF with analysis)
 
 2. Card Scanner
    - [ ] Image recognition
@@ -111,13 +113,13 @@
 - [x] Implement proper account linking for anonymous users (Rebuilt)
 - [x] Fix account deletion flow with proper state reset (Rebuilt)
 - [x] Fix Google authentication flow (Rebuilt)
-- [x] Implement data migration for anonymous users (Rebuilt)
+- [x] Implement data migration for anonymous users (Rebuilt - Collection only)
 - [x] Improved Google linking state management (Rebuilt)
 - [x] Fixed authentication method order consistency in UI
 - [x] Fixed Google authentication display name not storing in Firestore
   - [ ] **Fix Firestore permission issues during data migration (Critical)**
   - [ ] **Ensure all edge cases and state transitions are handled correctly (Ongoing Testing)**
-  - [ ] **Implement comprehensive data migration for all user data (Pending)**
+  - [ ] **Implement comprehensive data migration for all user data (Pending - See Phase 3, Item 17)**
 
 ### Recently Completed Tasks
 
@@ -216,34 +218,49 @@
    - Added re-authentication flows
    - Enhanced data protection
 
-### Next Steps
+### Detailed Development Plan (Phased Approach)
 
-1. **Address Account Limits Dialog Issue:**
-   - [x] Investigate why the Account Limits dialog appears after Google sign-in
-   - [x] Fix auth state transitions during the sign-out/sign-in process
+#### Phase 1: Bug Fixes, Core Usability & Setup (Highest Priority)
 
-2. **Fix Firestore permission issues during data migration (Critical)**
-   - [ ] Review and update Firestore rules for all migration scenarios
-   - [ ] Fix user document creation timing
-   - [ ] Add proper error handling for permission denied cases
-   - [ ] Test all data migration paths
+- [ ] **1. Fix App Check Token Issue:** Address `No AppCheckProvider installed` error.
+- [ ] **2. Fix Card Details Page Flicker/Lag:** Fix initial card display and swipe/button responsiveness issues.
+- [ ] **3. Maintain Screen State:** Preserve filters/sort/search on navigation.
+- [ ] **4. Finish Favorite/Wishlist Features:** Implement UI (filters, icons).
 
-3. **Continue testing and troubleshooting Authentication edge cases and flows (especially Google linking)**
+#### Phase 2: Collection Management & Key Enhancements (High Priority)
 
-4. **Expand data migration to handle all user data:**
-   - [ ] Deck data migration
-   - [ ] User settings migration
-   - [ ] User preferences migration
-   - [ ] Ensure data integrity during migration
+- [ ] **5. Multiple Copies of Same Card Handling:** Implement **Solution C (Subcollection per Card)**.
+- [ ] **6. Delete Card on Zero Quantity:** Delete Firestore doc when quantities are zeroed out.
+- [ ] **7. Tablet/Foldable Layout:** Implement adaptive layouts (start with master-detail).
 
-5. Implement deck builder feature
-6. Add card scanner functionality
-7. Develop price tracking system
-8. Add collection import/export
-9. Implement collection sharing
-10. Add favorites and wishlist
-11. Enhance filtering options
-12. Add batch operations
+#### Phase 3: New Features & UI Refinements (Medium Priority)
+
+- [ ] **8. User Avatar Upload:** Allow users to upload profile pictures.
+- [ ] **9. Add Card Page for Non-Cards (`isNonCard = true`):** Adapt UI for non-card items.
+- [ ] **10. Search Result Sorting:** Implement specified sorting logic.
+- [ ] **11. Card Description Formatting:** Bold keywords, add crystal cost icons.
+- [ ] **12. EX BURST Filter:** Add filter for `ex_burst = true`.
+- [ ] **13. Collection Import/Export Feature:** Add CSV, XML, JSON import/export.
+- [ ] **14. Theme Settings Page Refinement:** Simplify color picker (Primary/Accent shades only), adjust spacing, ensure responsiveness.
+- [ ] **15. Create About Page:** Add static About page.
+- [ ] **16. Add Batch Operations:** Implement batch actions for collection management (e.g., add/delete multiple cards).
+- [ ] **17. Expand Data Migration:** Implement migration for deck data, user settings, and preferences, ensuring data integrity.
+
+#### Phase 4: Major Features & Infrastructure (Medium-Low Priority)
+
+- [ ] **18. Implement Deck Builder:** Core features - creation, editing, analysis, standard export (CSV, XML, JSON).
+- [ ] **19. Add Advanced Deck Analysis Export:** Generate HTML/PDF output with element distribution, cost curves, etc.
+- [ ] **20. Add Card Scanner Functionality:** Image recognition, bulk scanning.
+- [ ] **21. Collection Price Tracking:** Integrate `fl_chart`, design UI (requires price data source).
+- [ ] **22. Google Auth Photo URL Logic:** Prioritize existing Firestore photoURL.
+- [ ] **23. Implement Analytics, Crashlytics, Performance Monitoring:** Integrate Firebase services.
+- [ ] **24. Grading Info Casing:** Correct "Regular"/"Foil" casing.
+- [ ] **25. Collection Page Spacing:** Adjust spacing on empty collection page.
+
+#### Phase 5: Modern UI/UX Overhaul & Social (Lower Priority)
+
+- [ ] **26. Modernize UI/UX:** Implement motion, elevation, rounded inputs. Create an onboarding experience (parallax, feature highlights, auth options). Review overall aesthetic.
+- [ ] **27. Implement Collection Sharing:** Allow users to share their collections (view-only initially).
 
 ### Future Considerations
 
