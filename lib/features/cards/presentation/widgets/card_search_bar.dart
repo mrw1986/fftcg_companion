@@ -170,13 +170,13 @@ class _CardSearchBarState extends ConsumerState<CardSearchBar>
                 tooltip: 'Clear search',
                 onPressed: () {
                   widget.controller.clear();
-                  ref.read(searchQueryProvider.notifier).state = '';
+                  ref.read(cardSearchQueryProvider.notifier).setQuery('');
                 },
               )
             : null,
       ),
       onChanged: (value) {
-        ref.read(searchQueryProvider.notifier).state = value;
+        ref.read(cardSearchQueryProvider.notifier).setQuery(value);
       },
     );
   }

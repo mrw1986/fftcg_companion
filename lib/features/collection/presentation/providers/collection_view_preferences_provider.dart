@@ -1,88 +1,18 @@
-// lib/features/cards/presentation/providers/view_preferences_provider.dart
+// lib/features/collection/presentation/providers/collection_view_preferences_provider.dart
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart'; // Import shared enums
 
-part 'view_preferences_provider.g.dart';
+part 'collection_view_preferences_provider.g.dart';
 
-// Shared enums (can remain here or be moved to a shared location if preferred)
-enum ViewType {
-  grid,
-  list;
-
-  String get icon => switch (this) {
-        ViewType.grid => 'grid_view',
-        ViewType.list => 'view_list',
-      };
-
-  String get label => switch (this) {
-        ViewType.grid => 'Grid View',
-        ViewType.list => 'List View',
-      };
-}
-
-enum ViewSize {
-  small,
-  normal,
-  large;
-
-  ViewSize get next => switch (this) {
-        ViewSize.small => ViewSize.normal,
-        ViewSize.normal => ViewSize.large,
-        ViewSize.large => ViewSize.small,
-      };
-
-  double get gridPadding => switch (this) {
-        ViewSize.small => 4.0,
-        ViewSize.normal => 8.0,
-        ViewSize.large => 12.0,
-      };
-
-  double get gridSpacing => switch (this) {
-        ViewSize.small => 4.0,
-        ViewSize.normal => 8.0,
-        ViewSize.large => 12.0,
-      };
-
-  double get listItemHeight => switch (this) {
-        ViewSize.small => 64.0,
-        ViewSize.normal => 80.0,
-        ViewSize.large => 96.0,
-      };
-
-  int getColumnCount(double screenWidth) => switch (this) {
-        ViewSize.small => screenWidth > 1200
-            ? 8
-            : screenWidth > 900
-                ? 6
-                : screenWidth > 600
-                    ? 4
-                    : 3,
-        ViewSize.normal => screenWidth > 1200
-            ? 6
-            : screenWidth > 900
-                ? 4
-                : screenWidth > 600
-                    ? 3
-                    : 2,
-        ViewSize.large => screenWidth > 1200
-            ? 4
-            : screenWidth > 900
-                ? 3
-                : screenWidth > 600
-                    ? 2
-                    : 1,
-      };
-}
-
-// Renamed provider for Cards page preferences
 @riverpod
-class CardViewPreferences extends _$CardViewPreferences {
-  // Use distinct keys for cards preferences
+class CollectionViewPreferences extends _$CollectionViewPreferences {
+  // Use distinct keys for collection preferences
   static const _boxName = 'settings';
-  static const _viewTypeKey = 'card_view_type'; // Renamed key
-  static const _gridSizeKey = 'card_grid_size'; // Renamed key
-  static const _listSizeKey = 'card_list_size'; // Renamed key
-  static const _showLabelsKey = 'card_show_labels'; // Renamed key
+  static const _viewTypeKey = 'collection_view_type';
+  static const _gridSizeKey = 'collection_grid_size';
+  static const _listSizeKey = 'collection_list_size';
+  static const _showLabelsKey = 'collection_show_labels';
 
   Box? _getBox() {
     if (!Hive.isBoxOpen(_boxName)) {
@@ -115,7 +45,6 @@ class CardViewPreferences extends _$CardViewPreferences {
   }
 
   ViewType _loadViewType(Box? box) {
-    // Load using the renamed key
     final saved = box?.get(_viewTypeKey, defaultValue: ViewType.grid.name);
     if (saved == null) return ViewType.grid;
     return ViewType.values.firstWhere(
@@ -125,7 +54,6 @@ class CardViewPreferences extends _$CardViewPreferences {
   }
 
   ViewSize _loadSize(Box? box, String key) {
-    // Load using the specific key passed (e.g., _gridSizeKey, _listSizeKey)
     final saved = box?.get(key, defaultValue: ViewSize.normal.name);
     if (saved == null) return ViewSize.normal;
     return ViewSize.values.firstWhere(
@@ -137,7 +65,6 @@ class CardViewPreferences extends _$CardViewPreferences {
   Future<void> toggleViewType() async {
     final box = await _openBox();
     final newType = state.type == ViewType.grid ? ViewType.list : ViewType.grid;
-    // Save using the renamed key
     await box.put(_viewTypeKey, newType.name);
     state = (
       type: newType,
@@ -151,7 +78,6 @@ class CardViewPreferences extends _$CardViewPreferences {
     final box = await _openBox();
     if (state.type == ViewType.grid) {
       final newSize = state.gridSize.next;
-      // Save using the renamed key
       await box.put(_gridSizeKey, newSize.name);
       state = (
         type: state.type,
@@ -161,7 +87,6 @@ class CardViewPreferences extends _$CardViewPreferences {
       );
     } else {
       final newSize = state.listSize.next;
-      // Save using the renamed key
       await box.put(_listSizeKey, newSize.name);
       state = (
         type: state.type,
@@ -174,7 +99,6 @@ class CardViewPreferences extends _$CardViewPreferences {
 
   Future<void> toggleLabels() async {
     final box = await _openBox();
-    // Save using the renamed key
     await box.put(_showLabelsKey, !state.showLabels);
     state = (
       type: state.type,

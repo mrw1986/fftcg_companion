@@ -1,5 +1,6 @@
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
+// Import Card model directly to access mapper
 import 'package:fftcg_companion/core/utils/logger.dart';
 
 class CardCache {
@@ -66,7 +67,8 @@ class CardCache {
       // Update disk cache
       final batch = <String, Map>{};
       for (final card in cards) {
-        batch[card.productId.toString()] = card.toJson();
+        // Use toMap
+        batch[card.productId.toString()] = card.toMap();
       }
       await _cardsBox!.putAll(batch);
     } catch (e, stack) {
@@ -88,7 +90,9 @@ class CardCache {
       // Fall back to disk cache
       talker.debug('Using disk card cache');
       final cards = _cardsBox!.values
-          .map((data) => models.Card.fromJson(Map<String, dynamic>.from(data)))
+          // Use fromMap
+          .map((data) =>
+              models.CardMapper.fromMap(Map<String, dynamic>.from(data)))
           .toList();
 
       // Update memory cache
@@ -111,7 +115,8 @@ class CardCache {
       // Update disk cache with timestamp for debugging
       final cacheData = [
         DateTime.now().toIso8601String(),
-        ...results.map((card) => card.toJson())
+        // Use toMap
+        ...results.map((card) => card.toMap())
       ];
       await _searchCacheBox!.put(query, cacheData);
     } catch (e, stack) {
@@ -136,7 +141,8 @@ class CardCache {
       // Rest of elements are card data (skip timestamp)
       final results = cached.skip(1).map((data) {
         final cardData = Map<String, dynamic>.from(data as Map);
-        return models.Card.fromJson(cardData);
+        // Use fromMap
+        return models.CardMapper.fromMap(cardData);
       }).toList();
 
       // Update memory cache

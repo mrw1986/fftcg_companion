@@ -3,6 +3,8 @@ import 'package:fftcg_companion/features/models.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+// Import the Card model to access the mapper
+import 'package:fftcg_companion/features/cards/domain/models/card.dart';
 
 class CacheService {
   static const String _cardsBoxName = 'cards';
@@ -89,7 +91,8 @@ class CacheService {
 
       final batch = <String, Map>{};
       for (final card in cards) {
-        batch[card.productId.toString()] = card.toJson();
+        // Use toMap
+        batch[card.productId.toString()] = card.toMap();
 
         // Commit batch every 100 cards to avoid memory issues
         if (batch.length >= 100) {
@@ -124,7 +127,8 @@ class CacheService {
       // Fall back to disk cache
       talker.debug('Using disk card cache');
       final cards = _cardsBox.values
-          .map((data) => Card.fromJson(Map<String, dynamic>.from(data)))
+          // Use fromMap
+          .map((data) => CardMapper.fromMap(Map<String, dynamic>.from(data)))
           .toList();
 
       // Update memory cache
@@ -148,7 +152,8 @@ class CacheService {
       // Update disk cache with timestamp for debugging
       final cacheData = [
         DateTime.now().toIso8601String(),
-        ...results.map((card) => card.toJson())
+        // Use toMap
+        ...results.map((card) => card.toMap())
       ];
       await _searchCacheBox.put(query, cacheData);
 
@@ -208,7 +213,8 @@ class CacheService {
       // Rest of elements are card data (skip timestamp)
       final results = cached.skip(1).map((data) {
         final cardData = Map<String, dynamic>.from(data as Map);
-        return Card.fromJson(cardData);
+        // Use fromMap
+        return CardMapper.fromMap(cardData);
       }).toList();
 
       // Update memory cache

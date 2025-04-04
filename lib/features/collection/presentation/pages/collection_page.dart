@@ -2,8 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../shared/widgets/loading_indicator.dart';
-import '../../domain/providers/collection_providers.dart';
-import '../../domain/providers/view_preferences_provider.dart';
+// Hide the incorrect search provider from this import
+import '../../domain/providers/collection_providers.dart'
+    hide collectionSearchQueryProvider; // Keep for collection data
+// Import the new collection-specific view preferences provider
+import '../providers/collection_view_preferences_provider.dart';
+// Import the new collection-specific search provider
+import '../providers/collection_search_provider.dart';
+// Import the shared view preference enums (assuming they are still in cards feature or moved)
+import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart'
+    show ViewType, ViewSize;
 import '../widgets/collection_content.dart';
 import '../widgets/collection_stats_card.dart';
 import '../widgets/collection_sort_bottom_sheet.dart';
@@ -36,7 +44,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
 
     if (!_isSearching) {
       _searchController.clear();
-      ref.read(collectionSearchQueryProvider.notifier).state = '';
+      // Use the correct search provider from collection_search_provider.dart
+      ref.read(collectionSearchQueryProvider.notifier).setQuery('');
     }
   }
 
@@ -68,8 +77,10 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                 ),
                 style: TextStyle(color: colorScheme.onPrimary),
                 onChanged: (value) {
-                  ref.read(collectionSearchQueryProvider.notifier).state =
-                      value;
+                  // Use the correct search provider from collection_search_provider.dart
+                  ref
+                      .read(collectionSearchQueryProvider.notifier)
+                      .setQuery(value);
                 },
                 autofocus: true,
               )
@@ -140,15 +151,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             ),
             tooltip: 'Change Size',
             onPressed: () {
-              if (viewPrefs.type == ViewType.grid) {
-                ref
-                    .read(collectionViewPreferencesProvider.notifier)
-                    .cycleGridSize();
-              } else {
-                ref
-                    .read(collectionViewPreferencesProvider.notifier)
-                    .cycleListSize();
-              }
+              // Use the correct provider name
+              ref.read(collectionViewPreferencesProvider.notifier).cycleSize();
             },
             constraints: const BoxConstraints(
               minWidth: 48.0,

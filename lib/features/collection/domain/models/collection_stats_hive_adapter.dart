@@ -2,6 +2,7 @@
 
 import 'package:hive_ce/hive.dart';
 import 'package:fftcg_companion/features/collection/domain/models/collection_stats.dart';
+// import 'collection_stats.mapper.dart'; // Removed incorrect import
 
 @HiveType(typeId: 7)
 class CollectionStatsAdapter extends TypeAdapter<CollectionStats> {
@@ -11,11 +12,13 @@ class CollectionStatsAdapter extends TypeAdapter<CollectionStats> {
   @override
   CollectionStats read(BinaryReader reader) {
     final map = reader.readMap().cast<String, dynamic>();
-    return CollectionStats.fromJson(map);
+    // Use dart_mappable's fromMap
+    return CollectionStatsMapper.fromMap(map);
   }
 
   @override
   void write(BinaryWriter writer, CollectionStats obj) {
-    writer.writeMap(obj.toJson());
+    // Use dart_mappable's toMap
+    writer.writeMap(obj.toMap());
   }
 }

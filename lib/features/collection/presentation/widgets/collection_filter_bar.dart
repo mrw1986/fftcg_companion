@@ -15,7 +15,7 @@ class CollectionFilterBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final currentFilters = ref.watch(collectionFilterProvider);
+    final currentFilters = ref.watch(collectionSpecificFilterProvider);
 
     return Card(
       elevation: 0,
@@ -33,7 +33,9 @@ class CollectionFilterBar extends ConsumerWidget {
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () {
-                    ref.read(collectionFilterProvider.notifier).state = {};
+                    ref
+                        .read(collectionSpecificFilterProvider.notifier)
+                        .clearFilters();
                     onFilterChanged?.call({});
                   },
                   child: const Text('Clear All'),
@@ -91,7 +93,7 @@ class CollectionFilterBar extends ConsumerWidget {
   ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final currentFilters = ref.watch(collectionFilterProvider);
+    final currentFilters = ref.watch(collectionSpecificFilterProvider);
     final isSelected = currentFilters[filterKey] == filterValue;
 
     return FilterChip(
@@ -111,14 +113,21 @@ class CollectionFilterBar extends ConsumerWidget {
       ),
       selected: isSelected,
       onSelected: (selected) {
-        final newFilters = Map<String, dynamic>.from(currentFilters);
+        // No longer need to create a new map here, notifier handles state update.
         if (selected) {
-          newFilters[filterKey] = filterValue;
+          ref
+              .read(collectionSpecificFilterProvider.notifier)
+              .setFilter(filterKey, filterValue);
         } else {
-          newFilters.remove(filterKey);
+          ref
+              .read(collectionSpecificFilterProvider.notifier)
+              .removeFilter(filterKey);
         }
-        ref.read(collectionFilterProvider.notifier).state = newFilters;
-        onFilterChanged?.call(newFilters);
+        // State is updated within the notifier methods, no need to set it here.
+        // We still need to call the callback if provided.
+        final updatedFilters =
+            ref.read(collectionSpecificFilterProvider); // Read the latest state
+        onFilterChanged?.call(updatedFilters);
       },
       backgroundColor: colorScheme.surface,
       selectedColor: colorScheme.primaryContainer,
@@ -139,7 +148,7 @@ class CollectionFilterBar extends ConsumerWidget {
   Widget _buildGradingCompanyFilter(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final currentFilters = ref.watch(collectionFilterProvider);
+    final currentFilters = ref.watch(collectionSpecificFilterProvider);
     final hasGradingCompanyFilter =
         currentFilters.containsKey('gradingCompany');
 
@@ -152,10 +161,16 @@ class CollectionFilterBar extends ConsumerWidget {
     return PopupMenuButton<String>(
       initialValue: currentFilters['gradingCompany'],
       onSelected: (company) {
-        final newFilters = Map<String, dynamic>.from(currentFilters);
-        newFilters['gradingCompany'] = company;
-        ref.read(collectionFilterProvider.notifier).state = newFilters;
-        onFilterChanged?.call(newFilters);
+        // No longer need to create a new map here, notifier handles state update.
+        // Use setFilter to update the specific key
+        ref
+            .read(collectionSpecificFilterProvider.notifier)
+            .setFilter('gradingCompany', company);
+        // State is updated within the notifier method.
+        // We still need to call the callback if provided.
+        final updatedFilters =
+            ref.read(collectionSpecificFilterProvider); // Read the latest state
+        onFilterChanged?.call(updatedFilters);
       },
       itemBuilder: (context) => [
         const PopupMenuItem(

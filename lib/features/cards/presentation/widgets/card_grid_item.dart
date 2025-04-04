@@ -1,11 +1,17 @@
+// lib/features/cards/presentation/widgets/card_grid_item.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod
 import 'package:go_router/go_router.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart';
+// Import favorite/wishlist providers
+import 'package:fftcg_companion/features/cards/presentation/providers/favorites_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/wishlist_provider.dart';
 
-class CardGridItem extends StatefulWidget {
+// Convert to ConsumerStatefulWidget
+class CardGridItem extends ConsumerStatefulWidget {
   final models.Card card;
   final ViewSize viewSize;
   final bool showLabels;
@@ -18,17 +24,25 @@ class CardGridItem extends StatefulWidget {
   });
 
   @override
-  State<CardGridItem> createState() => _CardGridItemState();
+  ConsumerState<CardGridItem> createState() => _CardGridItemState();
 }
 
-class _CardGridItemState extends State<CardGridItem>
+// Update state class to ConsumerState
+class _CardGridItemState extends ConsumerState<CardGridItem>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
+    super.build(context); // Keep this for AutomaticKeepAliveClientMixin
+
+    // Watch favorite and wishlist status
+    final isFavorite =
+        ref.watch(isFavoriteProvider(widget.card.productId.toString()));
+    final isInWishlist =
+        ref.watch(isInWishlistProvider(widget.card.productId.toString()));
+    final colorScheme = Theme.of(context).colorScheme;
 
     final titleStyle = switch (widget.viewSize) {
       ViewSize.small => const TextStyle(
@@ -134,6 +148,62 @@ class _CardGridItemState extends State<CardGridItem>
                     ),
                   ),
                 ),
+              // --- Favorite/Wishlist Icons ---
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Favorite Icon
+                    Material(
+                      color: Colors.black54,
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        icon: Icon(
+                          isFavorite ? Icons.star : Icons.star_border,
+                          color: isFavorite ? Colors.amber : Colors.white70,
+                        ),
+                        iconSize: 18,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        tooltip:
+                            isFavorite ? 'Remove Favorite' : 'Add Favorite',
+                        onPressed: () {
+                          ref
+                              .read(favoritesProvider.notifier)
+                              .toggleFavorite(widget.card.productId.toString());
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 2), // Spacing between icons
+                    // Wishlist Icon
+                    Material(
+                      color: Colors.black54,
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        icon: Icon(
+                          isInWishlist ? Icons.bookmark : Icons.bookmark_border,
+                          color: isInWishlist
+                              ? colorScheme.tertiary
+                              : Colors.white70,
+                        ),
+                        iconSize: 18,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        tooltip:
+                            isInWishlist ? 'Remove Wishlist' : 'Add Wishlist',
+                        onPressed: () {
+                          ref
+                              .read(wishlistProvider.notifier)
+                              .toggleWishlist(widget.card.productId.toString());
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // --- End Favorite/Wishlist Icons ---
             ],
           ),
         ),

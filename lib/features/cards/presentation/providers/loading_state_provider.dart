@@ -1,22 +1,29 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart'; // Added
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-part 'loading_state_provider.freezed.dart';
-part 'loading_state_provider.g.dart';
+part 'loading_state_provider.mapper.dart'; // Added
+part 'loading_state_provider.g.dart'; // Added back for Riverpod generator
 
-@freezed
-class LoadingState with _$LoadingState {
-  const factory LoadingState({
-    required String message,
-    double? progress,
-    @Default(false) bool isLoading,
-  }) = _LoadingState;
+@MappableClass() // Added
+class LoadingState with LoadingStateMappable {
+  // Added mixin
+  final String message;
+  final double? progress;
+  final bool isLoading;
+
+  const LoadingState({
+    // Changed to standard constructor
+    required this.message,
+    this.progress,
+    this.isLoading = false, // Default value handled here
+  });
 }
 
 @riverpod
 class LoadingStateNotifier extends _$LoadingStateNotifier {
   @override
   LoadingState build() {
+    // Constructor usage remains the same due to named parameters
     return const LoadingState(message: '', isLoading: false);
   }
 

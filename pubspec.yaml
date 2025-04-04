@@ -46,9 +46,7 @@ dependencies:
   flutter_native_splash: ^2.4.5
 
   # Utils
-  freezed_annotation: ^3.0.0
-  freezed: ^3.0.3
-  json_annotation: ^4.9.0
+  dart_mappable: ^4.2.1 # Added
   intl: ^0.20.2
   collection: ^1.19.1
   talker: ^4.6.14
@@ -73,7 +71,7 @@ dev_dependencies:
   # Code Generation
   build_runner: ^2.4.15
   custom_lint: ^0.7.5
-  json_serializable: ^6.9.4
+  dart_mappable_builder: ^4.2.1 # Added
   riverpod_generator: ^2.6.5
   riverpod_lint: ^2.6.5
 

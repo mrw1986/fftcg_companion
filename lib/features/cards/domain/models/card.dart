@@ -1,55 +1,76 @@
 // lib/features/cards/domain/models/card.dart
 
-import 'package:fftcg_companion/core/utils/soundex.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart'; // Added
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-part 'card.freezed.dart';
-part 'card.g.dart';
+part 'card.mapper.dart'; // Added
 
-@freezed
-class Card with _$Card {
-  const Card._();
+@MappableClass(caseStyle: CaseStyle.camelCase) // Added
+class Card with CardMappable {
+  // Added mixin
+  final int productId;
+  final String name;
+  final String cleanName;
+  final String fullResUrl;
+  final String highResUrl;
+  final String lowResUrl;
+  final DateTime? lastUpdated;
+  final int groupId;
+  final bool isNonCard;
+  final String? cardType;
+  final String? category;
+  final List<String> categories;
+  final int? cost;
+  final String? description;
+  final List<String> elements;
+  final String? job;
+  final String? number;
+  final int? power;
+  final String? rarity;
+  final List<String> cardNumbers;
+  final List<String> searchTerms;
+  final List<String> set;
+  final String? fullCardNumber;
 
-  const factory Card({
-    required int productId,
-    required String name,
-    required String cleanName,
-    required String fullResUrl,
-    required String highResUrl,
-    required String lowResUrl,
-    DateTime? lastUpdated,
-    required int groupId,
-    @Default(false) bool isNonCard,
-    String? cardType,
-    String? category,
-    @Default([]) List<String> categories,
-    int? cost,
-    String? description,
-    @Default([]) List<String> elements,
-    String? job,
-    String? number,
-    int? power,
-    String? rarity,
-    @Default([]) List<String> cardNumbers,
-    @Default([]) List<String> searchTerms,
-    @Default([]) List<String> set,
-    String? fullCardNumber,
-  }) = _Card;
+  const Card({
+    // Changed to standard constructor
+    required this.productId,
+    required this.name,
+    required this.cleanName,
+    required this.fullResUrl,
+    required this.highResUrl,
+    required this.lowResUrl,
+    this.lastUpdated,
+    required this.groupId,
+    this.isNonCard = false, // Default value
+    this.cardType,
+    this.category,
+    this.categories = const [], // Default value
+    this.cost,
+    this.description,
+    this.elements = const [], // Default value
+    this.job,
+    this.number,
+    this.power,
+    this.rarity,
+    this.cardNumbers = const [], // Default value
+    this.searchTerms = const [], // Default value
+    this.set = const [], // Default value
+    this.fullCardNumber,
+  });
 
-  factory Card.fromJson(Map<String, dynamic> json) => _$CardFromJson(json);
+  // fromJson factory removed
 
+  // Keep custom Firestore factory
   factory Card.fromFirestore(Map<String, dynamic> data) {
     final name = data['name'] as String? ?? '';
     final number = data['number'] as String?;
     final cardNumbers =
         (data['cardNumbers'] as List?)?.map((e) => e.toString()).toList() ?? [];
-    // Get search terms array
     final searchTerms =
         (data['searchTerms'] as List?)?.map((e) => e.toString()).toList() ?? [];
     final categories =
         (data['categories'] as List?)?.map((e) => e.toString()).toList() ?? [];
-    // Get fullCardNumber or construct it from cardNumbers
     final fullCardNumber = data['fullCardNumber'] as String? ??
         (cardNumbers.isNotEmpty ? cardNumbers.join('/') : number);
 
@@ -83,6 +104,7 @@ class Card with _$Card {
     );
   }
 
+  // Keep custom Firestore method
   Map<String, dynamic> toFirestore() {
     final Map<String, dynamic> data = {
       'productId': productId,
@@ -112,11 +134,14 @@ class Card with _$Card {
     if (number != null) data['number'] = number;
     if (power != null) data['power'] = power;
     if (rarity != null) data['rarity'] = rarity;
+    if (fullCardNumber != null) {
+      data['fullCardNumber'] = fullCardNumber; // Added missing field
+    }
 
     return data;
   }
 
-  // Helper methods for card properties
+  // Helper methods for card properties (Keep as is)
   bool get hasElement => elements.isNotEmpty;
   bool get hasMultipleElements => elements.length > 1;
   bool get isForward => cardType?.toLowerCase() == 'forward';
@@ -124,12 +149,12 @@ class Card with _$Card {
   bool get isSummon => cardType?.toLowerCase() == 'summon';
   bool get isMonster => cardType?.toLowerCase() == 'monster';
 
-  // Display helpers
+  // Display helpers (Keep as is)
   String? get displayNumber => isNonCard ? null : (fullCardNumber ?? number);
   String get displayRarity => isNonCard ? 'Sealed Product' : (rarity ?? '');
   String? get displayCategory => category?.replaceAll('&middot;', ' · ');
 
-  // Rarity helpers
+  // Rarity helpers (Keep as is)
   bool get isCommon => !isNonCard && rarity?.toLowerCase() == 'c';
   bool get isRare => !isNonCard && rarity?.toLowerCase() == 'r';
   bool get isHeroic => !isNonCard && rarity?.toLowerCase() == 'h';
@@ -137,19 +162,15 @@ class Card with _$Card {
   bool get isSpecial => !isNonCard && rarity?.toLowerCase() == 's';
   bool get isPromo => !isNonCard && rarity?.toLowerCase() == 'p';
 
-  // Compare cards for sorting
+  // Compare cards for sorting (Keep as is)
   int compareByNumber(Card other) {
-    // If either card is a non-card, sort them to the end
     if (isNonCard && other.isNonCard) return 0;
     if (isNonCard) return 1;
     if (other.isNonCard) return -1;
 
-    // Use fullCardNumber if available, otherwise fall back to number
     final thisNum = fullCardNumber ?? number ?? '';
     final otherNum = other.fullCardNumber ?? other.number ?? '';
 
-    // Split numbers into parts (e.g., "2-017R" -> ["2", "017"])
-    // For fullCardNumber like "Re-001H/12-002H", use the first part
     final thisParts = thisNum.split('/')[0].split('-');
     final otherParts = otherNum.split('/')[0].split('-');
 
@@ -157,38 +178,29 @@ class Card with _$Card {
       return thisNum.compareTo(otherNum);
     }
 
-    // Handle crystal cards (C-001, etc.) - they should be sorted after regular cards
     final thisIsCrystal = thisParts[0] == 'C';
     final otherIsCrystal = otherParts[0] == 'C';
 
-    // If one is crystal and other isn't, crystal comes after
     if (thisIsCrystal && !otherIsCrystal) return 1;
     if (!thisIsCrystal && otherIsCrystal) return -1;
 
-    // If both are crystal or both are regular cards, proceed with normal comparison
     if (thisIsCrystal && otherIsCrystal) {
-      // For crystal cards, compare second part
       if (thisParts.length > 1 && otherParts.length > 1) {
         return thisParts[1].compareTo(otherParts[1]);
       }
       return thisNum.compareTo(otherNum);
     }
 
-    // For regular cards, check if first parts are numeric
     final thisFirstIsNumeric = RegExp(r'^\d+$').hasMatch(thisParts[0]);
     final otherFirstIsNumeric = RegExp(r'^\d+$').hasMatch(otherParts[0]);
 
-    // If one is numeric and other isn't, numeric comes first
     if (thisFirstIsNumeric && !otherFirstIsNumeric) return -1;
     if (!thisFirstIsNumeric && otherFirstIsNumeric) return 1;
 
-    // If both are numeric or both are non-numeric, compare first parts
     final firstPartComparison = thisParts[0].compareTo(otherParts[0]);
     if (firstPartComparison != 0) return firstPartComparison;
 
-    // If first parts are equal and there's a second part, compare those
     if (thisParts.length > 1 && otherParts.length > 1) {
-      // Extract numeric portion from second part
       final thisSecondNum = int.tryParse(
               RegExp(r'(\d+)').firstMatch(thisParts[1])?.group(1) ?? '') ??
           0;
@@ -199,11 +211,9 @@ class Card with _$Card {
       final secondPartComparison = thisSecondNum.compareTo(otherSecondNum);
       if (secondPartComparison != 0) return secondPartComparison;
 
-      // If numeric parts are equal, compare full strings
       return thisParts[1].compareTo(otherParts[1]);
     }
 
-    // Fall back to string comparison
     return thisNum.compareTo(otherNum);
   }
 
@@ -215,15 +225,12 @@ class Card with _$Card {
   }
 
   int compareByName(Card other) {
-    // First compare by name
-    // Use lowercase comparison to ensure consistent sorting
     final thisName = cleanName.toLowerCase();
     final otherName = other.cleanName.toLowerCase();
 
     final nameComparison = thisName.compareTo(otherName);
     if (nameComparison != 0) return nameComparison;
 
-    // If names are equal, compare by card number
     return compareByNumber(other);
   }
 
@@ -234,17 +241,15 @@ class Card with _$Card {
     return power!.compareTo(other.power!);
   }
 
-  // Search helpers
+  // Search helpers (Keep as is)
   bool matchesSearchTerm(String term) {
     final searchTerm = term.toLowerCase().trim();
     return searchTerms.contains(searchTerm) ||
-        searchTerms.any((token) => token.startsWith(searchTerm)) ||
-        searchTerms.contains(SoundexUtil.generate(searchTerm));
+        searchTerms.any((token) => token.startsWith(searchTerm));
   }
 
-  // URL helpers
+  // URL helpers (Keep as is)
   String? getBestImageUrl() {
-    // Try URLs in priority order: full -> high -> low
     if (fullResUrl.isNotEmpty) {
       return fullResUrl;
     }
@@ -258,6 +263,7 @@ class Card with _$Card {
   }
 }
 
+@MappableEnum() // Added
 enum ImageQuality {
   low,
   medium,

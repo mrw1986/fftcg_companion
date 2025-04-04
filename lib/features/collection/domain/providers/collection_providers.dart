@@ -1,10 +1,18 @@
+// lib/features/collection/domain/providers/collection_providers.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart'; // Import Hive
+import 'package:fftcg_companion/core/utils/logger.dart'; // Import Logger
 import '../models/collection_item.dart';
 import '../../data/repositories/collection_repository.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/card_cache_provider.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
-import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
+// Import the correct collection filter provider for shared card filters
+import 'package:fftcg_companion/features/collection/presentation/providers/collection_filter_provider.dart';
+// Keep import for the CardFilters model
+// Import favorite/wishlist providers
+import 'package:fftcg_companion/features/cards/presentation/providers/favorites_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/wishlist_provider.dart';
 
 /// Repository provider
 final collectionRepositoryProvider = Provider<CollectionRepository>((ref) {
@@ -120,10 +128,80 @@ final collectionStatsProvider =
   };
 });
 
-/// Collection filter provider
-final collectionFilterProvider = StateProvider<Map<String, dynamic>>((ref) {
-  return {};
+// --- Refactored collectionSpecificFilterProvider to NotifierProvider ---
+final collectionSpecificFilterProvider =
+    NotifierProvider<CollectionSpecificFilterNotifier, Map<String, dynamic>>(
+        () {
+  return CollectionSpecificFilterNotifier();
 });
+
+class CollectionSpecificFilterNotifier extends Notifier<Map<String, dynamic>> {
+  static const _boxName = 'settings';
+  static const _filtersKey = 'collection_specific_filters'; // Unique key
+
+  late Box _box;
+
+  @override
+  Map<String, dynamic> build() {
+    _openBox();
+    final savedData = _box.get(_filtersKey);
+    if (savedData is Map) {
+      talker.debug('Loading saved collection-specific filters from Hive.');
+      // Ensure keys are strings and values are dynamic
+      return Map<String, dynamic>.from(savedData);
+    }
+    talker.debug(
+        'No saved collection-specific filters found, using defaults (empty map).');
+    return {}; // Default to empty map
+  }
+
+  void _openBox() {
+    try {
+      if (!Hive.isBoxOpen(_boxName)) {
+        Hive.openBox(_boxName); // Consider async open if issues arise
+      }
+      _box = Hive.box(_boxName);
+    } catch (e, stack) {
+      talker.error(
+          'Error opening Hive box for collection-specific filters', e, stack);
+    }
+  }
+
+  Future<void> setFilter(String key, dynamic value) async {
+    final newState = Map<String, dynamic>.from(state);
+    newState[key] = value;
+    state = newState;
+    await _saveFilters();
+  }
+
+  Future<void> removeFilter(String key) async {
+    final newState = Map<String, dynamic>.from(state);
+    if (newState.containsKey(key)) {
+      newState.remove(key);
+      state = newState;
+      await _saveFilters();
+    }
+  }
+
+  Future<void> clearFilters() async {
+    if (state.isNotEmpty) {
+      state = {};
+      await _saveFilters();
+    }
+  }
+
+  Future<void> _saveFilters() async {
+    try {
+      if (!_box.isOpen) _openBox();
+      await _box.put(_filtersKey, state);
+      talker.debug('Saved collection-specific filters to Hive: $state');
+    } catch (e, stack) {
+      talker.error(
+          'Error saving collection-specific filters to Hive', e, stack);
+    }
+  }
+}
+// --- End Refactor ---
 
 /// Collection sort provider
 final collectionSortProvider = StateProvider<String>((ref) {
@@ -133,10 +211,15 @@ final collectionSortProvider = StateProvider<String>((ref) {
 /// Filtered collection provider
 final filteredCollectionProvider = Provider<List<CollectionItem>>((ref) {
   final collectionAsync = ref.watch(userCollectionProvider);
-  final filter = ref.watch(collectionFilterProvider);
-  final cardsFilter = ref.watch(filterProvider);
+  // Watch the collection-specific filters (NOW A NOTIFIER)
+  final collectionSpecificFilters = ref.watch(collectionSpecificFilterProvider);
+  // Watch the shared card filters (renamed provider)
+  final cardsFilter = ref.watch(collectionFilterProvider);
   final sort = ref.watch(collectionSortProvider);
   final cardCacheAsync = ref.watch(collectionCardCacheProvider);
+  // Watch favorite/wishlist providers
+  final favorites = ref.watch(favoritesProvider);
+  final wishlist = ref.watch(wishlistProvider);
 
   return collectionAsync.when(
     data: (collection) {
@@ -147,23 +230,26 @@ final filteredCollectionProvider = Provider<List<CollectionItem>>((ref) {
       bool sortDescending = sort.contains(':desc');
       String sortField = sort.split(':').first;
 
-      // Apply collection-specific filters
-      if (filter.containsKey('type')) {
-        if (filter['type'] == 'regular') {
+      // Apply collection-specific filters using collectionSpecificFilters
+      if (collectionSpecificFilters.containsKey('type')) {
+        if (collectionSpecificFilters['type'] == 'regular') {
           filtered = filtered.where((item) => item.regularQty > 0).toList();
-        } else if (filter['type'] == 'foil') {
+        } else if (collectionSpecificFilters['type'] == 'foil') {
           filtered = filtered.where((item) => item.foilQty > 0).toList();
         }
       }
 
-      if (filter.containsKey('graded') && filter['graded'] == true) {
+      if (collectionSpecificFilters.containsKey('graded') &&
+          collectionSpecificFilters['graded'] == true) {
         filtered =
             filtered.where((item) => item.gradingInfo.isNotEmpty).toList();
 
-        if (filter.containsKey('gradingCompany')) {
+        if (collectionSpecificFilters.containsKey('gradingCompany')) {
           filtered = filtered.where((item) {
             return item.gradingInfo.values.any(
-              (info) => info.company.name == filter['gradingCompany'],
+              (info) =>
+                  info.company.name ==
+                  collectionSpecificFilters['gradingCompany'],
             );
           }).toList();
         }
@@ -294,6 +380,17 @@ final filteredCollectionProvider = Provider<List<CollectionItem>>((ref) {
           }).toList();
         }
       }
+
+      // --- Apply Favorite/Wishlist Filters ---
+      if (cardsFilter.showFavoritesOnly) {
+        filtered =
+            filtered.where((item) => favorites.contains(item.cardId)).toList();
+      }
+      if (cardsFilter.showWishlistOnly) {
+        filtered =
+            filtered.where((item) => wishlist.contains(item.cardId)).toList();
+      }
+      // --- End Favorite/Wishlist Filters ---
 
       // Apply sorting
       if (filtered.isNotEmpty) {

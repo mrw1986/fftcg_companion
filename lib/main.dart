@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:fftcg_companion/app/app.dart';
@@ -40,6 +41,18 @@ Future<void> initializeApp() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     talker.debug('Firebase initialized successfully');
+    // Initialize Firebase App Check
+    // TODO: Add your reCAPTCHA v3 site key for web
+    // final kWebRecaptchaSiteKey = 'YOUR_RECAPTCHA_V3_SITE_KEY';
+    await FirebaseAppCheck.instance.activate(
+      // You can also use a `ReCaptchaEnterpriseProvider` provider instance as an argument for `webProvider`
+      // webProvider: ReCaptchaV3Provider(kWebRecaptchaSiteKey),
+      // Default provider for Android is Play Integrity.
+      androidProvider: AndroidProvider.playIntegrity,
+      // Default provider for Apple platforms is App Attest.
+      appleProvider: AppleProvider.appAttestWithDeviceCheckFallback,
+    );
+    talker.debug('Firebase App Check activated');
     // Initialize CachePersistence
     await CachePersistence.initialize();
 

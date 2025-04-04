@@ -1,25 +1,36 @@
 // lib/features/collection/domain/models/collection_stats.dart
 
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart'; // Added
 
-part 'collection_stats.freezed.dart';
-part 'collection_stats.g.dart';
+part 'collection_stats.mapper.dart'; // Added
 
-@freezed
-class CollectionStats with _$CollectionStats {
-  const factory CollectionStats({
-    required int totalCards,
-    required int uniqueCards,
-    required Map<String, int> elementDistribution,
-    required Map<String, int> typeDistribution,
-    required Map<String, int> rarityDistribution,
-    required Map<String, int> setDistribution,
-    required int foilCount,
-    required int normalCount,
-    required double collectionCompleteness,
-    required double estimatedValue,
-  }) = _CollectionStats;
+@MappableClass() // Added
+class CollectionStats with CollectionStatsMappable {
+  // Added mixin
+  final int totalCards;
+  final int uniqueCards;
+  final Map<String, int> elementDistribution;
+  final Map<String, int> typeDistribution;
+  final Map<String, int> rarityDistribution;
+  final Map<String, int> setDistribution;
+  final int foilCount;
+  final int normalCount;
+  final double collectionCompleteness;
+  final double estimatedValue;
 
-  factory CollectionStats.fromJson(Map<String, dynamic> json) =>
-      _$CollectionStatsFromJson(json);
+  const CollectionStats({
+    // Changed to standard constructor
+    required this.totalCards,
+    required this.uniqueCards,
+    required this.elementDistribution,
+    required this.typeDistribution,
+    required this.rarityDistribution,
+    required this.setDistribution,
+    required this.foilCount,
+    required this.normalCount,
+    required this.collectionCompleteness,
+    required this.estimatedValue,
+  });
+
+  // fromJson factory removed - handled by dart_mappable generator
 }

@@ -2,46 +2,74 @@
 
 ## Recent Changes
 
+### Analysis Errors & Provider Refactoring (Current Session)
+
+- **Context:** Addressed various analysis errors (`unused_import`, `invalid_use_of_protected_member`, `deprecated_member_use`, `use_super_parameters`, `unused_local_variable`) and refactored providers using deprecated `listenSelf` for persistence.
+- **Changes:**
+  - Removed unused imports and local variables.
+  - Fixed `use_super_parameters` warnings.
+  - Refactored `cardSearchQueryProvider`, `collectionSpecificFilterProvider`, and `collectionSearchQueryProvider` from `StateProvider` to `NotifierProvider` to correctly handle state persistence via Hive and resolve `listenSelf` deprecation warnings.
+  - Updated UI components (`cards_page.dart`, `card_app_bar_actions.dart`, `card_search_bar.dart`, `collection_edit_page.dart`, `collection_page.dart`, `collection_filter_bar.dart`, `collection_filter_dialog.dart`) to use the appropriate methods (`setQuery`, `clearFilters`, `setFilter`, `removeFilter`) on the refactored notifiers instead of accessing `.state` directly.
+- **Status:** Completed.
+
+### Independent Screen States (Cards vs. Collection)
+
+- **Context:** The Cards page and Collection page previously shared the same state for filters, search query, and view preferences.
+- **Requirement:** Implement independent state management for these UI aspects for each feature.
+- **Changes:**
+  - **Filter State:** Duplicated `filter_provider.dart` -> `collection_filter_provider.dart`. Renamed providers/notifiers (`cardFilterProvider`, `collectionFilterProvider`). Added `collectionSpecificFilterProvider` (now `NotifierProvider`). Updated UI widgets.
+  - **Search State:** Duplicated `search_provider.dart` -> `collection_search_provider.dart`. Renamed providers (`cardSearchQueryProvider`, `collectionSearchQueryProvider`). Updated UI widgets. **Refactored both to `NotifierProvider` for persistence.**
+  - **View Preferences State:** Duplicated `view_preferences_provider.dart` -> `collection_view_preferences_provider.dart`. Renamed providers/notifiers (`cardViewPreferencesProvider`, `collectionViewPreferencesProvider`). Updated Hive keys. Updated UI widgets.
+  - **Build Runner:** Executed.
+- **Status:** Refactoring complete. Persistence logic for duplicated filter providers (StateNotifierProviders) still needs implementation (TODOs added). Search/Specific filter persistence handled by NotifierProvider refactor.
+
+### Model Migration: Freezed to Dart Mappable (Objective 51 - Completed)
+
+- **Context:** Encountered persistent build errors and complexity related to the `freezed` code generation for models.
+- **Changes:** Replaced `freezed` with `dart_mappable`. Migrated models, updated serialization calls (`fromMap`/`toMap`), updated Hive adapters.
+- **Status:** Migration complete. Build runner successful. **Extensive testing required.**
+
+### Collection Management Fixes & UI Enhancements (Objective 50) - Completed
+
+- **Context:** Resolved Firestore permission errors, inaccurate `collectionCount`, missing delete-on-zero-quantity logic, and addressed UI requests for quantity input and label capitalization.
+- **Changes:** Fixed `CollectionItem.toMap()` serialization. Refactored `UserRepository.updateCollectionCount` to use transactions and added verification. Modified `CollectionRepository.addOrUpdateCard` to delete on zero quantity. Added quantity `TextField` and fixed grading labels in UI.
+- **Status:** Fixes and enhancements applied. Testing recommended.
+
 ### Fix Initialization Error During Set Count Preload (Objective 47) - Completed (Testing Needed)
 
-- **Context:** App initialization failed with `NoSuchMethodError: Class 'Future<int>' has no instance method 'ignore'.` when preloading set card counts in `initializationProvider`.
-- **Changes:** Modified `lib/features/cards/presentation/providers/initialization_provider.dart`. Replaced `.ignore()` with `await` on the `filteredSetCardCountCacheProvider(setId).future` call within the loop.
-- **Status:** Fix applied. Testing required to ensure initialization completes without error.
+- **Context:** App initialization failed with `NoSuchMethodError` on `.ignore()`.
+- **Changes:** Replaced `.ignore()` with `await` on the future in `initialization_provider.dart`.
+- **Status:** Fix applied. Testing required.
 
 ### Fix Riverpod Error After Google Linking & Subsequent Analyzer Issues (Objective 46) - Completed (Testing Needed)
 
-- **Context:** Google linking caused a Riverpod error (`Providers are not allowed to modify...`) due to `authStateProvider` modifying `emailVerificationDetectedProvider` during build. Fixing this revealed a dependency cycle and other analyzer errors.
-- **Changes:**
-  - **Riverpod Cycle Fix:** Removed incorrect `authStateListenerProvider`. Integrated logic to reset `emailVerificationDetectedProvider` into `firestoreUserSyncProvider`'s `ref.listen` callback, triggering on appropriate state changes (sign-out, verified, anonymous, error).
-  - **Analyzer Fixes:** Added null safety checks in `auto_auth_provider.dart`. Added explicit types and null checks in `email_verification_checker.dart`. Added extra `mounted` check before navigation in `account_settings_page.dart` (`_handleSuccessfulDeletion`).
-- **Status:** Fixes applied. Testing required for Google linking, email verification flow, and potential regressions.
+- **Context:** Google linking caused Riverpod error and revealed other issues.
+- **Changes:** Removed incorrect listener provider. Integrated logic into `firestoreUserSyncProvider`. Fixed analyzer errors with null checks and `mounted` checks.
+- **Status:** Fixes applied. Testing required.
 
 ### Refine Account Deletion Flow & Add Confirmation (Objective 45) - Completed (Testing Needed)
 
-- **Context:** Account deletion required re-authentication but unnecessarily retried Firestore deletion. No success confirmation existed. The "Account Limits" dialog appeared after deletion. Firebase "Delete User Data" extension handles Firestore cleanup. A persistent analyzer error blocked `SnackbarHelper` usage. `use_build_context_synchronously` lint appeared.
-- **Changes:**
-  - Simplified `AuthService.deleteUser` to only delete the Auth user, relying on the Firebase extension for Firestore data. Handles `requires-recent-login` and `user-not-found`.
-  - Updated `AccountSettingsPage` re-authentication logic (`_reauthenticateAndDeleteAccount`, `_reauthenticateWithGoogle`) to call the simplified `deleteUser` after successful re-auth.
-  - Added `_handleSuccessfulDeletion` helper in `AccountSettingsPage` for Snackbar confirmation (using `display_name.showThemedSnackBar` as a workaround), sign-out (using `skipAccountLimitsDialog: true`), and navigation. **Added extra `if (mounted)` check before navigation (Obj 46).**
+- **Context:** Deletion flow issues, no confirmation, analyzer errors.
+- **Changes:** Simplified `AuthService.deleteUser` (relies on Firebase Extension). Updated re-auth logic. Added `_handleSuccessfulDeletion` helper with Snackbar (workaround), sign-out, navigation, and `mounted` check.
 - **Status:** Fixes applied. Testing required.
 
 ### Fix "Unverified" Chip Logic (Objective 44) - Completed (Testing Needed)
 
-- **Context:** The "Unverified" chip in `AccountSettingsPage` didn't update immediately after email verification, unlike the banner.
-- **Changes:** Aligned the logic for the `isEmailNotVerified` parameter passed to `AccountInfoCard` to use the same condition as the verification banner (`authState.status == AuthStatus.emailNotVerified && !verificationDetected`).
-- **Status:** Fix applied. Testing required to confirm consistent UI updates for both banner and chip.
+- **Context:** "Unverified" chip didn't update consistently with banner.
+- **Changes:** Aligned chip logic with banner logic using `emailVerificationDetectedProvider`.
+- **Status:** Fix applied. Testing required.
 
 ### Fix Email Verification UI Update Delay (Objective 42 - Attempt 2) - Completed (Testing Needed)
 
-- **Context:** Verification banner in `AccountSettingsPage` didn't update immediately.
-- **Changes:** Implemented a hybrid approach using immediate Firestore update and `emailVerificationDetectedProvider`.
+- **Context:** Verification banner didn't update immediately.
+- **Changes:** Implemented hybrid approach (Firestore update + `emailVerificationDetectedProvider`).
 - **Status:** Fix applied. Testing required. (Chip logic addressed in Obj 44)
 
 ### Diagnose Google Linking Error and Consolidate User Creation Logic (Objective 41) - Completed
 
-- **Context:** Google linking failed (`credential-already-in-use`), duplicated Firestore update logic. Riverpod error occurred during linking.
-- **Changes:** Centralized Firestore updates via `firestoreUserSyncProvider`. Added router `redirect`/`errorBuilder`.
-- **Result:** Google linking error resolved. Navigation fixed. Router improved. Revealed email verification UI delay (Obj 42). **Riverpod error during linking fixed in Obj 46.**
+- **Context:** Google linking failed (`credential-already-in-use`), duplicated logic, Riverpod error.
+- **Changes:** Centralized Firestore updates via `firestoreUserSyncProvider`. Added router logic.
+- **Result:** Linking error resolved. Navigation fixed. Router improved. Revealed email verification UI delay (Obj 42). Riverpod error fixed (Obj 46).
 
 ### Prevent Anonymous Dialog After Password Reset (Objective 40) - Completed
 
@@ -52,84 +80,82 @@
 ### Email Verification Status Update Fix (Objective 39) - Completed
 
 - **Context:** Inconsistent Firestore `isVerified` field updates.
-- **Changes:** Modified `email_verification_checker.dart` and `AuthService.handleEmailVerificationComplete`. (Flow further refined in Obj 41/42, state reset logic refined in Obj 46).
+- **Changes:** Modified `email_verification_checker.dart` and `AuthService.handleEmailVerificationComplete`. (Flow further refined in Obj 41/42/46).
 - **Status:** Implemented (UI timing addressed in Obj 42/44, state reset logic refined in Obj 46).
-
-### Authentication Flow and Firestore Data Issues (Objective 38) - Superseded by Objective 41
-
-- **Status:** Superseded.
-
-### Fix Registration Routing Error (Objective 36) - Completed
-
-- **Conclusion:** Navigation path correct.
-
-### Update Registration Confirmation Text & Verify Navigation (Objective 35) - Completed
-
-- **Conclusion:** Text consistent. Navigation correct.
-
-### Correct Account Deletion Order (Objective 34) - Superseded by Objective 45
-
-- **Conclusion:** Deletion flow order and error handling corrected and simplified in Objective 45.
-
-### Ensure Firestore User Document is Fully Populated During Authentication (Objective 33)
-
-- **Conclusion:** Implementation largely correct. Testing recommended.
-
-### Fixed Google Authentication Display Name Issue (Objective 30)
-
-- **Results:** Display name correctly stored.
-
-### Firestore Permission Issues During Data Migration (Objective 27 - Fix Applied)
-
-- **Pending Fixes:** Testing required.
-
-### Email Update Flow and UI Improvements (Objective 26)
-
-- Fixed UI not updating after linking Google.
-- Improved email update messaging.
-
-### Authentication State & UI Fixes (Objective 26 - Ongoing Testing)
-
-- Corrected provider unlinking logic, state invalidation, state handling after deletion, Google sign-in fallback, email display/pre-population, profile banner logic.
-- Implemented anonymous-to-Google data migration (collection only).
-- Refined Google linking state management.
-
-### Authentication System Rebuild (Completed - Objective 26)
-
-- Completed full rebuild of `AuthService` and related integrations.
 
 ## Key Components
 
 ### Auth Service (lib/core/services/auth_service.dart) - **Refactored & Updated (Obj 45)**
 
-- **Status:** Centralized Firestore user document creation/updates via `firestoreUserSyncProvider` (listening to `firebaseUserProvider`), *except* for `linkEmailAndPasswordToAnonymous`. `handleEmailVerificationComplete` no longer updates Firestore directly. `signOut` accepts `skipAccountLimitsDialog`. **`deleteUser` now *only* deletes the Firebase Auth user (relying on Firebase Extension for Firestore data) and specifically ignores `user-not-found` errors during Auth deletion.**
+- **Status:** Centralized Firestore user document creation/updates via `firestoreUserSyncProvider`. `deleteUser` now *only* deletes the Firebase Auth user.
 - **Pending:** Test deletion flow.
 
-### User Repository (lib/features/profile/data/repositories/user_repository.dart)
+### User Repository (lib/features/profile/data/repositories/user_repository.dart) - **Updated (Obj 50)**
 
-- **Status:** `createUserFromAuth` handles initialization/updates. `deleteUser` removes Firestore doc. Called by `firestoreUserSyncProvider`, `AuthService.linkEmailAndPasswordToAnonymous`, and `email_verification_checker`. **No longer called directly by `AuthService.deleteUser`.**
+- **Status:** `createUserFromAuth` handles initialization/updates. `deleteUser` removes Firestore doc. **`updateCollectionCount` refactored to use atomic transactions.** **Added `verifyAndCorrectCollectionCount` method.**
+- **Pending:** Testing required for count verification.
+
+### Collection Repository (lib/features/collection/data/repositories/collection_repository.dart) - **Updated (Obj 50)**
+
+- **Status:** Handles fetching, adding, updating, and removing collection items. **`addOrUpdateCard` now checks for zero quantity and calls `removeCard` accordingly.** Calls transactional `UserRepository.updateCollectionCount`.
+- **Pending:** Testing required for zero quantity deletion.
+
+### Collection Item Model (lib/features/collection/domain/models/collection_item.dart) - **Updated (Obj 50)**
+
+- **Status:** Defines the structure for collection items. **`toMap()` method updated.**
+- **Pending:** None.
+
+### Firestore Rules (firestore.rules) - **Updated (Obj 50)**
+
+- **Status:** Updated `allow update` rule for `/users/{userId}`. **Corrected `isValidCollectionItem` quantity check.**
 - **Pending:** Testing required.
-
-### Firestore Rules (firestore.rules) - **Refined**
-
-- **Status:** Updated `allow update` rule for `/users/{userId}`.
-- **Pending:** Testing required, especially regarding deletion permissions (though less critical now with the Firebase Extension handling data deletion).
 
 #### Riverpod Providers (lib/core/providers/)
 
-- **`auth_provider.dart`:** **Updated (Objective 46)**
-  - `authStateProvider`: Calculates `AuthState` based on `firebaseUserProvider`. No longer attempts to modify other providers directly.
-  - `firestoreUserSyncProvider`: Listens to `firebaseUserProvider`. Handles Firestore sync **and** resets `emailVerificationDetectedProvider` based on user state changes (sign-out, verified, anonymous, error).
-  - Removed incorrect `authStateListenerProvider`.
-- **`email_verification_checker.dart`:** **Updated (Objective 42 - Attempt 2, Obj 46)** Polls `user.reload()`. Updates Firestore immediately and sets `emailVerificationDetectedProvider` on verification. Added null safety checks. **Testing needed.**
-- **`firestoreUserSyncProvider`:** Listens to `firebaseUserProvider` for eventual consistency updates. **Also handles resetting `emailVerificationDetectedProvider` (Obj 46).**
-- **`emailVerificationDetectedProvider`:** **NEW (Objective 42 - Attempt 2)** Simple `StateProvider<bool>` for immediate UI banner hiding. Reset logic moved to `firestoreUserSyncProvider`.
-- **`auto_auth_provider.dart`:** **Updated (Objective 46)** Added null safety checks in listener.
+- **`auth_provider.dart`:** **Updated (Objective 46, 50)** `authStateProvider` calculates state. `firestoreUserSyncProvider` handles sync, resets verification flag, triggers count verification. Removed incorrect listener.
+- **`email_verification_checker.dart`:** **Updated (Objective 42 - Attempt 2, Obj 46)** Polls, updates Firestore, sets detection flag. **Testing needed.**
+- **`firestoreUserSyncProvider`:** Listens to `firebaseUserProvider`. Handles sync, resets detection flag, triggers count verification.
+- **`emailVerificationDetectedProvider`:** **NEW (Objective 42 - Attempt 2)** Simple `StateProvider<bool>`. Reset logic in `firestoreUserSyncProvider`.
+- **`auto_auth_provider.dart`:** **Updated (Objective 46)** Added null safety checks.
 - Core auth state and action providers.
+
+#### Cards Feature Providers (lib/features/cards/presentation/providers/) - **Refactored**
+
+- **`filter_provider.dart`:** Renamed to `cardFilterProvider` (StateNotifierProvider). Manages filters **for Cards page**. (TODO: Implement persistence).
+- **`search_provider.dart`:** Renamed to `cardSearchQueryProvider` (**Refactored to NotifierProvider**). Manages search state **for Cards page**. Handles persistence via Hive. `cardSearchControllerProvider` (StateProvider) remains for UI controller.
+- **`view_preferences_provider.dart`:** Renamed to `cardViewPreferencesProvider` (NotifierProvider). Manages view preferences **for Cards page**. Persists state to Hive.
+- **`filter_options_provider.dart`:** Unchanged. Provides available filter options.
+- **`filtered_search_provider.dart`:** Updated to use `cardFilterProvider` and `cardSearchQueryProvider`. Combines filtering/searching for Cards page.
+- **`set_card_count_provider.dart`:** Updated to use `cardFilterProvider`. Calculates filtered counts per set.
+
+#### Collection Feature Providers (lib/features/collection/presentation/providers/) - **NEW/Refactored**
+
+- **`collection_filter_provider.dart`:** **NEW** `collectionFilterProvider` (StateNotifierProvider). Manages shared card filters **for Collection page**. (TODO: Implement persistence).
+- **`collection_search_provider.dart`:** **NEW** `collectionSearchQueryProvider` (**Refactored to NotifierProvider**). Manages search state **for Collection page**. Handles persistence via Hive. `collectionSearchControllerProvider` (StateProvider) remains for UI controller.
+- **`collection_view_preferences_provider.dart`:** **NEW** `collectionViewPreferencesProvider` (NotifierProvider). Manages view preferences **for Collection page**. Persists state to Hive.
+- **`collection_providers.dart`:**
+  - **NEW:** `collectionSpecificFilterProvider` (**Refactored to NotifierProvider**). Manages collection-only filters (type, graded). Handles persistence via Hive.
+  - Updated `filteredCollectionProvider` and `searchedCollectionProvider` to use `collectionFilterProvider`, `collectionSpecificFilterProvider`, and `collectionSearchQueryProvider`.
 
 #### Profile Page Components
 
-- **`account_settings_page.dart`:** **Updated (Objective 42, 44, 45, 46)** Manages account details, re-auth. Watches providers for verification banner. Added `if (mounted)` checks (including extra check before navigation in `_handleSuccessfulDeletion`). **Aligned "Unverified" chip logic with banner logic.** **Added `_handleSuccessfulDeletion` helper for Snackbar confirmation (using workaround), sign-out (using `skipAccountLimitsDialog: true`), and navigation.** Calls simplified `AuthService.deleteUser` directly and after re-auth.
+- **`account_settings_page.dart`:** **Updated (Objective 42, 44, 45, 46)** Manages account details, re-auth. Watches providers for verification banner. Added `if (mounted)` checks. **Aligned "Unverified" chip logic.** **Added `_handleSuccessfulDeletion` helper.** Calls simplified `AuthService.deleteUser`.
+
+#### Collection Page Components - **Updated**
+
+- **`collection_item_detail_page.dart`:** **Updated (Obj 50)** Displays details. **Fixed grading labels.**
+- **`collection_edit_page.dart`:** **Updated (Obj 50)** Add/edit items. **Added quantity `TextField`.** Updated to use `cardSearchQueryProvider`. **Fixed interaction with refactored `cardSearchQueryProvider`.**
+- **`collection_page.dart`:** Updated to use `collectionViewPreferencesProvider` and `collectionSearchQueryProvider`. **Fixed interaction with refactored `collectionSearchQueryProvider`.**
+- **`collection_filter_dialog.dart`:** Updated to use `collectionFilterProvider` and `collectionSpecificFilterProvider`. **Fixed interaction with refactored `collectionSpecificFilterProvider`.**
+- **`collection_filter_bar.dart`:** Updated to use `collectionSpecificFilterProvider`. **Fixed interaction with refactored `collectionSpecificFilterProvider` and removed unused variables.**
+
+#### Cards Page Components - **Updated**
+
+- **`cards_page.dart`:** Updated to use `cardViewPreferencesProvider` and `cardSearchQueryProvider`. **Fixed interaction with refactored `cardSearchQueryProvider`.**
+- **`card_app_bar_actions.dart`:** Updated to use `cardViewPreferencesProvider` and `cardSearchQueryProvider`. **Fixed interaction with refactored `cardSearchQueryProvider`.**
+- **`card_search_bar.dart`:** Updated to use `cardSearchQueryProvider`. **Fixed interaction with refactored `cardSearchQueryProvider`.**
+- **`filter_dialog.dart`:** Updated to use `cardFilterProvider`.
+- **`sort_bottom_sheet.dart`:** Updated to use `cardFilterProvider` and `cardSearchQueryProvider`.
 
 #### Authentication Pages
 
@@ -139,38 +165,15 @@
 ## Data Flow (Refactored & Updated)
 
 - **Authentication Flow (Rebuilt & Refined - Testing)**
-- **Firestore User Document Creation/Update:** (Flow unchanged)
-    1. Firebase Auth state changes.
-    2. `firebaseUserProvider` emits `User`.
-    3. `firestoreUserSyncProvider` detects change.
-    4. Calls `UserRepository.createUserFromAuth`.
-    5. `UserRepository` updates Firestore.
-    6. **Exception:** `AuthService.linkEmailAndPasswordToAnonymous` calls `UserRepository.createUserFromAuth` directly.
+- **Firestore User Document Creation/Update:** (Flow unchanged, but now triggers count verification)
+- **Collection Add/Update Flow:** (Flow updated for zero quantity deletion)
 - **Email Verification Flow (Fixed - Attempt 2 - Testing Needed - Obj 42, 44, 46)**
-    1. Checker polls `user.reload()`.
-    2. Detects `emailVerified == true`.
-    3. Checker calls `UserRepository.createUserFromAuth`.
-    4. Checker sets `emailVerificationDetectedProvider` to `true`.
-    5. Checker cancels timer.
-    6. UI hides banner **and "Unverified" chip** via `emailVerificationDetectedProvider` and `authStateProvider` status check.
-    7. Firebase stream eventually emits updated `User`.
-    8. `firestoreUserSyncProvider` listener detects verified user, resets `emailVerificationDetectedProvider` to `false`.
-    9. `authStateProvider` updates based on stream.
-- **Password Reset Flow (Updated)** (Flow unchanged)
-    1. User initiates reset.
-    2. UI calls `AuthService.sendPasswordResetEmail()`.
-    3. UI calls `AuthService.signOut(skipAccountLimitsDialog: true)`.
-    4. `AuthService` signs out, skipping timestamp reset.
+- **Password Reset Flow (Updated)**
 - **Account Deletion Flow (Updated - Objective 45 & 46 - Simplified)**
-    1. User initiates deletion.
-    2. UI calls `AuthService.deleteUser()`.
-    3. `AuthService` attempts to delete Auth user (`currentUser.delete()`). **(Firestore data handled by Firebase Extension)**.
-    4. **If Auth delete fails:**
-        - **If error is `user-not-found`:** Log warning, **do not rethrow**. Treat as success.
-        - **If error is `requires-recent-login`:** Rethrow error. UI handles re-auth prompt -> Retry step 2.
-        - **If other Auth error:** Rethrow error. UI handles error.
-    5. **If Auth delete succeeds (or `user-not-found` ignored):** `AuthService` completes successfully. UI calls `_handleSuccessfulDeletion` helper (shows Snackbar, signs out using `skipAccountLimitsDialog: true`, navigates with extra `mounted` check).
-    6. `AccountSettingsPage` includes `if (mounted)` checks before `setState` calls in the re-authentication flow.
+- **Cards/Collection Filtering/Search/View:** (Flow Refactored)
+  - Each feature uses its own providers.
+  - State changes isolated to the respective feature.
+  - Persistence for search/specific filters handled by `NotifierProvider`s. Filter persistence (StateNotifier) is TODO.
 
 ```mermaid
 graph TD
@@ -187,6 +190,7 @@ graph TD
         ResetFlag --> CheckSyncNeeded;
         CheckSyncNeeded -- Yes --> CallCreateUser[Call UserRepository.createUserFromAuth(user)];
         CallCreateUser --> FirestoreUpdate[Firestore Doc Updated];
+        FirestoreUpdate --> VerifyCount[Call UserRepository.verifyAndCorrectCollectionCount]; %% Added Verification Step
         CheckSyncNeeded -- No --> NoOp[No Firestore Action];
         UserEvent -- No --> NoOp;
     end
@@ -314,3 +318,4 @@ graph TD
     style CheckResetFlag fill:#d1c4e9,stroke:#512da8,stroke-width:1px
     style ResetFlag fill:#ffecb3,stroke:#ffa000,stroke-width:1px
     style CheckSyncNeeded fill:#d1c4e9,stroke:#512da8,stroke-width:1px
+    style VerifyCount fill:#b39ddb,stroke:#512da8,stroke-width:2px %% Added Verification Step Style

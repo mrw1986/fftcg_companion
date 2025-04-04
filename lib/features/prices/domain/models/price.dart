@@ -1,24 +1,29 @@
 // lib/features/prices/domain/models/price.dart
 
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart'; // Added
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-part 'price.freezed.dart';
-part 'price.g.dart';
+part 'price.mapper.dart'; // Added
 
-@freezed
-class Price with _$Price {
-  const Price._();
+@MappableClass(caseStyle: CaseStyle.camelCase) // Added
+class Price with PriceMappable {
+  // Added mixin
+  final int productId;
+  final DateTime lastUpdated;
+  final PriceData normal;
+  final PriceData foil;
 
-  const factory Price({
-    required int productId,
-    required DateTime lastUpdated,
-    required PriceData normal,
-    required PriceData foil,
-  }) = _Price;
+  const Price({
+    // Changed to standard constructor
+    required this.productId,
+    required this.lastUpdated,
+    required this.normal,
+    required this.foil,
+  });
 
-  factory Price.fromJson(Map<String, dynamic> json) => _$PriceFromJson(json);
+  // fromJson factory removed
 
+  // Keep custom Firestore factory
   factory Price.fromFirestore(Map<String, dynamic> data) {
     return Price(
       productId: data['productId'] as int? ?? 0,
@@ -32,6 +37,7 @@ class Price with _$Price {
     );
   }
 
+  // Keep custom Firestore method
   Map<String, dynamic> toFirestore() {
     return {
       'productId': productId,
@@ -41,45 +47,56 @@ class Price with _$Price {
     };
   }
 
-  // Helper methods
+  // Helper methods (Keep as is)
   bool get hasNormalPrice => normal.lowPrice != null;
   bool get hasFoilPrice => foil.lowPrice != null;
   bool get hasPrices => hasNormalPrice || hasFoilPrice;
 
-  double? get lowestPrice => [
-        if (normal.lowPrice != null) normal.lowPrice,
-        if (foil.lowPrice != null) foil.lowPrice,
-      ].reduce((a, b) => a! < b! ? a : b);
+  double? get lowestPrice {
+    final prices = [
+      if (normal.lowPrice != null) normal.lowPrice,
+      if (foil.lowPrice != null) foil.lowPrice,
+    ].where((p) => p != null).cast<double>().toList();
+    if (prices.isEmpty) return null;
+    return prices.reduce((a, b) => a < b ? a : b);
+  }
 
-  double? get highestPrice => [
-        if (normal.lowPrice != null) normal.lowPrice,
-        if (foil.lowPrice != null) foil.lowPrice,
-      ].reduce((a, b) => a! > b! ? a : b);
+  double? get highestPrice {
+    final prices = [
+      if (normal.lowPrice != null) normal.lowPrice,
+      if (foil.lowPrice != null) foil.lowPrice,
+    ].where((p) => p != null).cast<double>().toList();
+    if (prices.isEmpty) return null;
+    return prices.reduce((a, b) => a > b ? a : b);
+  }
 }
 
-@freezed
-class PriceData with _$PriceData {
-  const PriceData._();
+@MappableClass(caseStyle: CaseStyle.camelCase) // Added
+class PriceData with PriceDataMappable {
+  // Added mixin
+  final double? lowPrice;
 
-  const factory PriceData({
-    double? lowPrice,
-  }) = _PriceData;
+  const PriceData({
+    // Changed to standard constructor
+    this.lowPrice,
+  });
 
-  factory PriceData.fromJson(Map<String, dynamic> json) =>
-      _$PriceDataFromJson(json);
+  // fromJson factory removed
 
+  // Keep custom Firestore factory
   factory PriceData.fromFirestore(Map<String, dynamic> data) {
     return PriceData(
       lowPrice: (data['lowPrice'] as num?)?.toDouble(),
     );
   }
 
+  // Keep custom Firestore method
   Map<String, dynamic> toFirestore() {
     return {
       if (lowPrice != null) 'lowPrice': lowPrice,
     };
   }
 
-  // Helper methods
+  // Helper methods (Keep as is)
   bool get hasPrice => lowPrice != null;
 }

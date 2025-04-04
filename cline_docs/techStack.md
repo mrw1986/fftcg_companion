@@ -14,6 +14,7 @@
 - Riverpod for dependency injection and state management
   - AsyncNotifierProvider for async operations
   - StateNotifierProvider for mutable state
+  - NotifierProvider for synchronous state with side effects (e.g., persistence) - **Used for refactored search/filter persistence**
   - Provider for dependency injection
   - ConsumerWidget for reactive UI updates
 
@@ -78,6 +79,7 @@
   - User preferences and settings
   - Theme settings persistence
   - View preferences persistence
+  - **Search/Filter query persistence (via NotifierProviders)**
   - Custom adapters for complex types
   - Version-based cache management
 
@@ -102,7 +104,7 @@
 ### Data Flow
 
 - Unidirectional data flow
-- Immutable state management
+- Immutable state management (where applicable, models are now mutable via copyWith)
 - Reactive programming with Streams
 - Async/await for asynchronous operations
 - Optimized filter chain processing
@@ -120,7 +122,8 @@
 ### Code Generation
 
 - build_runner for code generation
-- freezed for immutable models
+- dart_mappable for model serialization/deserialization
+- dart_mappable_builder for code generation
 - riverpod_generator for provider generation
 
 ### Testing
@@ -241,7 +244,8 @@
 
 - State Management
   - AsyncNotifierProvider for collection data
-  - StateProvider for search, filter, and sort preferences
+  - **NotifierProvider for collection-specific filters and search persistence**
+  - StateProvider for sort preferences
   - FutureProvider for collection statistics
   - Provider for filtered and searched collection
 

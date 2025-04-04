@@ -1,48 +1,47 @@
-// lib/features/cards/presentation/providers/filter_provider.dart
+// lib/features/collection/presentation/providers/collection_filter_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart'; // Import Hive
-import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
+import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart'; // Keep using the same model
 import 'package:fftcg_companion/core/utils/logger.dart';
 
-// Renamed provider for Cards page
-final cardFilterProvider =
-    StateNotifierProvider<CardFilterNotifier, CardFilters>((ref) {
+// Renamed provider for Collection page
+final collectionFilterProvider =
+    StateNotifierProvider<CollectionFilterNotifier, CardFilters>((ref) {
   // Load initial state from persistence
-  return CardFilterNotifier._loadInitial();
+  return CollectionFilterNotifier._loadInitial();
 });
 
-// Renamed notifier for Cards page
-class CardFilterNotifier extends StateNotifier<CardFilters> {
+// Renamed notifier for Collection page
+class CollectionFilterNotifier extends StateNotifier<CardFilters> {
   static const _boxName = 'settings';
-  static const _filtersKey = 'card_filters'; // Unique key for card filters
+  static const _filtersKey =
+      'collection_filters'; // Unique key for collection filters
 
   // Private constructor used by the factory - FIXED use_super_parameters
-  CardFilterNotifier._(super.initialState);
+  CollectionFilterNotifier._(super.initialState);
 
   // Factory constructor to load initial state
-  factory CardFilterNotifier._loadInitial() {
+  factory CollectionFilterNotifier._loadInitial() {
     try {
       if (!Hive.isBoxOpen(_boxName)) {
-        // This should ideally be opened earlier during app init,
-        // but open it here as a fallback if needed.
-        // Note: Synchronous openBox might block UI if called frequently.
         Hive.openBox(_boxName); // Consider async open if issues arise
       }
       final box = Hive.box(_boxName);
       final savedData = box.get(_filtersKey);
 
       if (savedData is Map) {
-        talker.debug('Loading saved card filters from Hive.');
+        talker.debug('Loading saved collection filters from Hive.');
         // Use dart_mappable to deserialize
-        return CardFilterNotifier._(
+        return CollectionFilterNotifier._(
             CardFiltersMapper.fromMap(Map<String, dynamic>.from(savedData)));
       } else {
-        talker.debug('No saved card filters found, using defaults.');
-        return CardFilterNotifier._(const CardFilters());
+        talker.debug('No saved collection filters found, using defaults.');
+        return CollectionFilterNotifier._(const CardFilters());
       }
     } catch (e, stack) {
-      talker.error('Error loading card filters from Hive', e, stack);
-      return CardFilterNotifier._(const CardFilters()); // Fallback to default
+      talker.error('Error loading collection filters from Hive', e, stack);
+      return CollectionFilterNotifier._(
+          const CardFilters()); // Fallback to default
     }
   }
 
@@ -52,9 +51,9 @@ class CardFilterNotifier extends StateNotifier<CardFilters> {
       final box = Hive.box(_boxName);
       // Use dart_mappable to serialize
       await box.put(_filtersKey, state.toMap());
-      talker.debug('Saved card filters to Hive.');
+      talker.debug('Saved collection filters to Hive.');
     } catch (e, stack) {
-      talker.error('Error saving card filters to Hive', e, stack);
+      talker.error('Error saving collection filters to Hive', e, stack);
     }
   }
 
@@ -71,7 +70,7 @@ class CardFilterNotifier extends StateNotifier<CardFilters> {
       elements.add(element);
     }
     state = state.copyWith(elements: elements);
-    talker.debug('Card Filter updated - Elements: $elements');
+    talker.debug('Collection Filter updated - Elements: $elements');
     _saveFilters(); // Save state
   }
 
@@ -115,7 +114,7 @@ class CardFilterNotifier extends StateNotifier<CardFilters> {
       categories.add(category);
     }
     state = state.copyWith(categories: categories);
-    talker.debug('Card Filter updated - Categories: $categories');
+    talker.debug('Collection Filter updated - Categories: $categories');
     _saveFilters(); // Save state
   }
 

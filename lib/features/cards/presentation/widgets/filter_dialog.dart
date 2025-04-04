@@ -7,6 +7,8 @@ import 'package:fftcg_companion/features/cards/presentation/providers/filter_opt
 import 'package:fftcg_companion/features/cards/presentation/providers/set_card_count_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_collection_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
+// Import the CardFilters model to access the new fields
+import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
 
 /// A provider to prefetch filter options before showing the dialog
 /// This helps reduce the loading time when opening the filter dialog
@@ -35,7 +37,7 @@ class FilterDialog extends ConsumerWidget {
     ref.watch(prefetchFilterOptionsProvider);
 
     final filterOptions = ref.watch(filterOptionsNotifierProvider);
-    final filters = ref.watch(filterProvider);
+    final filters = ref.watch(cardFilterProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final size = MediaQuery.of(context).size;
 
@@ -71,13 +73,18 @@ class FilterDialog extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // --- Add Status Filter Section ---
+                        _buildStatusFilterSection(context, ref, filters)
+                            .animate()
+                            .fadeIn(delay: 50.ms), // Added delay
+                        // --- End Status Filter Section ---
                         _buildFilterSection(
                           context,
                           'Elements',
                           options.elements,
                           filters.elements,
                           (element) => ref
-                              .read(filterProvider.notifier)
+                              .read(cardFilterProvider.notifier)
                               .toggleElement(element),
                         ).animate().fadeIn(delay: 100.ms),
                         _buildFilterSection(
@@ -86,7 +93,7 @@ class FilterDialog extends ConsumerWidget {
                           options.types,
                           filters.types,
                           (type) => ref
-                              .read(filterProvider.notifier)
+                              .read(cardFilterProvider.notifier)
                               .toggleType(type),
                         ).animate().fadeIn(delay: 200.ms),
                         _buildFilterSection(
@@ -95,7 +102,7 @@ class FilterDialog extends ConsumerWidget {
                           options.rarities,
                           filters.rarities,
                           (rarity) => ref
-                              .read(filterProvider.notifier)
+                              .read(cardFilterProvider.notifier)
                               .toggleRarity(rarity),
                           // No need for display names since we're using full names
                         ).animate().fadeIn(delay: 300.ms),
@@ -125,7 +132,7 @@ class FilterDialog extends ConsumerWidget {
                                   filters
                                       .categories, // Current selected categories
                                   (category) => ref
-                                      .read(filterProvider.notifier)
+                                      .read(cardFilterProvider.notifier)
                                       .toggleCategory(category),
                                 ).animate().fadeIn(delay: 350.ms);
                               },
@@ -150,40 +157,44 @@ class FilterDialog extends ConsumerWidget {
                           ref,
                           colorScheme,
                         ).animate().fadeIn(delay: 400.ms),
-                        if (options.costRange.$1 != options.costRange.$2)
+                        if (options.costRangeTuple.$1 !=
+                            options.costRangeTuple.$2)
                           _buildCollapsibleRangeSlider(
                             context,
                             'Cost',
-                            options.costRange.$1.toDouble(),
-                            options.costRange.$2.toDouble(),
+                            options.costRangeTuple.$1.toDouble(),
+                            options.costRangeTuple.$2.toDouble(),
                             filters.minCost?.toDouble(),
                             filters.maxCost?.toDouble(),
-                            (min, max) =>
-                                ref.read(filterProvider.notifier).setCostRange(
-                                      min?.toInt(),
-                                      max?.toInt(),
-                                    ),
+                            (min, max) => ref
+                                .read(cardFilterProvider.notifier)
+                                .setCostRange(
+                                  min?.toInt(),
+                                  max?.toInt(),
+                                ),
                           ).animate().fadeIn(delay: 500.ms),
-                        if (options.powerRange.$1 != options.powerRange.$2)
+                        if (options.powerRangeTuple.$1 !=
+                            options.powerRangeTuple.$2)
                           _buildCollapsibleRangeSlider(
                             context,
                             'Power',
-                            options.powerRange.$1.toDouble(),
-                            options.powerRange.$2.toDouble(),
+                            options.powerRangeTuple.$1.toDouble(),
+                            options.powerRangeTuple.$2.toDouble(),
                             filters.minPower?.toDouble(),
                             filters.maxPower?.toDouble(),
-                            (min, max) =>
-                                ref.read(filterProvider.notifier).setPowerRange(
-                                      min?.toInt(),
-                                      max?.toInt(),
-                                    ),
+                            (min, max) => ref
+                                .read(cardFilterProvider.notifier)
+                                .setPowerRange(
+                                  min?.toInt(),
+                                  max?.toInt(),
+                                ),
                           ).animate().fadeIn(delay: 600.ms),
                         _buildSwitchRow(
                           context,
                           'Show Sealed Products',
                           filters.showSealedProducts,
                           (_) => ref
-                              .read(filterProvider.notifier)
+                              .read(cardFilterProvider.notifier)
                               .toggleShowSealedProducts(),
                         ).animate().fadeIn(delay: 700.ms),
                       ],
@@ -205,7 +216,8 @@ class FilterDialog extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: () => ref.read(filterProvider.notifier).reset(),
+                    onPressed: () =>
+                        ref.read(cardFilterProvider.notifier).reset(),
                     child: Text('Reset',
                         style: TextStyle(color: colorScheme.primary)),
                   ),
@@ -235,6 +247,71 @@ class FilterDialog extends ConsumerWidget {
       ),
     );
   }
+
+  // --- NEW: Status Filter Section ---
+  Widget _buildStatusFilterSection(
+      BuildContext context, WidgetRef ref, CardFilters filters) {
+    final colorScheme = Theme.of(context).colorScheme;
+    // Check if either status filter is active
+    final hasSelectedOptions =
+        filters.showFavoritesOnly || filters.showWishlistOnly;
+
+    return ExpansionTile(
+      title: Text(
+        'Status',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      initiallyExpanded: hasSelectedOptions, // Expand if a status is selected
+      collapsedIconColor: colorScheme.onSurface,
+      iconColor: colorScheme.primary,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilterChip(
+                label: const Text('Favorites'),
+                avatar: Icon(
+                  filters.showFavoritesOnly ? Icons.star : Icons.star_border,
+                  color: filters.showFavoritesOnly
+                      ? Colors.amber
+                      : colorScheme.onSurfaceVariant,
+                ),
+                selected: filters.showFavoritesOnly,
+                onSelected: (selected) {
+                  ref
+                      .read(cardFilterProvider.notifier)
+                      .toggleShowFavoritesOnly();
+                },
+                showCheckmark: false, // Use avatar instead
+              ),
+              FilterChip(
+                label: const Text('Wishlist'),
+                avatar: Icon(
+                  filters.showWishlistOnly
+                      ? Icons.bookmark
+                      : Icons.bookmark_border,
+                  color: filters.showWishlistOnly
+                      ? colorScheme.tertiary
+                      : colorScheme.onSurfaceVariant,
+                ),
+                selected: filters.showWishlistOnly,
+                onSelected: (selected) {
+                  ref
+                      .read(cardFilterProvider.notifier)
+                      .toggleShowWishlistOnly();
+                },
+                showCheckmark: false, // Use avatar instead
+              ),
+            ],
+          ).animate().fadeIn(duration: 150.ms),
+        ),
+      ],
+    );
+  }
+  // --- End Status Filter Section ---
 
   Widget _buildFilterSection(
     BuildContext context,
@@ -389,7 +466,7 @@ class FilterDialog extends ConsumerWidget {
               ),
               selected: selectedValues.contains(setId),
               onSelected: (_) =>
-                  ref.read(filterProvider.notifier).toggleSet(setId),
+                  ref.read(cardFilterProvider.notifier).toggleSet(setId),
               backgroundColor: colorScheme.surfaceContainerHighest,
               selectedColor: colorScheme.primaryContainer,
               labelStyle: TextStyle(

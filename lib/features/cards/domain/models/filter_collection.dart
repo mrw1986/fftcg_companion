@@ -1,23 +1,32 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart'; // Added
 
-part 'filter_collection.freezed.dart';
-part 'filter_collection.g.dart';
+part 'filter_collection.mapper.dart'; // Added
 
-@freezed
-class FilterCollection with _$FilterCollection {
-  const factory FilterCollection({
-    required List<String> cardType,
-    required List<String> category,
-    required List<String> cost,
-    required List<String> elements,
-    required List<String> power,
-    required List<String> rarity,
-    required List<String> set,
-  }) = _FilterCollection;
+@MappableClass(caseStyle: CaseStyle.camelCase) // Added
+class FilterCollection with FilterCollectionMappable {
+  // Added mixin
+  final List<String> cardType;
+  final List<String> category;
+  final List<String> cost;
+  final List<String> elements;
+  final List<String> power;
+  final List<String> rarity;
+  final List<String> set;
 
-  factory FilterCollection.fromJson(Map<String, dynamic> json) =>
-      _$FilterCollectionFromJson(json);
+  const FilterCollection({
+    // Changed to standard constructor
+    required this.cardType,
+    required this.category,
+    required this.cost,
+    required this.elements,
+    required this.power,
+    required this.rarity,
+    required this.set,
+  });
 
+  // fromJson factory removed
+
+  // Keep the empty factory
   factory FilterCollection.empty() => const FilterCollection(
         cardType: [],
         category: [],
@@ -29,13 +38,17 @@ class FilterCollection with _$FilterCollection {
       );
 }
 
-@freezed
-class FilterCollectionCache with _$FilterCollectionCache {
-  const factory FilterCollectionCache({
-    required FilterCollection filters,
-    required DateTime lastUpdated,
-  }) = _FilterCollectionCache;
+@MappableClass(caseStyle: CaseStyle.camelCase) // Added
+class FilterCollectionCache with FilterCollectionCacheMappable {
+  // Added mixin
+  final FilterCollection filters;
+  final DateTime lastUpdated;
 
-  factory FilterCollectionCache.fromJson(Map<String, dynamic> json) =>
-      _$FilterCollectionCacheFromJson(json);
+  const FilterCollectionCache({
+    // Changed to standard constructor
+    required this.filters,
+    required this.lastUpdated,
+  });
+
+  // fromJson factory removed
 }

@@ -1,13 +1,21 @@
+// lib/features/collection/presentation/widgets/collection_filter_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_options_provider.dart';
-import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
+// Import the correct filter provider for the collection view
+import 'package:fftcg_companion/features/collection/presentation/providers/collection_filter_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_collection_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/set_card_count_provider.dart';
-import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart';
+// Import only needed widget from cards filter dialog
+import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart'
+    show
+        SetCardCountDisplay,
+        prefetchFilterOptionsProvider; // Added prefetch provider
 import 'package:fftcg_companion/core/utils/logger.dart';
 import '../../domain/providers/collection_providers.dart';
+// Import CardFilters model
+import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
 
 /// Collection filter dialog that combines Cards filter options with Collection-specific filters
 class CollectionFilterDialog extends ConsumerWidget {
@@ -19,8 +27,11 @@ class CollectionFilterDialog extends ConsumerWidget {
     ref.watch(prefetchFilterOptionsProvider);
 
     final filterOptions = ref.watch(filterOptionsNotifierProvider);
-    final cardsFilters = ref.watch(filterProvider);
-    final collectionFilters = ref.watch(collectionFilterProvider);
+    // Watch the shared card filters provider for the collection view
+    final cardsFilters = ref.watch(collectionFilterProvider);
+    // Watch the collection-specific filters provider
+    final collectionSpecificFilters =
+        ref.watch(collectionSpecificFilterProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final size = MediaQuery.of(context).size;
 
@@ -60,8 +71,14 @@ class CollectionFilterDialog extends ConsumerWidget {
                         _buildCollectionFiltersSection(
                           context,
                           ref,
-                          collectionFilters,
+                          collectionSpecificFilters, // Pass the specific filters map
                         ).animate().fadeIn(delay: 50.ms),
+
+                        // --- Add Status Filter Section ---
+                        _buildStatusFilterSection(context, ref, cardsFilters)
+                            .animate()
+                            .fadeIn(delay: 75.ms), // Adjust delay
+                        // --- End Status Filter Section ---
 
                         // Card filters from the Cards page
                         _buildFilterSection(
@@ -70,7 +87,8 @@ class CollectionFilterDialog extends ConsumerWidget {
                           options.elements,
                           cardsFilters.elements,
                           (element) => ref
-                              .read(filterProvider.notifier)
+                              .read(collectionFilterProvider
+                                  .notifier) // Use collection provider
                               .toggleElement(element),
                         ).animate().fadeIn(delay: 100.ms),
                         _buildFilterSection(
@@ -79,7 +97,8 @@ class CollectionFilterDialog extends ConsumerWidget {
                           options.types,
                           cardsFilters.types,
                           (type) => ref
-                              .read(filterProvider.notifier)
+                              .read(collectionFilterProvider
+                                  .notifier) // Use collection provider
                               .toggleType(type),
                         ).animate().fadeIn(delay: 200.ms),
                         _buildFilterSection(
@@ -88,7 +107,8 @@ class CollectionFilterDialog extends ConsumerWidget {
                           options.rarities,
                           cardsFilters.rarities,
                           (rarity) => ref
-                              .read(filterProvider.notifier)
+                              .read(collectionFilterProvider
+                                  .notifier) // Use collection provider
                               .toggleRarity(rarity),
                         ).animate().fadeIn(delay: 300.ms),
                         // Add Category filter section using Consumer for better reactivity
@@ -117,7 +137,8 @@ class CollectionFilterDialog extends ConsumerWidget {
                                   cardsFilters
                                       .categories, // Current selected categories
                                   (category) => ref
-                                      .read(filterProvider.notifier)
+                                      .read(collectionFilterProvider
+                                          .notifier) // Use collection provider
                                       .toggleCategory(category),
                                 ).animate().fadeIn(delay: 350.ms);
                               },
@@ -142,40 +163,47 @@ class CollectionFilterDialog extends ConsumerWidget {
                           ref,
                           colorScheme,
                         ).animate().fadeIn(delay: 400.ms),
-                        if (options.costRange.$1 != options.costRange.$2)
+                        if (options.costRangeTuple.$1 !=
+                            options.costRangeTuple.$2)
                           _buildCollapsibleRangeSlider(
                             context,
                             'Cost',
-                            options.costRange.$1.toDouble(),
-                            options.costRange.$2.toDouble(),
+                            options.costRangeTuple.$1.toDouble(),
+                            options.costRangeTuple.$2.toDouble(),
                             cardsFilters.minCost?.toDouble(),
                             cardsFilters.maxCost?.toDouble(),
-                            (min, max) =>
-                                ref.read(filterProvider.notifier).setCostRange(
-                                      min?.toInt(),
-                                      max?.toInt(),
-                                    ),
+                            (min, max) => ref
+                                .read(collectionFilterProvider.notifier)
+                                .setCostRange(
+                                  // Use collection provider
+                                  min?.toInt(),
+                                  max?.toInt(),
+                                ),
                           ).animate().fadeIn(delay: 500.ms),
-                        if (options.powerRange.$1 != options.powerRange.$2)
+                        if (options.powerRangeTuple.$1 !=
+                            options.powerRangeTuple.$2)
                           _buildCollapsibleRangeSlider(
                             context,
                             'Power',
-                            options.powerRange.$1.toDouble(),
-                            options.powerRange.$2.toDouble(),
+                            options.powerRangeTuple.$1.toDouble(),
+                            options.powerRangeTuple.$2.toDouble(),
                             cardsFilters.minPower?.toDouble(),
                             cardsFilters.maxPower?.toDouble(),
-                            (min, max) =>
-                                ref.read(filterProvider.notifier).setPowerRange(
-                                      min?.toInt(),
-                                      max?.toInt(),
-                                    ),
+                            (min, max) => ref
+                                .read(collectionFilterProvider.notifier)
+                                .setPowerRange(
+                                  // Use collection provider
+                                  min?.toInt(),
+                                  max?.toInt(),
+                                ),
                           ).animate().fadeIn(delay: 600.ms),
                         _buildSwitchRow(
                           context,
                           'Show Sealed Products',
                           cardsFilters.showSealedProducts,
                           (_) => ref
-                              .read(filterProvider.notifier)
+                              .read(collectionFilterProvider
+                                  .notifier) // Use collection provider
                               .toggleShowSealedProducts(),
                         ).animate().fadeIn(delay: 700.ms),
                       ],
@@ -198,8 +226,12 @@ class CollectionFilterDialog extends ConsumerWidget {
                 children: [
                   TextButton(
                     onPressed: () {
-                      ref.read(filterProvider.notifier).reset();
-                      ref.read(collectionFilterProvider.notifier).state = {};
+                      // Reset shared card filters for collection
+                      ref.read(collectionFilterProvider.notifier).reset();
+                      // Reset collection-specific filters
+                      ref
+                          .read(collectionSpecificFilterProvider.notifier)
+                          .clearFilters();
                     },
                     child: Text('Reset',
                         style: TextStyle(color: colorScheme.primary)),
@@ -212,7 +244,10 @@ class CollectionFilterDialog extends ConsumerWidget {
                   FilledButton(
                     onPressed: () => Navigator.pop(
                       context,
-                      (cardsFilters, collectionFilters),
+                      (
+                        cardsFilters,
+                        collectionSpecificFilters
+                      ), // Return correct filters
                       // Apply both filters when the Apply button is pressed
                     ),
                     style: FilledButton.styleFrom(
@@ -238,7 +273,7 @@ class CollectionFilterDialog extends ConsumerWidget {
   Widget _buildCollectionFiltersSection(
     BuildContext context,
     WidgetRef ref,
-    Map<String, dynamic> collectionFilters,
+    Map<String, dynamic> collectionSpecificFilters, // Use specific filters map
   ) {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -267,7 +302,7 @@ class CollectionFilterDialog extends ConsumerWidget {
                     'type',
                     'regular',
                     Icons.copy,
-                    collectionFilters,
+                    collectionSpecificFilters, // Use specific filters map
                   ),
                   _buildCollectionFilterChip(
                     context,
@@ -276,7 +311,7 @@ class CollectionFilterDialog extends ConsumerWidget {
                     'type',
                     'foil',
                     Icons.star,
-                    collectionFilters,
+                    collectionSpecificFilters, // Use specific filters map
                   ),
                   _buildCollectionFilterChip(
                     context,
@@ -285,18 +320,18 @@ class CollectionFilterDialog extends ConsumerWidget {
                     'graded',
                     true,
                     Icons.verified,
-                    collectionFilters,
+                    collectionSpecificFilters, // Use specific filters map
                   ),
                 ],
               ),
-              if (collectionFilters.containsKey('graded') &&
-                  collectionFilters['graded'] == true)
+              if (collectionSpecificFilters.containsKey('graded') &&
+                  collectionSpecificFilters['graded'] == true)
                 Padding(
                   padding: const EdgeInsets.only(top: 8.0),
                   child: _buildGradingCompanyDropdown(
                     context,
                     ref,
-                    collectionFilters,
+                    collectionSpecificFilters, // Use specific filters map
                   ),
                 ),
             ],
@@ -313,10 +348,10 @@ class CollectionFilterDialog extends ConsumerWidget {
     String filterKey,
     dynamic filterValue,
     IconData icon,
-    Map<String, dynamic> collectionFilters,
+    Map<String, dynamic> collectionSpecificFilters, // Use specific filters map
   ) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isSelected = collectionFilters[filterKey] == filterValue;
+    final isSelected = collectionSpecificFilters[filterKey] == filterValue;
 
     return FilterChip(
       label: Row(
@@ -335,13 +370,16 @@ class CollectionFilterDialog extends ConsumerWidget {
       ),
       selected: isSelected,
       onSelected: (selected) {
-        final newFilters = Map<String, dynamic>.from(collectionFilters);
+        // Use the notifier methods to update the state
         if (selected) {
-          newFilters[filterKey] = filterValue;
+          ref
+              .read(collectionSpecificFilterProvider.notifier)
+              .setFilter(filterKey, filterValue);
         } else {
-          newFilters.remove(filterKey);
+          ref
+              .read(collectionSpecificFilterProvider.notifier)
+              .removeFilter(filterKey);
         }
-        ref.read(collectionFilterProvider.notifier).state = newFilters;
       },
       backgroundColor: colorScheme.surface,
       selectedColor: colorScheme.primaryContainer,
@@ -362,10 +400,10 @@ class CollectionFilterDialog extends ConsumerWidget {
   Widget _buildGradingCompanyDropdown(
     BuildContext context,
     WidgetRef ref,
-    Map<String, dynamic> collectionFilters,
+    Map<String, dynamic> collectionSpecificFilters, // Use specific filters map
   ) {
     return DropdownButtonFormField<String?>(
-      value: collectionFilters['gradingCompany'],
+      value: collectionSpecificFilters['gradingCompany'],
       decoration: InputDecoration(
         labelText: 'Grading Company',
         border: OutlineInputBorder(
@@ -392,16 +430,86 @@ class CollectionFilterDialog extends ConsumerWidget {
         ),
       ],
       onChanged: (value) {
-        final newFilters = Map<String, dynamic>.from(collectionFilters);
+        // Use the notifier methods to update the state
         if (value == null) {
-          newFilters.remove('gradingCompany');
+          ref
+              .read(collectionSpecificFilterProvider.notifier)
+              .removeFilter('gradingCompany');
         } else {
-          newFilters['gradingCompany'] = value;
+          ref
+              .read(collectionSpecificFilterProvider.notifier)
+              .setFilter('gradingCompany', value);
         }
-        ref.read(collectionFilterProvider.notifier).state = newFilters;
       },
     );
   }
+
+  // --- NEW: Status Filter Section ---
+  Widget _buildStatusFilterSection(
+      BuildContext context, WidgetRef ref, CardFilters filters) {
+    final colorScheme = Theme.of(context).colorScheme;
+    // Check if either status filter is active
+    final hasSelectedOptions =
+        filters.showFavoritesOnly || filters.showWishlistOnly;
+
+    return ExpansionTile(
+      title: Text(
+        'Status',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      initiallyExpanded: hasSelectedOptions, // Expand if a status is selected
+      collapsedIconColor: colorScheme.onSurface,
+      iconColor: colorScheme.primary,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilterChip(
+                label: const Text('Favorites'),
+                avatar: Icon(
+                  filters.showFavoritesOnly ? Icons.star : Icons.star_border,
+                  color: filters.showFavoritesOnly
+                      ? Colors.amber
+                      : colorScheme.onSurfaceVariant,
+                ),
+                selected: filters.showFavoritesOnly,
+                onSelected: (selected) {
+                  // Use collectionFilterProvider here
+                  ref
+                      .read(collectionFilterProvider.notifier)
+                      .toggleShowFavoritesOnly();
+                },
+                showCheckmark: false, // Use avatar instead
+              ),
+              FilterChip(
+                label: const Text('Wishlist'),
+                avatar: Icon(
+                  filters.showWishlistOnly
+                      ? Icons.bookmark
+                      : Icons.bookmark_border,
+                  color: filters.showWishlistOnly
+                      ? colorScheme.tertiary
+                      : colorScheme.onSurfaceVariant,
+                ),
+                selected: filters.showWishlistOnly,
+                onSelected: (selected) {
+                  // Use collectionFilterProvider here
+                  ref
+                      .read(collectionFilterProvider.notifier)
+                      .toggleShowWishlistOnly();
+                },
+                showCheckmark: false, // Use avatar instead
+              ),
+            ],
+          ).animate().fadeIn(duration: 150.ms),
+        ),
+      ],
+    );
+  }
+  // --- End Status Filter Section ---
 
   // Reuse the filter section widgets from the Cards filter dialog
   Widget _buildFilterSection(
@@ -557,7 +665,8 @@ class CollectionFilterDialog extends ConsumerWidget {
               ),
               selected: selectedValues.contains(setId),
               onSelected: (_) =>
-                  ref.read(filterProvider.notifier).toggleSet(setId),
+                  // Use the correct provider for shared card filters
+                  ref.read(collectionFilterProvider.notifier).toggleSet(setId),
               // This applies the set filter
               backgroundColor: colorScheme.surfaceContainerHighest,
               selectedColor: colorScheme.primaryContainer,

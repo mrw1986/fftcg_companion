@@ -110,14 +110,14 @@ class FilteredSetCardCountCache extends _$FilteredSetCardCountCache {
   @override
   Future<int> build(String setId) async {
     // Watch the current filters to update counts when filters change
-    final filters = ref.watch(filterProvider);
+    final filters = ref.watch(cardFilterProvider);
     final cacheKey = _getCacheKey(filters);
 
     // Store previous state to avoid flickering when toggling sets
     final previousState = state;
 
     // Check if we're toggling a set filter
-    final isTogglingSet = ref.read(filterProvider.notifier).isTogglingSet;
+    final isTogglingSet = ref.read(cardFilterProvider.notifier).isTogglingSet;
 
     // Check in-memory cache first (fastest)
     if (_memoryCache.containsKey(setId) &&

@@ -35,7 +35,8 @@ class FilterCollectionNotifier extends AsyncNotifier<FilterCollection> {
             .get<Map<String, dynamic>>(_filterCollectionCacheKey);
         if (cachedData != null) {
           talker.debug('Using Hive-cached filter collection');
-          final cache = FilterCollectionCache.fromJson(cachedData);
+          // Use dart_mappable's fromMap
+          final cache = FilterCollectionCacheMapper.fromMap(cachedData);
           _memoryCache = cache.filters;
           return cache.filters;
         }
@@ -112,7 +113,8 @@ class FilterCollectionNotifier extends AsyncNotifier<FilterCollection> {
     );
 
     try {
-      await _hiveStorage.put(_filterCollectionCacheKey, cache.toJson());
+      // Use dart_mappable's toMap
+      await _hiveStorage.put(_filterCollectionCacheKey, cache.toMap());
       talker.debug('Successfully cached filter collection');
     } catch (e) {
       // Just log the error but don't fail - we still have the memory cache

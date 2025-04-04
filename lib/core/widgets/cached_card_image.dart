@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
-import 'package:fftcg_companion/core/widgets/flipping_card_image.dart';
 
 class CardImageCacheManager {
   static const key = 'cardImageCache';
@@ -218,29 +217,33 @@ class _CachedCardImageState extends State<CachedCardImage>
           height: widget.height,
         );
 
-        if (!widget.animate ||
-            CardImageCacheManager.hasBeenAnimated(targetUrl)) {
-          return imageWidget;
-        }
+        // Temporarily disable animation for testing
+        return imageWidget;
 
-        // Mark this URL as animated before starting the animation
-        CardImageCacheManager.markAsAnimated(targetUrl);
-
-        return FlippingCardImage(
-          key: ValueKey('flip_$targetUrl'),
-          frontWidget: Image.asset(
-            'assets/images/card-back.jpeg',
-            fit: widget.fit,
-            width: widget.width,
-            height: widget.height,
-          ),
-          backWidget: imageWidget,
-          duration: const Duration(milliseconds: 500),
-          borderRadius: widget.borderRadius,
-          onAnimationComplete: () {
-            CardImageCacheManager.markAsAnimated(targetUrl);
-          },
-        );
+        // Original animation code:
+        // if (!widget.animate ||
+        //     CardImageCacheManager.hasBeenAnimated(targetUrl)) {
+        //   return imageWidget;
+        // }
+        //
+        // // Mark this URL as animated before starting the animation
+        // CardImageCacheManager.markAsAnimated(targetUrl);
+        //
+        // return FlippingCardImage(
+        //   key: ValueKey('flip_$targetUrl'),
+        //   frontWidget: Image.asset(
+        //     'assets/images/card-back.jpeg',
+        //     fit: widget.fit,
+        //     width: widget.width,
+        //     height: widget.height,
+        //   ),
+        //   backWidget: imageWidget,
+        //   duration: const Duration(milliseconds: 500),
+        //   borderRadius: widget.borderRadius,
+        //   onAnimationComplete: () {
+        //     CardImageCacheManager.markAsAnimated(targetUrl);
+        //   },
+        // );
       },
       errorWidget: (context, url, error) {
         talker.error('Failed to load image: $url', error);

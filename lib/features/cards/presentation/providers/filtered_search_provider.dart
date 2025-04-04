@@ -11,13 +11,13 @@ class FilteredSearchNotifier extends AsyncNotifier<List<models.Card>> {
   @override
   Future<List<models.Card>> build() async {
     // Watch for changes to the search query
-    final searchQuery = ref.watch(searchQueryProvider);
+    final searchQuery = ref.watch(cardSearchQueryProvider);
 
     // Watch for changes to the filtered cards
     final filteredCards = await ref.watch(cardsNotifierProvider.future);
 
     // Watch for changes to the filter provider to get current sort settings
-    final currentFilters = ref.watch(filterProvider);
+    final currentFilters = ref.watch(cardFilterProvider);
 
     // If search query is empty, return the filtered cards
     if (searchQuery.isEmpty) {

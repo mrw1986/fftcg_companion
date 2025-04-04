@@ -11,7 +11,7 @@ class SortBottomSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final filters = ref.watch(filterProvider);
+    final filters = ref.watch(cardFilterProvider);
     final textTheme = Theme.of(context).textTheme;
     final defaultSort = filters.sortField == null || filters.sortField!.isEmpty;
 
@@ -128,7 +128,7 @@ class SortBottomSheet extends ConsumerWidget {
   }
 
   void _updateSort(BuildContext context, WidgetRef ref, String field) {
-    final currentFilters = ref.read(filterProvider);
+    final currentFilters = ref.read(cardFilterProvider);
 
     // For number sort, treat null/empty sortField as 'number' since that's the default
     final isNumberSort = field == 'number';
@@ -138,18 +138,18 @@ class SortBottomSheet extends ConsumerWidget {
             currentFilters.sortField == 'number')
         : currentFilters.sortField == field;
 
-    ref.read(filterProvider.notifier).setSorting(
+    ref.read(cardFilterProvider.notifier).setSorting(
           field,
           isCurrentField ? !currentFilters.sortDescending : false,
         );
 
     // Apply the filters immediately
     ref.read(cardsNotifierProvider.notifier).applyFilters(
-          ref.read(filterProvider),
+          ref.read(cardFilterProvider),
         );
 
     // Check if we're currently searching
-    final searchQuery = ref.read(searchQueryProvider);
+    final searchQuery = ref.read(cardSearchQueryProvider);
     if (searchQuery.isNotEmpty) {
       // If searching, also invalidate the filtered search provider to apply the new sort
       ref.invalidate(filteredSearchNotifierProvider);

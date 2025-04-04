@@ -1,12 +1,18 @@
+// lib/features/cards/presentation/widgets/card_list_item.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod
 import 'package:go_router/go_router.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/widgets/cached_card_image.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/card_metadata_chips.dart';
+// Import favorite/wishlist providers
+import 'package:fftcg_companion/features/cards/presentation/providers/favorites_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/wishlist_provider.dart';
 
-class CardListItem extends StatefulWidget {
+// Convert to ConsumerStatefulWidget
+class CardListItem extends ConsumerStatefulWidget {
   final models.Card card;
   final ViewSize viewSize;
   final bool isSmallScreen;
@@ -19,17 +25,24 @@ class CardListItem extends StatefulWidget {
   });
 
   @override
-  State<CardListItem> createState() => _CardListItemState();
+  ConsumerState<CardListItem> createState() => _CardListItemState();
 }
 
-class _CardListItemState extends State<CardListItem>
+// Update state class to ConsumerState
+class _CardListItemState extends ConsumerState<CardListItem>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
+    super.build(context); // Keep this for AutomaticKeepAliveClientMixin
+
+    // Watch favorite and wishlist status
+    final isFavorite =
+        ref.watch(isFavoriteProvider(widget.card.productId.toString()));
+    final isInWishlist =
+        ref.watch(isInWishlistProvider(widget.card.productId.toString()));
 
     final double height = switch (widget.viewSize) {
       ViewSize.small =>
@@ -159,6 +172,48 @@ class _CardListItemState extends State<CardListItem>
                     ],
                   ),
                 ),
+                // --- Favorite/Wishlist Icons ---
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        isFavorite ? Icons.star : Icons.star_border,
+                        color: isFavorite
+                            ? Colors.amber
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                      iconSize: 20, // Adjust size as needed
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(),
+                      tooltip: isFavorite ? 'Remove Favorite' : 'Add Favorite',
+                      onPressed: () {
+                        ref
+                            .read(favoritesProvider.notifier)
+                            .toggleFavorite(widget.card.productId.toString());
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        isInWishlist ? Icons.bookmark : Icons.bookmark_border,
+                        color: isInWishlist
+                            ? colorScheme.tertiary
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                      iconSize: 20, // Adjust size as needed
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(),
+                      tooltip:
+                          isInWishlist ? 'Remove Wishlist' : 'Add Wishlist',
+                      onPressed: () {
+                        ref
+                            .read(wishlistProvider.notifier)
+                            .toggleWishlist(widget.card.productId.toString());
+                      },
+                    ),
+                  ],
+                ),
+                // --- End Favorite/Wishlist Icons ---
               ],
             ),
           ),

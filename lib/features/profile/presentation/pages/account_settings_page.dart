@@ -261,9 +261,12 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
         context.go('/profile');
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      // Add mounted check before setState
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
 
       // Show error message
       if (mounted) {

@@ -1,6 +1,6 @@
 // lib/features/cards/presentation/providers/filter_options_provider.dart
 
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart'; // Added
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:fftcg_companion/features/repositories.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card_filter_options.dart';
@@ -9,11 +9,13 @@ import 'package:fftcg_companion/core/providers/card_cache_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 part 'filter_options_provider.g.dart';
-part 'filter_options_provider.freezed.dart';
+part 'filter_options_provider.mapper.dart'; // Updated part directive
 
 // Generated provider
 final cardCacheProvider = cardCacheNotifierProvider;
 
+// Mappable Enum needs annotation
+@MappableEnum()
 enum SetCategory {
   promotional,
   collection,
@@ -26,16 +28,25 @@ enum SetCategory {
       };
 }
 
-@freezed
-class SetInfo with _$SetInfo {
-  const factory SetInfo({
-    required String id,
-    required String name,
-    String? abbreviation, // Changed to nullable
-    required SetCategory category,
-    required DateTime publishedDate,
-    required int sortOrder,
-  }) = _SetInfo;
+@MappableClass() // Added annotation
+class SetInfo with SetInfoMappable {
+  // Added mixin
+  final String id;
+  final String name;
+  final String? abbreviation;
+  final SetCategory category;
+  final DateTime publishedDate;
+  final int sortOrder;
+
+  const SetInfo({
+    // Changed to standard constructor
+    required this.id,
+    required this.name,
+    this.abbreviation,
+    required this.category,
+    required this.publishedDate,
+    required this.sortOrder,
+  });
 }
 
 @Riverpod(keepAlive: true)
@@ -56,16 +67,8 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
           (cachedOptions['setInfo'] as Map).map(
             (key, value) => MapEntry(
               key as String,
-              SetInfo(
-                id: value['id'] as String,
-                name: value['name'] as String,
-                abbreviation: value['abbreviation'] as String?,
-                category: SetCategory.values.firstWhere(
-                  (e) => e.name == value['category'] as String,
-                ),
-                publishedDate: DateTime.parse(value['publishedDate'] as String),
-                sortOrder: value['sortOrder'] as int,
-              ),
+              // Use dart_mappable for deserialization
+              SetInfoMapper.fromMap(value as Map<String, dynamic>),
             ),
           ),
         ));
@@ -83,8 +86,9 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
           types: Set<String>.from(cachedOptions['types'] as List),
           rarities: Set<String>.from(cachedOptions['rarities'] as List),
           set: _setInfo.keys.toSet(),
-          costRange: _costRange,
-          powerRange: _powerRange,
+          // Convert tuple to list for constructor
+          costRange: [_costRange.$1, _costRange.$2],
+          powerRange: [_powerRange.$1, _powerRange.$2],
         );
       }
 
@@ -113,15 +117,9 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
           'Starter',
           'Promo'
         ],
-        'setInfo': _setInfo.map((key, value) => MapEntry(key, {
-              'id': value.id,
-              'name': value.name,
-              'abbreviation': value.abbreviation,
-              'category': value.category.name,
-              'publishedDate': value.publishedDate.toIso8601String(),
-              'sortOrder': value.sortOrder,
-            })),
-        'minCost': _costRange.$1,
+        // Use dart_mappable for serialization
+        'setInfo': _setInfo.map((key, value) => MapEntry(key, value.toMap())),
+        'minCost': _costRange.$1, // Keep tuple access for caching
         'maxCost': _costRange.$2,
         'minPower': _powerRange.$1,
         'maxPower': _powerRange.$2,
@@ -148,13 +146,16 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
           'Promo'
         },
         set: _setInfo.keys.toSet(),
-        costRange: _costRange,
-        powerRange: _powerRange,
+        // Convert tuple to list for constructor
+        costRange: [_costRange.$1, _costRange.$2],
+        powerRange: [_powerRange.$1, _powerRange.$2],
       );
     } catch (e, stack) {
       talker.error('Error building filter options', e, stack);
       // Return default options on error
-      return const CardFilterOptions(
+      // Use list for constructor
+      return CardFilterOptions(
+        // Removed const
         elements: {
           'Fire',
           'Ice',
@@ -168,8 +169,8 @@ class FilterOptionsNotifier extends _$FilterOptionsNotifier {
         types: {'Forward', 'Backup', 'Summon', 'Monster'},
         set: {},
         rarities: {'Common', 'Rare', 'Hero', 'Legend', 'Starter', 'Promo'},
-        costRange: (0, 10),
-        powerRange: (0, 10000),
+        costRange: [0, 10], // Use list
+        powerRange: [0, 10000], // Use list
       );
     }
   }

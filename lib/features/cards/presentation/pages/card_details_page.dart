@@ -1,6 +1,8 @@
 // lib/features/cards/presentation/pages/card_details_page.dart
 import 'dart:math';
 import 'package:fftcg_companion/core/utils/logger.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fftcg_companion/core/widgets/cached_card_image.dart'; // Added import
 import 'package:fftcg_companion/core/widgets/corner_mask_painter.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/card_description_text.dart';
 import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
@@ -9,6 +11,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/models.dart' as models;
 import 'package:fftcg_companion/features/cards/presentation/providers/filtered_search_provider.dart';
 import 'package:go_router/go_router.dart';
+// Import favorite/wishlist providers
+import 'package:fftcg_companion/features/cards/presentation/providers/favorites_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/wishlist_provider.dart';
 
 class CardDetailsPage extends ConsumerStatefulWidget {
   final models.Card initialCard;
@@ -28,15 +33,16 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
   List<models.Card> _allCards = [];
   int _currentIndex = 0;
   bool _isLoading = true;
-  bool _isFavorite = false;
-  bool _isInWishlist = false;
+  // Remove local state variables for favorite/wishlist
+  // bool _isFavorite = false;
+  // bool _isInWishlist = false;
   bool _isFabExpanded = false;
 
   @override
   void initState() {
     super.initState();
     _currentCard = widget.initialCard;
-    _pageController = PageController();
+    // Initialize PageController later in _initializeCardList
     _initializeCardList();
   }
 
@@ -58,13 +64,8 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
             .indexWhere((card) => card.productId == _currentCard.productId);
         if (_currentIndex < 0) _currentIndex = 0;
 
-        // Initialize the page controller to the current index
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _pageController.hasClients) {
-            _pageController.jumpToPage(_currentIndex);
-          }
-        });
-
+        // Initialize PageController here now that we have the index
+        _pageController = PageController(initialPage: _currentIndex);
         _isLoading = false;
       });
     }
@@ -100,7 +101,8 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
               : _buildNormalLayout(context, card);
         },
       ),
-      floatingActionButton: _buildFab(context, _currentCard),
+      // Pass ref to _buildFab
+      floatingActionButton: _buildFab(context, ref, _currentCard),
     );
   }
 
@@ -115,8 +117,13 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
     );
   }
 
-  Widget _buildFab(BuildContext context, models.Card card) {
+  // Update _buildFab to accept and use WidgetRef
+  Widget _buildFab(BuildContext context, WidgetRef ref, models.Card card) {
     final colorScheme = Theme.of(context).colorScheme;
+    // Watch providers using the current card's ID
+    final isFavorite = ref.watch(isFavoriteProvider(card.productId.toString()));
+    final isInWishlist =
+        ref.watch(isInWishlistProvider(card.productId.toString()));
 
     return _isFabExpanded
         ? Column(
@@ -127,6 +134,8 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
                 heroTag: 'fab_collection',
                 onPressed: () {
                   context.push('/collection/add?cardId=${card.productId}');
+                  // Close FAB after action
+                  setState(() => _isFabExpanded = false);
                 },
                 label: const Text('Add to Collection'),
                 icon: const Icon(Icons.add),
@@ -135,81 +144,97 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
               ),
               const SizedBox(height: 8),
 
-              // Favorite option
+              // Favorite option - Use provider state and notifier
               FloatingActionButton.small(
                 heroTag: 'fab_favorite',
+                tooltip: isFavorite ? 'Remove Favorite' : 'Add Favorite',
                 onPressed: () {
-                  setState(() {
-                    _isFavorite = !_isFavorite;
-                    _isFabExpanded = false;
-                  });
+                  ref
+                      .read(favoritesProvider.notifier)
+                      .toggleFavorite(card.productId.toString());
+                  // Close FAB after action
+                  setState(() => _isFabExpanded = false);
+                  // Show snackbar (optional, could be handled by a listener elsewhere)
                   SnackBarHelper.showSnackBar(
                     context: context,
-                    message: _isFavorite
-                        ? 'Added to favorites'
-                        : 'Removed from favorites',
+                    message:
+                        !isFavorite // Use !isFavorite because state updates after this
+                            ? 'Added to favorites'
+                            : 'Removed from favorites',
                     duration: const Duration(seconds: 1),
                   );
                 },
-                backgroundColor: _isFavorite
-                    ? Colors.amber
+                backgroundColor: isFavorite
+                    ? Colors.amber // Use provider state for color
                     : colorScheme.surfaceContainerHighest,
                 foregroundColor:
-                    _isFavorite ? Colors.white : colorScheme.onSurfaceVariant,
-                child: Icon(_isFavorite ? Icons.star : Icons.star_border),
+                    isFavorite ? Colors.white : colorScheme.onSurfaceVariant,
+                child: Icon(isFavorite
+                    ? Icons.star
+                    : Icons.star_border), // Use provider state for icon
               ),
               const SizedBox(height: 8),
 
-              // Wishlist option
+              // Wishlist option - Use provider state and notifier
               FloatingActionButton.small(
                 heroTag: 'fab_wishlist',
+                tooltip: isInWishlist ? 'Remove Wishlist' : 'Add Wishlist',
                 onPressed: () {
-                  setState(() {
-                    _isInWishlist = !_isInWishlist;
-                    _isFabExpanded = false;
-                  });
+                  ref
+                      .read(wishlistProvider.notifier)
+                      .toggleWishlist(card.productId.toString());
+                  // Close FAB after action
+                  setState(() => _isFabExpanded = false);
+                  // Show snackbar (optional)
                   SnackBarHelper.showSnackBar(
                     context: context,
-                    message: _isInWishlist
-                        ? 'Added to wishlist'
-                        : 'Removed from wishlist',
+                    message:
+                        !isInWishlist // Use !isInWishlist because state updates after this
+                            ? 'Added to wishlist'
+                            : 'Removed from wishlist',
                     duration: const Duration(seconds: 1),
                   );
                 },
-                backgroundColor: _isInWishlist
-                    ? colorScheme.tertiary
+                backgroundColor: isInWishlist
+                    ? colorScheme.tertiary // Use provider state for color
                     : colorScheme.surfaceContainerHighest,
                 foregroundColor:
-                    _isInWishlist ? Colors.white : colorScheme.onSurfaceVariant,
-                child: Icon(
-                    _isInWishlist ? Icons.bookmark : Icons.bookmark_border),
+                    isInWishlist ? Colors.white : colorScheme.onSurfaceVariant,
+                child: Icon(isInWishlist
+                    ? Icons.bookmark
+                    : Icons.bookmark_border), // Use provider state for icon
               ),
               const SizedBox(height: 8),
 
               // Main FAB (close)
               FloatingActionButton(
-                heroTag: 'fab_main',
+                heroTag: 'fab_main_close', // Ensure unique heroTag
                 onPressed: () {
                   setState(() {
                     _isFabExpanded = false;
                   });
                 },
-                backgroundColor: colorScheme.primary,
+                backgroundColor:
+                    colorScheme.secondary, // Use secondary for close
+                foregroundColor: colorScheme.onSecondary,
                 child: const Icon(Icons.close),
               ),
             ],
           )
         : FloatingActionButton(
-            heroTag: 'fab_main',
+            heroTag: 'fab_main_open', // Ensure unique heroTag
             onPressed: () {
               setState(() {
                 _isFabExpanded = true;
               });
             },
             backgroundColor: colorScheme.primary,
+            foregroundColor: colorScheme.onPrimary,
             child: const Icon(Icons.add),
           );
   }
+
+  // ... rest of the _CardDetailsPageState methods (_buildEnhancedBackButton, etc.) remain the same ...
 
   Widget _buildEnhancedBackButton(BuildContext context) {
     return SafeArea(
@@ -343,19 +368,35 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
                                     _openFullScreenImage(context, card),
                                 child: Hero(
                                   tag: 'card_image_${card.productId}',
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .scaffoldBackgroundColor,
-                                      borderRadius: BorderRadius.circular(16.0),
-                                      image: DecorationImage(
-                                        image: NetworkImage(
-                                            card.getBestImageUrl() ?? ''),
-                                        fit: BoxFit.contain,
-                                        onError: (_, __) {
-                                          talker.error(
-                                              'Failed to load high-res image for card: ${card.productId}');
-                                        },
+                                  // Use CachedNetworkImage widget for placeholder/error handling
+                                  child: CachedNetworkImage(
+                                    imageUrl: card.getBestImageUrl() ?? '',
+                                    cacheManager: CardImageCacheManager
+                                        .instance, // Use shared cache manager
+                                    cacheKey:
+                                        Uri.parse(card.getBestImageUrl() ?? '')
+                                            .path, // Use path as cache key
+                                    fit: BoxFit.contain,
+                                    placeholder: (context, url) => Image.asset(
+                                      'assets/images/card-back.jpeg',
+                                      fit: BoxFit.contain,
+                                    ),
+                                    errorWidget: (context, url, error) {
+                                      talker.error(
+                                          'Failed to load image for card: ${card.productId}',
+                                          error);
+                                      return const Center(
+                                          child: Icon(Icons.error));
+                                    },
+                                    imageBuilder: (context, imageProvider) =>
+                                        Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius:
+                                            BorderRadius.circular(16.0),
+                                        image: DecorationImage(
+                                          image: imageProvider,
+                                          fit: BoxFit.contain,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -441,19 +482,35 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
                                     _openFullScreenImage(context, card),
                                 child: Hero(
                                   tag: 'card_image_${card.productId}',
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .scaffoldBackgroundColor,
-                                      borderRadius: BorderRadius.circular(16.0),
-                                      image: DecorationImage(
-                                        image: NetworkImage(
-                                            card.getBestImageUrl() ?? ''),
-                                        fit: BoxFit.contain,
-                                        onError: (_, __) {
-                                          talker.error(
-                                              'Failed to load high-res image for card: ${card.productId}');
-                                        },
+                                  // Use CachedNetworkImage widget for placeholder/error handling
+                                  child: CachedNetworkImage(
+                                    imageUrl: card.getBestImageUrl() ?? '',
+                                    cacheManager: CardImageCacheManager
+                                        .instance, // Use shared cache manager
+                                    cacheKey:
+                                        Uri.parse(card.getBestImageUrl() ?? '')
+                                            .path, // Use path as cache key
+                                    fit: BoxFit.contain,
+                                    placeholder: (context, url) => Image.asset(
+                                      'assets/images/card-back.jpeg',
+                                      fit: BoxFit.contain,
+                                    ),
+                                    errorWidget: (context, url, error) {
+                                      talker.error(
+                                          'Failed to load image for card: ${card.productId}',
+                                          error);
+                                      return const Center(
+                                          child: Icon(Icons.error));
+                                    },
+                                    imageBuilder: (context, imageProvider) =>
+                                        Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius:
+                                            BorderRadius.circular(16.0),
+                                        image: DecorationImage(
+                                          image: imageProvider,
+                                          fit: BoxFit.contain,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -656,11 +713,13 @@ class FullScreenImageViewer extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16.0),
                 child: Hero(
-                  tag: 'card_image_${imageUrl.hashCode}',
+                  tag:
+                      'card_image_${imageUrl.hashCode}', // Use different tag for fullscreen
                   child: CornerMaskWidget(
                     backgroundColor: Colors.black,
                     cornerRadius: 16.0,
                     child: Image.network(
+                      // Use standard Image.network for zoomable view
                       imageUrl,
                       fit: BoxFit.cover,
                       width: double.infinity,

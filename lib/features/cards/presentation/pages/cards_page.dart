@@ -122,16 +122,16 @@ class _CardsPageState extends ConsumerState<CardsPage>
       // Don't need to show the FAB since it's already visible
       // _fabAnimationController.reverse();
 
-      ref.read(searchControllerProvider).clear();
-      ref.read(searchQueryProvider.notifier).state = '';
+      ref.read(cardSearchControllerProvider).clear();
+      ref.read(cardSearchQueryProvider.notifier).setQuery('');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final viewPrefs = ref.watch(viewPreferencesProvider);
-    final searchController = ref.watch(searchControllerProvider);
-    final searchQuery = ref.watch(searchQueryProvider);
+    final viewPrefs = ref.watch(cardViewPreferencesProvider);
+    final searchController = ref.watch(cardSearchControllerProvider);
+    final searchQuery = ref.watch(cardSearchQueryProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
     // Use the filtered search provider which combines search and filter functionality

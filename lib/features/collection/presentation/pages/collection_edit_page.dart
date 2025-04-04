@@ -136,7 +136,7 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
 
     if (!_isSearching) {
       _searchController.clear();
-      ref.read(searchQueryProvider.notifier).state = '';
+      ref.read(cardSearchQueryProvider.notifier).setQuery('');
     }
   }
 
@@ -172,7 +172,7 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
                   border: InputBorder.none,
                 ),
                 onChanged: (value) {
-                  ref.read(searchQueryProvider.notifier).state = value;
+                  ref.read(cardSearchQueryProvider.notifier).setQuery(value);
                 },
                 autofocus: true,
               )

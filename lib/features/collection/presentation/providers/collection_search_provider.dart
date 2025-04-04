@@ -1,18 +1,18 @@
-// lib/features/cards/presentation/providers/search_provider.dart
+// lib/features/collection/presentation/providers/collection_search_provider.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart'; // Import Hive
 import 'package:fftcg_companion/core/utils/logger.dart'; // Import Logger
 
 // --- Refactored to NotifierProvider ---
-final cardSearchQueryProvider =
-    NotifierProvider.autoDispose<CardSearchQueryNotifier, String>(() {
-  return CardSearchQueryNotifier();
+final collectionSearchQueryProvider =
+    NotifierProvider.autoDispose<CollectionSearchQueryNotifier, String>(() {
+  return CollectionSearchQueryNotifier();
 });
 
-class CardSearchQueryNotifier extends AutoDisposeNotifier<String> {
+class CollectionSearchQueryNotifier extends AutoDisposeNotifier<String> {
   static const _boxName = 'settings';
-  static const _queryKey = 'card_search_query'; // Unique key
+  static const _queryKey = 'collection_search_query'; // Unique key
 
   late Box _box;
 
@@ -22,10 +22,12 @@ class CardSearchQueryNotifier extends AutoDisposeNotifier<String> {
     _openBox(); // Ensure box is open
     final savedQuery = _box.get(_queryKey);
     if (savedQuery is String) {
-      talker.debug('Loading saved card search query from Hive: "$savedQuery"');
+      talker.debug(
+          'Loading saved collection search query from Hive: "$savedQuery"');
       return savedQuery;
     }
-    talker.debug('No saved card search query found, using default (empty).');
+    talker.debug(
+        'No saved collection search query found, using default (empty).');
     return ''; // Default to empty string
   }
 
@@ -38,9 +40,9 @@ class CardSearchQueryNotifier extends AutoDisposeNotifier<String> {
       }
       _box = Hive.box(_boxName);
     } catch (e, stack) {
-      talker.error('Error opening Hive box for card search query', e, stack);
-      // Handle error appropriately, maybe rethrow or use a dummy box
-      // For now, we'll let it potentially fail later if box isn't open.
+      talker.error(
+          'Error opening Hive box for collection search query', e, stack);
+      // Handle error appropriately
     }
   }
 
@@ -55,27 +57,29 @@ class CardSearchQueryNotifier extends AutoDisposeNotifier<String> {
     try {
       if (!_box.isOpen) _openBox(); // Ensure box is open before writing
       await _box.put(_queryKey, query);
-      talker.debug('Saved card search query to Hive: "$query"');
+      talker.debug('Saved collection search query to Hive: "$query"');
     } catch (e, stack) {
-      talker.error('Error saving card search query to Hive', e, stack);
+      talker.error('Error saving collection search query to Hive', e, stack);
     }
   }
 }
 // --- End Refactor ---
 
-// Provider for the Cards page search query text controller
+// Provider for the collection search query text controller
 // Updated to watch the NotifierProvider's state
-final cardSearchControllerProvider =
+final collectionSearchControllerProvider =
     StateProvider.autoDispose<TextEditingController>(
   (ref) {
     // Initialize controller with the query from the NotifierProvider
-    final initialQuery = ref.watch(cardSearchQueryProvider);
+    final initialQuery = ref.watch(collectionSearchQueryProvider);
     final controller = TextEditingController(text: initialQuery);
 
     // Update the Notifier state when the controller text changes
     controller.addListener(() {
       // Use read to avoid dependency loop and call the method on the notifier
-      ref.read(cardSearchQueryProvider.notifier).setQuery(controller.text);
+      ref
+          .read(collectionSearchQueryProvider.notifier)
+          .setQuery(controller.text);
     });
 
     // Dispose the controller when the provider is disposed

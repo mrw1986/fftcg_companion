@@ -6,6 +6,8 @@ import 'package:fftcg_companion/core/utils/logger.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card_hive_adapter.dart';
+// Import the Card model to access the mapper
+import 'package:fftcg_companion/features/cards/domain/models/card.dart';
 
 class CachePersistence {
   static const String _cardCacheBox = 'card_cache';
@@ -55,7 +57,8 @@ class CachePersistence {
 
   static Future<void> cacheCards(List<Card> cards) async {
     final box = Hive.box<Map>(_cardCacheBox);
-    final batch = cards.map((card) => card.toJson()).toList();
+    // Use toMap
+    final batch = cards.map((card) => card.toMap()).toList();
 
     await box.clear();
     for (var i = 0; i < batch.length; i += 100) {
@@ -63,7 +66,9 @@ class CachePersistence {
       final chunk = batch.sublist(i, end);
       await box.putAll(
         Map.fromEntries(
-          chunk.map((json) => MapEntry(json['productId'].toString(), json)),
+          // Ensure json is treated as Map<String, dynamic>
+          chunk.map((json) => MapEntry(
+              json['productId'].toString(), Map<String, dynamic>.from(json))),
         ),
       );
     }
@@ -78,7 +83,8 @@ class CachePersistence {
   ) async {
     final box = Hive.box<Map>(_queryCacheBox);
     await box.put(key, {
-      'cards': cards.map((card) => card.toJson()).toList(),
+      // Use toMap
+      'cards': cards.map((card) => card.toMap()).toList(),
     });
     talker.debug('Cached query result for key: $key');
   }
@@ -92,7 +98,8 @@ class CachePersistence {
     try {
       final cardsList = (cached['cards'] as List)
           .cast<Map<String, dynamic>>()
-          .map((json) => Card.fromJson(json))
+          // Use fromMap
+          .map((json) => CardMapper.fromMap(json))
           .toList();
 
       talker.debug('Retrieved cached query for key: $key');
@@ -110,7 +117,8 @@ class CachePersistence {
   ) async {
     final box = Hive.box<Map>(_sortCacheBox);
     await box.put(key, {
-      'cards': cards.map((card) => card.toJson()).toList(),
+      // Use toMap
+      'cards': cards.map((card) => card.toMap()).toList(),
     });
     talker.debug('Cached sorted results for key: $key');
   }
@@ -124,7 +132,8 @@ class CachePersistence {
     try {
       final cardsList = (cached['cards'] as List)
           .cast<Map<String, dynamic>>()
-          .map((json) => Card.fromJson(json))
+          // Use fromMap
+          .map((json) => CardMapper.fromMap(json))
           .toList();
 
       talker.debug('Retrieved cached sorted results for key: $key');

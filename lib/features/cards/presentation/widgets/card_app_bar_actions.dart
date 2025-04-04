@@ -19,7 +19,7 @@ class CardAppBarActions extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final viewPrefs = ref.watch(viewPreferencesProvider);
+    final viewPrefs = ref.watch(cardViewPreferencesProvider);
     final currentSize = viewPrefs.type == ViewType.grid
         ? viewPrefs.gridSize
         : viewPrefs.listSize;
@@ -42,7 +42,7 @@ class CardAppBarActions extends ConsumerWidget {
           onPressed: () {
             if (isSearching) {
               // Clear search state when closing search
-              ref.read(searchQueryProvider.notifier).state = '';
+              ref.read(cardSearchQueryProvider.notifier).setQuery('');
             }
             onSearchToggle();
           },
@@ -70,7 +70,7 @@ class CardAppBarActions extends ConsumerWidget {
           tooltip:
               viewPrefs.showLabels ? 'Hide Card Labels' : 'Show Card Labels',
           onPressed: () {
-            ref.read(viewPreferencesProvider.notifier).toggleLabels();
+            ref.read(cardViewPreferencesProvider.notifier).toggleLabels();
           },
         ),
 
@@ -83,7 +83,7 @@ class CardAppBarActions extends ConsumerWidget {
               ? 'Switch to List View'
               : 'Switch to Grid View',
           onPressed: () {
-            ref.read(viewPreferencesProvider.notifier).toggleViewType();
+            ref.read(cardViewPreferencesProvider.notifier).toggleViewType();
           },
         ),
 
@@ -99,7 +99,7 @@ class CardAppBarActions extends ConsumerWidget {
             color: Theme.of(context).colorScheme.onPrimary,
           ),
           onPressed: () {
-            ref.read(viewPreferencesProvider.notifier).cycleSize();
+            ref.read(cardViewPreferencesProvider.notifier).cycleSize();
           },
           constraints: const BoxConstraints(
             minWidth: 48.0,
