@@ -183,21 +183,35 @@ class AuthService {
       return userCredential;
     } catch (e) {
       // Handle potential conflict where Google email matches existing Email/Password account
-      if (e is FirebaseAuthException &&
-          (e.code == 'account-exists-with-different-credential' ||
-              e.code == 'email-already-in-use')) {
-        talker.warning(
-            'Google sign-in conflict: Email exists with different credential. $e');
-        // Sign out from Google to allow potential linking later if needed
-        await _googleSignIn.signOut();
-        // Rethrow a specific error for the UI to handle (e.g., prompt user to sign in with email/pass first)
-        throw AuthException(
-          code: e.code, // Keep original code for potential UI logic
-          message:
-              'An account already exists with this email using a different sign-in method. Please sign in with your original method first.',
-          category: AuthErrorCategory.conflict,
-          originalException: e,
-        );
+      if (e is FirebaseAuthException) {
+        if (e.code == 'account-exists-with-different-credential' ||
+            e.code == 'email-already-in-use') {
+          talker.warning(
+              'Google sign-in conflict: Email exists with different credential. $e');
+          // Sign out from Google to allow potential linking later if needed
+          await _googleSignIn.signOut();
+          // Rethrow a specific error for the UI to handle
+          throw AuthException(
+            code: e.code,
+            message:
+                'An account already exists with this email using a different sign-in method. Please sign in with your original method first.',
+            category: AuthErrorCategory.conflict,
+            originalException: e,
+          );
+        } else if (e.code == 'user-not-found') {
+          talker.warning(
+              'Google sign-in failed: No account exists for this Google email.');
+          // Sign out from Google since sign-in failed
+          await _googleSignIn.signOut();
+          // Throw a specific error for the UI to handle account creation flow
+          throw AuthException(
+            code:
+                'not-anonymous', // Reuse this code since UI already handles it properly
+            message: 'No account exists for this Google account.',
+            category: AuthErrorCategory.authentication,
+            originalException: e,
+          );
+        }
       }
       talker.error('Google sign-in failed: $e');
       throw _handleAuthException(e);
@@ -313,47 +327,12 @@ class AuthService {
         if (userCredential.user != null) {
           await userCredential.user!.reload();
 
-          // Sign out and sign back in to ensure clean state
-          try {
-            talker.debug(
-                'Signing out and back in to ensure clean state after Google linking');
-            final googleCredential = GoogleAuthProvider.credential(
-              accessToken: googleAuth.accessToken,
-              idToken: googleAuth.idToken,
-            );
-            talker.info('Current auth state before sign out: '
-                'isAnonymous=${_auth.currentUser?.isAnonymous}, '
-                'providers=${_auth.currentUser?.providerData.map((p) => p.providerId).join(", ")}');
-
-            // Sign out from both services with delay
-            await _googleSignIn.signOut();
-            talker.debug('Signed out from Google.');
-            await Future.delayed(const Duration(milliseconds: 500));
-
-            await signOut(isInternalAuthFlow: true);
-            await Future.delayed(const Duration(milliseconds: 500));
-
-            // Sign back in with Google
-            userCredential = await _auth
-                .signInWithCredential(googleCredential)
-                .timeout(_timeout);
+          // Reload user to ensure we have latest provider data
+          await userCredential.user?.reload();
+          final finalUser = _auth.currentUser;
+          if (finalUser != null) {
             talker.info(
-                'Successfully signed back in with Google after linking. '
-                'New auth state: isAnonymous=${userCredential.user?.isAnonymous}, '
-                'providers=${userCredential.user?.providerData.map((p) => p.providerId).join(", ")}');
-
-            // Reload one more time to ensure we have the latest state
-            // Firestore update will be handled by the authStateChanges listener
-            await userCredential.user?.reload();
-            final finalUser = _auth.currentUser;
-            if (finalUser != null) {
-              talker.info(
-                  'Final user state after Google linking: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
-            }
-          } catch (signInError) {
-            talker.error('Error during sign out/sign in after Google linking',
-                signInError);
-            throw _handleAuthException(signInError);
+                'Successfully linked Google. User state: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
           }
         }
       } on FirebaseAuthException catch (e) {
@@ -417,44 +396,13 @@ class AuthService {
             }
           }
 
-          // Now reload user and sign out/sign back in to ensure clean state
+          // Reload user to ensure we have latest provider data
           if (userCredential.user != null) {
             await userCredential.user!.reload();
-
-            try {
-              talker.debug(
-                  'Signing out and back in to ensure clean state after Google sign-in');
-              final googleCredential = GoogleAuthProvider.credential(
-                accessToken: googleAuth.accessToken,
-                idToken: googleAuth.idToken,
-              );
-              // Sign out from both services with delay
-              await _googleSignIn.signOut();
-              talker.debug('Signed out from Google.');
-              await Future.delayed(const Duration(milliseconds: 500));
-
-              await signOut(isInternalAuthFlow: true);
-              await Future.delayed(const Duration(milliseconds: 500));
-
-              // Sign back in with Google
-              userCredential = await _auth
-                  .signInWithCredential(googleCredential)
-                  .timeout(_timeout);
+            final finalUser = _auth.currentUser;
+            if (finalUser != null) {
               talker.info(
-                  'Successfully signed back in with Google after sign-in');
-
-              // Reload one more time to ensure we have the latest state
-              // Firestore update will be handled by the authStateChanges listener
-              await userCredential.user?.reload();
-              final finalUser = _auth.currentUser;
-              if (finalUser != null) {
-                talker.info(
-                    'Final user state after Google sign-in: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
-              }
-            } catch (signInError) {
-              talker.error('Error during sign out/sign in after Google sign-in',
-                  signInError);
-              throw _handleAuthException(signInError);
+                  'Successfully signed in with Google. User state: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
             }
           }
         } else {

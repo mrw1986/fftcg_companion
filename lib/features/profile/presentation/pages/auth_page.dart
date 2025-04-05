@@ -177,22 +177,66 @@ class _AuthPageState extends ConsumerState<AuthPage> {
           talker.debug('Auth page: Google linking successful');
           _navigateToProfile();
         } catch (linkError) {
-          // If linking fails because user is NOT anonymous (timing issue after sign out?)
-          if (linkError is AuthException && linkError.code == 'not-anonymous') {
-            talker.warning(
-                'Auth page: Attempted to link Google, but user was not anonymous. Falling back to standard sign-in.');
-            // Fallback: Try standard sign-in instead
-            await authService.signInWithGoogle();
-            talker.debug(
-                'Auth page: Fallback Google Sign-In successful after link failure.');
-            _navigateToProfile();
-          }
-          // Handle other linking errors (like account already exists with different credential)
-          else if (linkError is AuthException) {
-            talker.warning(
-                'Auth page: Google link failed - ${linkError.code}: ${linkError.message}');
-            if (mounted) {
-              _showError(linkError.message, isError: true);
+          if (linkError is AuthException) {
+            if (linkError.code == 'not-anonymous') {
+              talker.warning(
+                  'Auth page: Attempted to link Google, but user was not anonymous. Showing account creation dialog.');
+              if (mounted) {
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text('Create New Account?'),
+                      content: const Text(
+                          'Would you like to create a new account with your Google credentials?'),
+                      actions: [
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            foregroundColor: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.8),
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor:
+                                Theme.of(context).colorScheme.primary,
+                            foregroundColor:
+                                Theme.of(context).colorScheme.onPrimary,
+                          ),
+                          onPressed: () async {
+                            Navigator.of(context).pop();
+                            // Try standard Google sign-in to create new account
+                            try {
+                              await authService.signInWithGoogle();
+                              _navigateToProfile();
+                            } catch (signInError) {
+                              if (mounted) {
+                                _showError(
+                                    signInError is AuthException
+                                        ? signInError.message
+                                        : 'Failed to create account with Google',
+                                    isError: true);
+                              }
+                            }
+                          },
+                          child: const Text('Create Account'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              }
+            } else {
+              // Handle other AuthException errors
+              talker.warning(
+                  'Auth page: Google link failed - ${linkError.code}: ${linkError.message}');
+              if (mounted) {
+                _showError(linkError.message, isError: true);
+              }
             }
           } else if (linkError is FirebaseAuthException) {
             talker.error(
@@ -210,18 +254,130 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         }
       } else {
         // Normal Google sign in for non-anonymous users
-        talker.debug('Auth page: Calling authService.signInWithGoogle()');
-        await authService.signInWithGoogle();
-        talker.debug('Auth page: Google Sign-In successful');
-        _navigateToProfile(); // Navigate after successful sign-in
+        try {
+          await authService.signInWithGoogle();
+          talker.debug('Auth page: Google Sign-In successful');
+          _navigateToProfile();
+        } catch (e) {
+          if (e is AuthException && e.code == 'not-anonymous') {
+            // Show account creation dialog for non-existing accounts
+            if (mounted) {
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: const Text('Create New Account?'),
+                    content: const Text(
+                        'Would you like to create a new account with your Google credentials?'),
+                    actions: [
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.8),
+                        ),
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primary,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onPrimary,
+                        ),
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          try {
+                            await authService.signInWithGoogle();
+                            _navigateToProfile();
+                          } catch (signInError) {
+                            if (mounted) {
+                              _showError(
+                                  signInError is AuthException
+                                      ? signInError.message
+                                      : 'Failed to create account with Google',
+                                  isError: true);
+                            }
+                          }
+                        },
+                        child: const Text('Create Account'),
+                      ),
+                    ],
+                  );
+                },
+              );
+            }
+          } else {
+            if (mounted) {
+              _showError(e is AuthException ? e.message : e.toString(),
+                  isError: true);
+            }
+          }
+        }
       }
       // Catch AuthException from sign-in attempts (including fallback)
     } on AuthException catch (e) {
       talker.error(
           'Caught AuthException in auth_page (Google): ${e.code} - ${e.message}');
-      bool isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled';
-      if (mounted) {
-        _showError(e.message, isError: isError);
+
+      if (e.code == 'not-anonymous') {
+        // Handle the case where we tried to link but user wasn't anonymous
+        talker.warning(
+            'Auth page: User not anonymous, showing account creation dialog');
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('Create New Account?'),
+                content: const Text(
+                    'Would you like to create a new account with your Google credentials?'),
+                actions: [
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.8),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    onPressed: () async {
+                      Navigator.of(context).pop();
+                      // Try standard Google sign-in to create new account
+                      try {
+                        await ref.read(authServiceProvider).signInWithGoogle();
+                        _navigateToProfile();
+                      } catch (signInError) {
+                        if (mounted) {
+                          _showError(
+                              signInError is AuthException
+                                  ? signInError.message
+                                  : 'Failed to create account with Google',
+                              isError: true);
+                        }
+                      }
+                    },
+                    child: const Text('Create Account'),
+                  ),
+                ],
+              );
+            },
+          );
+        }
+      } else {
+        bool isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled';
+        if (mounted) {
+          _showError(e.message, isError: isError);
+        }
       }
     } catch (e) {
       // Catch any other unexpected errors
