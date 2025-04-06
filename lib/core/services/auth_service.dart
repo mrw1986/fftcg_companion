@@ -28,12 +28,14 @@ class AuthException implements Exception {
   final String message;
   final AuthErrorCategory category;
   final dynamic originalException;
+  final Map<String, dynamic>? details; // Add details field
 
   AuthException({
     required this.code,
     required this.message,
     required this.category,
     this.originalException,
+    this.details, // Add details to constructor
   });
 
   @override
@@ -145,10 +147,8 @@ class AuthService {
   }
 
   /// Signs in or registers a user with Google.
-  /// Returns a tuple: (UserCredential, bool isNewUser)
-  Future<(UserCredential, bool)> signInWithGoogle() async {
+  Future<UserCredential> signInWithGoogle() async {
     talker.info('Attempting Google sign-in...');
-    bool isNewUser = false; // Default to false
     try {
       // Start Google sign-in flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
@@ -179,14 +179,10 @@ class AuthService {
       talker.debug(
           'Firebase user display name: ${userCredential.user?.displayName}');
 
-      // Check if the user is new
-      isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
-      talker.debug('Google sign-in: isNewUser = $isNewUser');
-
       // Reload to ensure latest state is fetched
       // Firestore update will be handled by the authStateChanges listener
       await userCredential.user?.reload();
-      return (userCredential, isNewUser);
+      return userCredential;
     } catch (e) {
       // Handle potential conflict where Google email matches existing Email/Password account
       if (e is FirebaseAuthException) {
@@ -285,7 +281,8 @@ class AuthService {
   }
 
   /// Links Google credentials to the currently signed-in anonymous user.
-  Future<UserCredential> linkGoogleToAnonymous(BuildContext context) async {
+  // Removed BuildContext parameter
+  Future<UserCredential> linkGoogleToAnonymous() async {
     talker.info('Attempting to link Google to anonymous user...');
     final currentUser = _auth.currentUser;
     if (currentUser == null || !currentUser.isAnonymous) {
@@ -358,53 +355,17 @@ class AuthService {
               'Signed in with Google instead of linking: ${signedInCredential.user?.uid}');
           userCredential = signedInCredential;
 
-          // Then prompt user to merge data
-          if (context.mounted) {
-            final mergeAction = await showMergeDataDecisionDialog(context);
-            if (mergeAction != null) {
-              final collectionRepo = CollectionRepository();
-              final userRepo = UserRepository();
-
-              try {
-                switch (mergeAction) {
-                  case MergeAction.discard:
-                    talker.debug('Discarding anonymous user data');
-                    break;
-                  case MergeAction.merge:
-                    talker.debug('Merging anonymous user data');
-                    await migrateCollectionData(
-                      collectionRepository: collectionRepo,
-                      fromUserId: anonymousUserId,
-                      toUserId: userCredential.user!.uid,
-                    );
-                    await migrateUserSettings(
-                      userRepository: userRepo,
-                      fromUserId: anonymousUserId,
-                      toUserId: userCredential.user!.uid,
-                      overwrite: false,
-                    );
-                    break;
-                  case MergeAction.overwrite:
-                    talker.debug('Overwriting with anonymous user data');
-                    await migrateCollectionData(
-                      collectionRepository: collectionRepo,
-                      fromUserId: anonymousUserId,
-                      toUserId: userCredential.user!.uid,
-                    );
-                    await migrateUserSettings(
-                      userRepository: userRepo,
-                      fromUserId: anonymousUserId,
-                      toUserId: userCredential.user!.uid,
-                      overwrite: true,
-                    );
-                    break;
-                }
-              } catch (e) {
-                talker.error('Error during data migration: $e');
-                // Continue with sign-in process even if migration fails
-              }
-            }
-          }
+          // Throw specific exception for UI to handle merge dialog
+          throw AuthException(
+              code: 'merge-required',
+              message:
+                  'Google account already exists. User action required to merge data.',
+              category: AuthErrorCategory.conflict,
+              originalException: e,
+              details: {
+                'anonymousUserId': anonymousUserId,
+                'signedInCredential': signedInCredential,
+              });
 
           // Reload user to ensure we have latest provider data
           if (userCredential.user != null) {

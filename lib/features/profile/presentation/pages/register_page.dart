@@ -6,12 +6,20 @@ import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 // Import LinkAccountsDialog to use it directly
 import 'package:fftcg_companion/features/profile/presentation/widgets/link_accounts_dialog.dart';
+// Import MergeDataDecisionDialog
+import 'package:fftcg_companion/features/profile/presentation/widgets/merge_data_decision_dialog.dart';
 import 'package:fftcg_companion/shared/widgets/google_sign_in_button.dart';
 import 'package:fftcg_companion/shared/widgets/app_bar_factory.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 import 'package:fftcg_companion/shared/widgets/styled_button.dart';
 // Import AuthException and skipAutoAuthProvider
 import 'package:fftcg_companion/core/services/auth_service.dart';
+import 'package:fftcg_companion/shared/utils/snackbar_helper.dart'; // Import SnackBarHelper
+// Import repositories and merge helpers for data migration
+import 'package:fftcg_companion/features/collection/data/repositories/collection_repository.dart';
+import 'package:fftcg_companion/features/collection/data/repositories/collection_merge_helper.dart';
+import 'package:fftcg_companion/features/profile/data/repositories/user_repository.dart';
+import 'package:fftcg_companion/features/profile/data/repositories/settings_merge_helper.dart';
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
@@ -20,47 +28,7 @@ class RegisterPage extends ConsumerStatefulWidget {
   ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
 
-/// Shows a snackbar with a message
-void showThemedSnackBar({
-  required BuildContext context,
-  required String message,
-  required bool isError,
-  Duration duration = const Duration(seconds: 4),
-}) {
-  // Ensure context is still valid before showing snackbar
-  if (!context.mounted) return;
-
-  final theme = Theme.of(context);
-  final colorScheme = theme.colorScheme;
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(
-        message,
-        style: TextStyle(
-          color: isError
-              ? colorScheme.onErrorContainer
-              : colorScheme.onPrimaryContainer,
-        ),
-      ),
-      backgroundColor:
-          isError ? colorScheme.errorContainer : colorScheme.primaryContainer,
-      duration: duration,
-      action: SnackBarAction(
-        label: 'OK',
-        textColor: isError
-            ? colorScheme.onErrorContainer
-            : colorScheme.onPrimaryContainer,
-        onPressed: () {
-          // Ensure context is still valid before hiding snackbar
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          }
-        },
-      ),
-    ),
-  );
-}
+// Removed duplicate showThemedSnackBar, using SnackBarHelper now
 
 class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
@@ -94,6 +62,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   // Listener for focus changes
   void _onPasswordFocusChange() {
+    if (!mounted) return; // Check mounted before setState
     setState(() {
       _isPasswordFocused = _passwordFocusNode.hasFocus;
     });
@@ -103,9 +72,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   Future<void> _submitEmailPasswordForm() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
+
+    final currentContext = context; // Capture context before async gap
+    bool registrationSuccess = false; // Flag to track success
 
     try {
       final authService = ref.read(authServiceProvider);
@@ -125,23 +98,22 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         talker.debug('Register page: Email/password registration successful');
       }
 
+      registrationSuccess = true; // Mark as successful
+
       if (!mounted) return;
 
       // Invalidate providers to ensure state is refreshed
-      // The router redirect logic will handle navigation based on the new state.
+      // The router redirect logic might still handle navigation in some cases,
+      // but we'll add explicit navigation after the dialog for reliability.
       ref.invalidate(firebaseUserProvider);
       ref.invalidate(authStateProvider);
       ref.invalidate(currentUserProvider);
 
-      // No longer need delay or manual navigation here
-
-      setState(() {
-        _isLoading = false;
-      });
-
       // Show verification email sent dialog
+      // Use currentContext captured before await
+      if (!currentContext.mounted) return; // Add mounted check
       await showDialog<void>(
-        context: context,
+        context: currentContext,
         barrierDismissible: false,
         builder: (BuildContext dialogContext) {
           final colorScheme = Theme.of(dialogContext).colorScheme;
@@ -169,8 +141,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 ),
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
-                  // REMOVED manual navigation: context.go('/profile/account');
-                  // Router redirect will handle navigation based on state change.
                 },
                 child: const Text('OK'),
               ),
@@ -180,12 +150,18 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           );
         },
       );
-    } catch (e) {
-      if (!mounted) return;
 
-      setState(() {
-        _isLoading = false;
-      });
+      // Explicit navigation AFTER dialog is dismissed and IF registration was successful
+      if (registrationSuccess && mounted) {
+        talker.debug(
+            'Register page: Navigating to /profile/account after dialog dismissal.');
+        // Use GoRouter.of(context) for navigation if context is still valid
+        if (!currentContext.mounted) return; // Add mounted check
+        GoRouter.of(currentContext).go('/profile/account');
+      }
+    } catch (e) {
+      registrationSuccess = false; // Mark as failed on error
+      if (!mounted) return;
 
       // Show user-friendly error message as SnackBar
       String errorMessage = 'Failed to complete action'; // Default message
@@ -201,10 +177,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         // Special handling for email-already-in-use error
         if (e.code == 'email-already-in-use') {
           // Show a dialog with options
+          // Use currentContext captured before await
           Future.delayed(const Duration(milliseconds: 100), () {
-            if (!mounted) return;
+            if (!currentContext.mounted) return;
             showDialog(
-              context: context,
+              context: currentContext,
               barrierDismissible: false, // Make this non-dismissible
               builder: (BuildContext dialogContext) {
                 final theme = Theme.of(dialogContext);
@@ -248,8 +225,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       ),
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
-                        if (mounted) {
-                          context.go('/profile/auth');
+                        // Use currentContext for navigation
+                        if (currentContext.mounted) {
+                          // Navigate to the top-level /auth route
+                          GoRouter.of(currentContext).go('/auth');
                         }
                       },
                       child: const Text('Sign In'),
@@ -272,21 +251,30 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       }
 
       // Show snackbar only if it wasn't handled by the special 'email-already-in-use' case
-      if (showErrorSnackbar) {
-        showThemedSnackBar(
-          context: context,
+      if (showErrorSnackbar && mounted) {
+        // Use currentContext for SnackBarHelper
+        if (!currentContext.mounted) return; // Add mounted check
+        SnackBarHelper.showErrorSnackBar(
+          context: currentContext,
           message: errorMessage,
-          isError: true,
           duration: const Duration(seconds: 5),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
 
   Future<void> _signInWithGoogle() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
+    final currentContext = context; // Capture context
 
     try {
       talker.debug('Register page: Starting Google Sign-In');
@@ -297,8 +285,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       if (authState.isAnonymous) {
         talker.debug('Register page: Linking anonymous account with Google');
         try {
-          // Corrected method call
-          await authService.linkGoogleToAnonymous(context);
+          // Corrected method call - removed context argument
+          await authService.linkGoogleToAnonymous();
           talker.debug('Register page: Google linking successful');
 
           // Navigate to profile page after successful linking
@@ -308,8 +296,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           ref.invalidate(firebaseUserProvider);
           ref.invalidate(authStateProvider);
           ref.invalidate(currentUserProvider);
-          // REMOVED manual navigation: context.go('/profile/account');
-          // Router redirect will handle navigation based on state change.
+          // Explicit navigation might be needed here too if router redirect is unreliable
+          if (mounted) {
+            talker.debug(
+                'Register page: Navigating to /profile/account after Google link.');
+            if (!currentContext.mounted) return; // Add mounted check
+            GoRouter.of(currentContext).go('/profile/account');
+          }
         } catch (linkError) {
           if (!mounted) return;
 
@@ -317,37 +310,134 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           if (linkError is AuthException) {
             talker.warning(
                 'Register page: Google link failed - ${linkError.code}: ${linkError.message}');
-            // Show specific message from AuthException
-            showThemedSnackBar(
-              context: context,
-              message: linkError.message,
-              isError: true,
-              duration: const Duration(seconds: 8),
-            );
-            setState(() {
-              _isLoading = false;
-            });
-            return; // Stop further processing
+
+            // Handle the specific 'merge-required' case
+            if (linkError.code == 'merge-required') {
+              if (!currentContext.mounted)
+                return; // Check context before dialog
+
+              final anonymousUserId =
+                  linkError.details?['anonymousUserId'] as String?;
+              final signedInCredential =
+                  linkError.details?['signedInCredential'] as UserCredential?;
+
+              if (anonymousUserId == null || signedInCredential?.user == null) {
+                talker.error(
+                    'Merge required error details missing anonymousUserId or signedInCredential.');
+                SnackBarHelper.showErrorSnackBar(
+                  context: currentContext,
+                  message: 'An error occurred during account linking.',
+                  duration: const Duration(seconds: 8),
+                );
+                return; // Exit if details are missing
+              }
+
+              final mergeAction =
+                  await showMergeDataDecisionDialog(currentContext);
+              if (mergeAction != null && currentContext.mounted) {
+                final collectionRepo = CollectionRepository();
+                final userRepo = UserRepository();
+                final toUserId = signedInCredential!.user!
+                    .uid; // Add null check for credential as well for safety, then user
+
+                try {
+                  setState(
+                      () => _isLoading = true); // Show loading during merge
+                  switch (mergeAction) {
+                    case MergeAction.discard:
+                      talker.debug('Discarding anonymous user data');
+                      // No data migration needed
+                      break;
+                    case MergeAction.merge:
+                      talker.debug('Merging anonymous user data');
+                      await migrateCollectionData(
+                        collectionRepository: collectionRepo,
+                        fromUserId: anonymousUserId,
+                        toUserId: toUserId,
+                      );
+                      await migrateUserSettings(
+                        userRepository: userRepo,
+                        fromUserId: anonymousUserId,
+                        toUserId: toUserId,
+                        overwrite: false,
+                      );
+                      break;
+                    case MergeAction.overwrite:
+                      talker.debug('Overwriting with anonymous user data');
+                      await migrateCollectionData(
+                        collectionRepository: collectionRepo,
+                        fromUserId: anonymousUserId,
+                        toUserId: toUserId,
+                      );
+                      await migrateUserSettings(
+                        userRepository: userRepo,
+                        fromUserId: anonymousUserId,
+                        toUserId: toUserId,
+                        overwrite: true,
+                      );
+                      break;
+                  }
+                  talker.debug('Data migration/handling complete.');
+
+                  // Invalidate and navigate after successful merge/discard
+                  if (mounted) {
+                    ref.invalidate(firebaseUserProvider);
+                    ref.invalidate(authStateProvider);
+                    ref.invalidate(currentUserProvider);
+                    if (currentContext.mounted) {
+                      GoRouter.of(currentContext).go('/profile/account');
+                    }
+                  }
+                } catch (e) {
+                  talker.error('Error during data migration: $e');
+                  if (mounted) {
+                    SnackBarHelper.showErrorSnackBar(
+                      context: currentContext,
+                      message: 'Error merging data. Please try again.',
+                      duration: const Duration(seconds: 8),
+                    );
+                  }
+                } finally {
+                  if (mounted) {
+                    setState(() => _isLoading = false);
+                  }
+                }
+              } else {
+                // User cancelled the dialog, potentially sign them out or leave as is?
+                // For now, just log it. The user is signed in with the Google account.
+                talker.debug('Merge data dialog cancelled by user.');
+              }
+            } else {
+              // Show specific message for other AuthExceptions
+              if (!currentContext.mounted) return; // Add mounted check
+              SnackBarHelper.showErrorSnackBar(
+                context: currentContext,
+                message: linkError.message,
+                duration: const Duration(seconds: 8),
+              );
+            }
           }
           // Catch potential FirebaseAuthException if not handled by AuthService (less likely now)
           else if (linkError is FirebaseAuthException) {
             talker.error(
                 'FirebaseAuthException during Google link: ${linkError.code}');
             final authService = ref.read(authServiceProvider);
-            showThemedSnackBar(
-              context: context,
+            if (!currentContext.mounted) return; // Add mounted check
+            SnackBarHelper.showErrorSnackBar(
+              context: currentContext,
               message: authService.getReadableAuthError(
                   linkError.code, linkError.message),
-              isError: true,
               duration: const Duration(seconds: 8),
             );
-            setState(() {
-              _isLoading = false;
-            });
-            return;
           } else {
             // Rethrow other non-FirebaseAuthException errors
-            rethrow;
+            talker.error('Unexpected error during Google link: $linkError');
+            if (!currentContext.mounted) return; // Add mounted check
+            SnackBarHelper.showErrorSnackBar(
+              context: currentContext,
+              message: 'An unexpected error occurred during linking.',
+              duration: const Duration(seconds: 8),
+            );
           }
         }
       } else {
@@ -376,15 +466,21 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           ref.invalidate(firebaseUserProvider);
           ref.invalidate(authStateProvider);
           ref.invalidate(currentUserProvider);
-          // REMOVED manual navigation: context.go('/profile/account');
-          // Router redirect will handle navigation based on state change.
+
+          // Explicit navigation for reliability
+          if (mounted) {
+            talker.debug(
+                'Register page: Navigating to /profile/account after Google sign-in/registration.');
+            if (!currentContext.mounted) return; // Add mounted check
+            GoRouter.of(currentContext).go('/profile/account');
+          }
 
           // Only show success message if this appears to be a new account
           if (isNewAccount && mounted) {
-            showThemedSnackBar(
-              context: context,
+            if (!currentContext.mounted) return; // Add mounted check
+            SnackBarHelper.showSuccessSnackBar(
+              context: currentContext,
               message: 'Account created successfully with Google',
-              isError: false,
               duration: const Duration(seconds: 5),
             );
           }
@@ -401,8 +497,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             // Show the LinkAccountsDialog
             final emailForDialog =
                 _emailController.text.trim(); // Get email from controller
+            if (!currentContext.mounted) return; // Add mounted check
             showDialog(
-              context: context,
+              context: currentContext, // Use captured context
               barrierDismissible: false, // Make non-dismissible
               builder: (BuildContext dialogContext) {
                 return LinkAccountsDialog(
@@ -413,7 +510,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       ref.invalidate(firebaseUserProvider);
                       ref.invalidate(authStateProvider);
                       ref.invalidate(currentUserProvider);
-                      // REMOVED manual navigation: context.go('/profile/account');
+                      // Explicit navigation after successful link
+                      if (mounted) {
+                        talker.debug(
+                            'Register page: Navigating to /profile/account after LinkAccountsDialog success.');
+                        GoRouter.of(currentContext).go('/profile/account');
+                      }
                     } else {
                       // Handle cancellation or failure if needed
                       talker.debug('LinkAccountsDialog cancelled or failed.');
@@ -422,11 +524,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 );
               },
             );
-            // Stop loading
-            setState(() {
-              _isLoading = false;
-            });
-            return; // Stop further processing
           } else {
             // Rethrow other errors to be caught by the outer catch block
             rethrow;
@@ -436,39 +533,38 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     } catch (e) {
       if (!mounted) return;
 
-      setState(() {
-        _isLoading = false;
-      });
-
       // Show user-friendly error message as SnackBar
       String errorMessage = 'Failed to sign in with Google';
-      bool isError = true; // Default to error
+      // bool isError = true; // Unused variable removed
 
       if (e is AuthException) {
         // Catch AuthException first
         errorMessage = e.message;
-        isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled';
+        // isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled'; // Assignment removed
       } else if (e is FirebaseAuthException) {
         // Fallback for direct FirebaseAuthException
         final authService = ref.read(authServiceProvider);
         errorMessage = authService.getReadableAuthError(e.code, e.message);
-        isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled';
+        // isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled'; // Assignment removed
       } else if (e.toString().contains('sign in was cancelled')) {
         errorMessage = 'Google sign-in was cancelled';
-        isError = false; // Not an error
+        // isError = false; // Assignment removed
       } else {
-        errorMessage = e.toString(); // Fallback for other errors
+        talker.error('Unexpected error during Google Sign-In: $e');
+        errorMessage =
+            'An unexpected error occurred.'; // Fallback for other errors
       }
 
-      showThemedSnackBar(
-        context: context,
+      if (!currentContext.mounted) return; // Add mounted check
+      SnackBarHelper.showErrorSnackBar(
+        // Use Error variant for clarity
+        context: currentContext,
         message: errorMessage,
-        isError: isError, // Use the flag determined above
         duration: const Duration(seconds: 10),
       );
     } finally {
       // Ensure loading state is reset even if navigation happens
-      if (mounted && _isLoading) {
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });
@@ -678,8 +774,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           const SizedBox(height: 24),
                           Center(
                             child: StyledButton(
-                              onPressed:
-                                  _submitEmailPasswordForm, // Updated onPressed
+                              onPressed: _isLoading
+                                  ? null
+                                  : _submitEmailPasswordForm, // Updated onPressed
                               text: isAnonymous
                                   ? 'Complete Registration'
                                   : 'Register',
@@ -692,46 +789,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     // Add Google Sign-In button below the Complete Registration button (no divider)
                     const SizedBox(height: 16),
                     GoogleSignInButton(
-                      onPressed: () async {
-                        await _signInWithGoogle();
-                      },
-                      onError: (e) {
-                        talker
-                            .error('Google Sign-In error in register page: $e');
-
-                        // Show a user-friendly error message
-                        String errorMessage = 'Failed to sign in with Google';
-                        bool isError = true; // Default to error
-
-                        if (e is AuthException) {
-                          // Catch AuthException first
-                          errorMessage = e.message;
-                          isError = e.code != 'cancelled' &&
-                              e.code != 'sign-in-cancelled';
-                        } else if (e is FirebaseAuthException) {
-                          // Fallback for direct FirebaseAuthException
-                          final authService = ref.read(authServiceProvider);
-                          errorMessage = authService.getReadableAuthError(
-                              e.code, e.message);
-                          isError = e.code != 'cancelled' &&
-                              e.code != 'sign-in-cancelled';
-                        } else if (e
-                            .toString()
-                            .contains('sign in was cancelled')) {
-                          errorMessage = 'Google sign-in was cancelled';
-                          isError = false; // Not an error
-                        } else {
-                          errorMessage =
-                              e.toString(); // Fallback for other errors
-                        }
-
-                        showThemedSnackBar(
-                          context: context,
-                          message: errorMessage,
-                          isError: isError, // Use the flag determined above
-                          duration: const Duration(seconds: 10),
-                        );
-                      },
+                      isLoading: _isLoading, // Pass loading state
+                      onPressed: _isLoading
+                          ? null
+                          : () async {
+                              await _signInWithGoogle();
+                            },
+                      // onError removed, handled within _signInWithGoogle
                       text: isAnonymous
                           ? 'Continue with Google'
                           : 'Register with Google',
@@ -743,7 +807,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           TextButton(
-                            onPressed: () => context.go('/profile/auth'),
+                            onPressed: _isLoading
+                                ? null
+                                : () => context
+                                    .go('/auth'), // Navigate to top-level /auth
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 8),

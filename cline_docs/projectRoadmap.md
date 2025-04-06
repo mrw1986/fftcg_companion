@@ -49,7 +49,7 @@
     - [x] Fixed Forgot Password flow for anonymous users
     - [x] Proper account linking for anonymous users
     - [x] Fixed account deletion flow with proper state reset
-    - [x] Fixed Google authentication flow
+    - [x] Google authentication flow functional (linking & sign-in)
     - [x] Simplified and robust AuthService implementation
     - [x] Fixed provider unlinking logic and UI refresh
     - [x] Fixed email pre-population in link dialog
@@ -64,7 +64,7 @@
     - [x] Fixed Google authentication display name not storing in Firestore
     - [x] Fixed navigation after registration to show Account Settings page
     - [x] **Fixed Firestore permission issues during data migration** (Resolved as part of general collection permission fix)
-    - [ ] **Ongoing:** Testing and troubleshooting edge cases (e.g., Google linking redirect, count verification edge cases)
+    - [ ] **Ongoing:** Resolve `GlobalKey` conflicts and `ref` disposal errors during auth flow. Address count verification edge cases.
     - [x] Implemented settings migration (theme, display preferences)
     - [ ] **Pending:** Expand data migration to include deck data (See Phase 3, Item 17)
 
@@ -117,13 +117,13 @@
 - [x] Fix Forgot Password flow for anonymous users (Rebuilt)
 - [x] Implement proper account linking for anonymous users (Rebuilt)
 - [x] Fix account deletion flow with proper state reset (Rebuilt)
-- [x] Fix Google authentication flow (Rebuilt)
+- [x] Fix Google authentication flow (Functional, pending error resolution)
 - [x] Implement data migration for anonymous users (Rebuilt - Collection only)
 - [x] Improved Google linking state management (Rebuilt)
 - [x] Fixed authentication method order consistency in UI
 - [x] Fixed Google authentication display name not storing in Firestore
 - [x] **Fixed Firestore permission issues during data migration (Resolved)**
-- [ ] **Ensure all edge cases and state transitions are handled correctly (Ongoing Testing)**
+- [ ] **Resolve `GlobalKey` / `ref` disposal errors during auth flow (Ongoing)**
 - [ ] **Implement comprehensive data migration for all user data (Pending - See Phase 3, Item 17)**
 
 ### Recently Completed Tasks

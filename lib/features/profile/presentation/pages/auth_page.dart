@@ -124,16 +124,20 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     _setLoading(true);
     _isSigningInWithEmail = true; // Set flag
     final currentContext = context; // Capture context
+    final authService = ref.read(authServiceProvider); // Read service once
 
     try {
-      final authState = ref.read(authStateProvider);
-      final authService = ref.read(authServiceProvider);
+      final authState = ref.read(authStateProvider); // Read state once
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
+      // Set skip flag BEFORE await
+      if (mounted) {
+        ref.read(skipAutoAuthProvider.notifier).state = true;
+      }
+
       if (authState.isAnonymous) {
         talker.debug('Auth page: Email/Pass sign-in from anonymous state.');
-        ref.read(skipAutoAuthProvider.notifier).state = true;
         await authService.signOut();
         await authService.signInWithEmailAndPassword(email, password);
       } else {
@@ -142,14 +146,24 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       }
       talker
           .debug('Auth page: Email/Pass sign-in successful (Firebase level).');
-      // Reset skip flag ONLY on success
-      ref.read(skipAutoAuthProvider.notifier).state = false;
+
+      // Reset skip flag ONLY on success, if mounted
+      if (mounted) {
+        ref.read(skipAutoAuthProvider.notifier).state = false;
+        // Invalidate providers to trigger listener
+        ref.invalidate(firebaseUserProvider);
+        ref.invalidate(authStateProvider);
+        ref.invalidate(currentUserProvider);
+      }
 
       // --- REMOVED EXPLICIT NAVIGATION ---
       // Rely on the listener _setupAuthListener to navigate
     } on AuthException catch (e) {
       _isSigningInWithEmail = false; // Reset flag on error
-      ref.read(skipAutoAuthProvider.notifier).state = false; // Reset skip flag
+      // Reset skip flag on error only if mounted
+      if (mounted) {
+        ref.read(skipAutoAuthProvider.notifier).state = false;
+      }
       talker.error(
           'Caught AuthException in auth_page (Email/Password): ${e.code} - ${e.message}');
       if (!currentContext.mounted) return;
@@ -191,7 +205,10 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       }
     } catch (e) {
       _isSigningInWithEmail = false; // Reset flag on error
-      ref.read(skipAutoAuthProvider.notifier).state = false; // Reset skip flag
+      // Reset skip flag on error only if mounted
+      if (mounted) {
+        ref.read(skipAutoAuthProvider.notifier).state = false;
+      }
       talker.error('Non-AuthException error in auth page (Email/Password): $e');
       if (!currentContext.mounted) return;
       _showError('An unexpected error occurred. Please try again.',
@@ -203,56 +220,59 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     }
   }
 
-  // *** FINAL Simplified Google Sign-In Logic - Relying on Listener ***
+  // *** REFACTORED Google Sign-In Logic - Moved ref access before await ***
   Future<void> _signInWithGoogle() async {
     _setLoading(true);
     _isSigningInWithGoogle = true; // Set flag
     final initialContext = context;
-    final authService = ref.read(authServiceProvider);
-// Track if the core operation succeeded
+    final authService = ref.read(authServiceProvider); // Read service once
+    // Read the notifier BEFORE the await
+    final skipAutoAuthNotifier = ref.read(skipAutoAuthProvider.notifier);
 
     // Set skip flag BEFORE attempting sign-in
-    ref.read(skipAutoAuthProvider.notifier).state = true;
+    if (mounted) {
+      skipAutoAuthNotifier.state = true; // Use captured notifier
+    } else {
+      _setLoading(false); // Ensure loading stops if unmounted early
+      _isSigningInWithGoogle = false;
+      return; // Exit if unmounted before setting flag
+    }
     talker.debug(
         'Auth page: Set skipAutoAuthProvider=true before Google sign-in attempt.');
 
     try {
       talker.debug('Auth page: Attempting direct Google Sign-In...');
-      // Check mounted before await
-      if (!initialContext.mounted) {
-        ref.read(skipAutoAuthProvider.notifier).state = false;
-        _setLoading(false);
-        _isSigningInWithGoogle = false; // Reset flag if exiting early
-        return;
+
+      // *** Perform the async operation ***
+      await authService.signInWithGoogle();
+
+      // *** Handle success AFTER await, only if mounted ***
+      if (mounted) {
+        talker.debug(
+            'Auth page: Direct Google Sign-In successful (Firebase level). Waiting for listener...');
+        // Reset skip flag immediately after successful Firebase operation
+        skipAutoAuthNotifier.state = false; // Use captured notifier
+        talker.debug(
+            'Auth page: Reset skipAutoAuthProvider=false after successful Google sign-in attempt.');
+        // Invalidate providers AFTER successful operation to trigger state change listener
+        ref.invalidate(firebaseUserProvider);
+        ref.invalidate(authStateProvider);
+        ref.invalidate(currentUserProvider);
+        talker.debug(
+            'Auth page: Invalidated auth providers after Google sign-in.');
+      } else {
+        talker.warning(
+            'Auth page: Widget disposed after Google sign-in await, skipping post-success logic.');
+        // If unmounted, ensure skip flag is reset (might have been missed if error occurred during await)
+        // This requires reading ref again, which is risky, so we rely on the catch block or next interaction
       }
-      await authService.signInWithGoogle(); // The core operation
-// Mark as successful
-      talker.debug(
-          'Auth page: Direct Google Sign-In successful (Firebase level). Waiting for listener...');
-
-      // Reset skip flag immediately after successful Firebase operation
-      ref.read(skipAutoAuthProvider.notifier).state = false;
-      talker.debug(
-          'Auth page: Reset skipAutoAuthProvider=false after successful Google sign-in attempt.');
-
-      // Invalidate providers AFTER successful operation to trigger state change listener
-      ref.invalidate(firebaseUserProvider);
-      ref.invalidate(authStateProvider);
-      ref.invalidate(currentUserProvider);
-      talker
-          .debug('Auth page: Invalidated auth providers after Google sign-in.');
-
-      // --- REMOVED ---
-      // - User reload (handled by listener/sync provider)
-      // - Delays
-      // - Force refresh trigger (invalidate does this)
-      // - Final auth state check (listener does this)
-      // - Success snackbar (listener does this)
-      // - Explicit navigation (listener does this)
-      // --- END REMOVED ---
     } on AuthException catch (e) {
       _isSigningInWithGoogle = false; // Reset flag on error
-      ref.read(skipAutoAuthProvider.notifier).state = false; // Reset skip flag
+      // Reset skip flag on error only if mounted
+      if (mounted) {
+        // Check if mounted before accessing ref
+        skipAutoAuthNotifier.state = false; // Use captured notifier
+      }
       talker.error(
           'Caught AuthException during direct Google Sign-In: ${e.code} - ${e.message}');
       if (!initialContext.mounted) return; // Exit if disposed during await
@@ -294,19 +314,37 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                     try {
                       talker.debug(
                           'Auth page: Retrying Google sign-in to create account...');
-                      ref.read(skipAutoAuthProvider.notifier).state = true;
-                      if (!mounted) return;
+                      // Set skip flag again before retry
+                      if (mounted) {
+                        ref.read(skipAutoAuthProvider.notifier).state = true;
+                      } else {
+                        return; // Exit if unmounted
+                      }
+
                       await authService.signInWithGoogle();
-// Mark success if creation works
-                      talker.debug(
-                          'Auth page: Google Sign-In successful (account created). Waiting for listener...');
-                      // Reset skip flag on success inside dialog too
-                      ref.read(skipAutoAuthProvider.notifier).state = false;
-                      // Invalidate providers to trigger listener
-                      ref.invalidate(firebaseUserProvider);
-                      ref.invalidate(authStateProvider);
-                      ref.invalidate(currentUserProvider);
+
+                      // Handle success after retry, only if mounted
+                      if (mounted) {
+                        talker.debug(
+                            'Auth page: Google Sign-In successful (account created). Waiting for listener...');
+                        // Reset skip flag on success inside dialog too
+                        skipAutoAuthNotifier.state =
+                            false; // Use captured notifier
+                        // Invalidate providers to trigger listener
+                        ref.invalidate(firebaseUserProvider);
+                        ref.invalidate(authStateProvider);
+                        ref.invalidate(currentUserProvider);
+                      } else {
+                        talker.warning(
+                            'Auth page: Widget disposed after Google creation retry await, skipping post-success logic.');
+                      }
                     } catch (signInError) {
+                      // Reset skip flag on error only if mounted
+                      if (mounted) {
+                        // Check if mounted before accessing ref
+                        skipAutoAuthNotifier.state =
+                            false; // Use captured notifier
+                      }
                       if (!mounted) return;
                       talker.error(
                           'Auth page: Error during Google account creation retry: $signInError');
@@ -315,8 +353,6 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                               ? signInError.message
                               : 'Failed to create account with Google',
                           isError: true);
-                      // Reset skip flag on error here too
-                      ref.read(skipAutoAuthProvider.notifier).state = false;
                     }
                   },
                   child: const Text('Create Account'),
@@ -331,7 +367,11 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       }
     } catch (e) {
       _isSigningInWithGoogle = false; // Reset flag on error
-      ref.read(skipAutoAuthProvider.notifier).state = false; // Reset skip flag
+      // Reset skip flag on error only if mounted
+      if (mounted) {
+        // Check if mounted before accessing ref
+        skipAutoAuthNotifier.state = false; // Use captured notifier
+      }
       talker.error('Non-AuthException during direct Google Sign-In: $e');
       if (initialContext.mounted) {
         _showError('An unexpected error occurred: ${e.toString()}',
@@ -340,19 +380,14 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     } finally {
       // Reset flag and loading state if still mounted
       if (mounted) {
-        // Flag might have been reset already on success/error, but reset again for safety
         _isSigningInWithGoogle = false;
         _setLoading(false);
-        // Ensure skip flag is false if somehow missed
-        try {
-          ref.read(skipAutoAuthProvider.notifier).state = false;
-        } catch (_) {}
       }
       talker
           .debug('Auth page: Google sign-in function finally block executed.');
     }
   }
-  // *** END FINAL Simplified Google Sign-In Logic ***
+  // *** END REFACTORED Google Sign-In Logic ***
 
   @override
   Widget build(BuildContext context) {

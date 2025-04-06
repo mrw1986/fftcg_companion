@@ -55,10 +55,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           'Router Redirect Check: Location="$location", AuthStatus=${authState.status}');
 
       // Define public routes accessible without full authentication
+      // These are now top-level routes, but the logic remains the same
       final publicRoutes = [
-        '/profile/auth',
-        '/profile/register',
-        '/profile/reset-password',
+        '/auth', // Changed from /profile/auth
+        '/register', // Changed from /profile/register
+        '/reset-password', // Changed from /profile/reset-password
       ];
 
       // Check if the current route is one of the public routes
@@ -75,8 +76,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       if ((authState.isUnauthenticated || authState.isAnonymous) &&
           !isPublicRoute) {
         talker.debug(
-            'Router Redirect: Unauthenticated/Anonymous on protected route -> /profile/auth');
-        return '/profile/auth'; // Redirect to login/auth page
+            'Router Redirect: Unauthenticated/Anonymous on protected route -> /auth');
+        return '/auth'; // Redirect to login/auth page (now top-level)
       }
 
       // If authenticated or emailNotVerified AND currently on a public auth route
@@ -84,7 +85,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           isPublicRoute) {
         talker.debug(
             'Router Redirect: Authenticated/EmailNotVerified on public auth route -> /profile/account');
-        return '/profile/account'; // Redirect to account settings page
+        // Redirect to account settings page (still inside the shell)
+        return '/profile/account';
       }
 
       // No redirect needed
@@ -94,9 +96,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     // Add error handler
     errorBuilder: (context, state) => ErrorPage(error: state.error),
     routes: [
+      // ShellRoute for main app navigation with bottom bar
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
         builder: (context, state, child) {
+          // Pass child without explicit key
           return ScaffoldWithNavBar(child: child);
         },
         routes: [
@@ -170,22 +174,17 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           GoRoute(
-            path: '/profile',
+            path: '/profile', // Profile root remains in shell
             builder: (context, state) => const ProfilePage(),
             routes: [
+              // Sub-routes that SHOULD be within the shell
               GoRoute(
                 path: 'theme',
-                pageBuilder: (context, state) => MaterialPage(
-                  key: state.pageKey,
-                  child: const ThemeSettingsPage(),
-                ),
+                builder: (context, state) => const ThemeSettingsPage(),
               ),
               GoRoute(
                 path: 'account',
-                pageBuilder: (context, state) => MaterialPage(
-                  key: state.pageKey,
-                  child: const AccountSettingsPage(),
-                ),
+                builder: (context, state) => const AccountSettingsPage(),
               ),
               GoRoute(
                 path: 'logs',
@@ -198,35 +197,28 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                 ),
               ),
-              GoRoute(
-                path: 'login', // Keep for potential old links/bookmarks
-                redirect: (_, __) =>
-                    '/profile/auth', // Redirect to the correct auth path
-              ),
-              GoRoute(
-                path: 'auth',
-                pageBuilder: (context, state) => MaterialPage(
-                  key: state.pageKey,
-                  child: const AuthPage(),
-                ),
-              ),
-              GoRoute(
-                path: 'register',
-                pageBuilder: (context, state) => MaterialPage(
-                  key: state.pageKey,
-                  child: const RegisterPage(),
-                ),
-              ),
-              GoRoute(
-                path: 'reset-password',
-                pageBuilder: (context, state) => MaterialPage(
-                  key: state.pageKey,
-                  child: const ResetPasswordPage(),
-                ),
-              ),
+              // Removed auth routes from here
             ],
           ),
         ],
+      ),
+      // Top-level routes (outside the shell) for authentication
+      GoRoute(
+        path: '/auth', // Changed from /profile/auth
+        builder: (context, state) => const AuthPage(),
+      ),
+      GoRoute(
+        path: '/register', // Changed from /profile/register
+        builder: (context, state) => const RegisterPage(),
+      ),
+      GoRoute(
+        path: '/reset-password', // Changed from /profile/reset-password
+        builder: (context, state) => const ResetPasswordPage(),
+      ),
+      // Redirect for old /profile/login path
+      GoRoute(
+        path: '/profile/login',
+        redirect: (_, __) => '/auth', // Redirect to the new top-level auth path
       ),
     ],
   );
@@ -310,8 +302,9 @@ Color _getTextColorForBackground(Color backgroundColor) {
 class ScaffoldWithNavBar extends ConsumerStatefulWidget {
   final Widget child;
 
+  // Accept the key passed from ShellRoute
   const ScaffoldWithNavBar({
-    super.key,
+    super.key, // Use the key passed by GoRouter/ShellRoute
     required this.child,
   });
 
@@ -432,38 +425,26 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
   static int _calculateSelectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
 
-    if (location == '/settings') {
-      final router = GoRouter.of(context);
-      final routes = router.routerDelegate.currentConfiguration.matches;
-
-      for (var i = routes.length - 1; i >= 0; i--) {
-        final route = routes[i].matchedLocation;
-        if (route != '/settings') {
-          return _getIndexForLocation(route);
-        }
-      }
-    }
-
-    return _getIndexForLocation(location);
-  }
-
-  static int _getIndexForLocation(String location) {
+    // Check top-level routes first
     if (location == '/') return 0;
     if (location.startsWith('/collection')) return 1;
     if (location.startsWith('/decks')) return 2;
     if (location.startsWith('/scanner')) return 3;
-    if (location.startsWith('/profile')) return 4;
-    return 0;
+    if (location.startsWith('/profile')) {
+      return 4; // Includes /profile and its sub-routes in shell
+    }
+
+    // Handle cases where we might be on a non-shell route (like /auth)
+    // In this case, no bottom nav item should be selected.
+    // Returning -1 or an index outside the bounds might cause errors depending on NavigationBar implementation.
+    // Returning 0 (or any valid index) is safer, though visually might not be ideal.
+    // Consider if NavigationBar should be hidden entirely on non-shell routes.
+    return 0; // Default to first item if route doesn't match shell routes
   }
 
   void _onItemTapped(int index, BuildContext context) {
-    final location = GoRouterState.of(context).uri.path;
+    // No need to check for /settings anymore as auth routes are top-level
     final historyNotifier = ref.read(rootRouteHistoryProvider.notifier);
-
-    if (location == '/settings') {
-      context.pop();
-    }
-
     historyNotifier.addHistory(index);
     _navigateToIndex(index);
   }

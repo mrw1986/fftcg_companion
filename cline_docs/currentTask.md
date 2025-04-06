@@ -9,29 +9,32 @@
 
 ### Actions Taken
 
-1. **Fixed Riverpod Provider Lifecycle Issue:**
-   - Modified `authStateProvider` to avoid modifying other providers during initialization
-   - Created a separate `forceRefreshHandlerProvider` to properly handle state updates
-   - Used `Future.microtask` to ensure state changes happen after the current execution frame completes
-
-2. **Improved Firestore Synchronization:**
-   - Added immediate Firestore updates after linking or signing in with Google credentials
-   - Ensured the user document is properly created/updated before any navigation occurs
-
-3. **Enhanced User Feedback:**
-   - Added success notifications (SnackBars) for successful Google sign-in attempts
-   - Improved error handling with specific user-friendly messages
-   - Added additional verification of Google authentication status after sign-in
-
-4. **Improved Auth State Validation:**
-   - Added longer delay to ensure auth state updates properly
-   - Added verification of provider data to confirm successful Google linking
-   - Added better diagnostic logging of authentication state changes
+1. **Refactored `GoogleSignInButton`:** Removed internal loading state (`setState`) to prevent errors when the parent page (`AuthPage`) was disposed during the async sign-in operation. Passed loading state down from `AuthPage`. Corrected deprecated `withOpacity` usage to `withValues`.
+2. **Simplified `_signInWithGoogle`:** Removed all post-`await` logic (reloads, delays, state checks, snackbars, explicit navigation) to prevent operations on a potentially disposed widget context/ref. Focused on triggering the core auth operation and resetting flags.
+3. **Implemented `ref.listen` in `AuthPage`:** Added a listener to `authStateProvider` within `AuthPage`'s `initState` to specifically handle the transition from non-authenticated to authenticated *after* a Google sign-in initiated from that page. This listener now handles showing the success snackbar and navigating to `/profile/account`.
+4. **Corrected `SnackBarHelper` Usage:** Fixed incorrect method calls in `AuthPage` (replaced hallucinated `buildThemedSnackBar` with correct methods).
+5. **Corrected `StyledButton` Deprecations & Nullability:** Updated `StyledButton` to use `withValues` instead of `withOpacity` and accept a nullable `onPressed`. Fixed type mismatch in `AuthPage` button usage.
+6. **Router Adjustments:** Modified `app_router.dart` to use `ref.watch` for reactive redirects and removed the potentially conflicting `refreshListenable`.
+7. **Provider Invalidation:** Added provider invalidation (`firebaseUserProvider`, `authStateProvider`, `currentUserProvider`) after successful Google sign-in/linking in `AuthPage` to ensure the reactive chain updates correctly, similar to the working `RegisterPage` flow.
+8. **Refined `_signInWithGoogle` Error/Flag Handling:** Ensured `skipAutoAuthProvider` flag is reset reliably in `try`/`catch`/`finally` blocks, checking `mounted` status before accessing `ref`.
+9. **Added Extra `mounted` Check in `AuthPage`:** Added an additional `mounted` check immediately before the `ref.read` call within the `finally` block of `_signInWithGoogle`. (Note: This was insufficient).
+10. **Simplified Router Page Building:** Changed `pageBuilder:` to `builder:` for profile sub-routes. (Note: Did not resolve GlobalKey issue).
+11. **Added GlobalKey to `ScaffoldWithNavBar`:** Added a persistent key to the shell scaffold. (Note: Did not resolve GlobalKey issue).
+12. **Temporarily Removed `LoadingWrapper`:** Removed wrapper from `app.dart` for diagnosis. (Note: Did not resolve GlobalKey issue).
+13. **Refactored `_signInWithGoogle` Ref Access:** Moved all `ref` interactions before the `await` call in `AuthPage`. (Note: This appears to have fixed the `ref` disposal error).
+14. **Isolated Auth Routes:** Moved `/auth`, `/register`, `/reset-password` outside the `ShellRoute` in `app_router.dart`.
+15. **Fixed Registration Redirect:** Added explicit `context.go('/profile/account')` after dialog dismissal in `RegisterPage`.
+16. **Restored `LoadingWrapper`:** Added the wrapper back in `app.dart`.
 
 ### Status
 
-- Implemented and tested fix for the authentication issue.
-- Added improved error handling and user feedback for Google authentication flows.
+- **`ref` Disposal Error:** Appears **resolved** by refactoring `_signInWithGoogle` in `AuthPage`.
+- **Registration Redirect:** Explicit navigation added in `RegisterPage` to ensure correct redirection after email/password registration.
+- **`GlobalKey` Error:** **Persists** even after isolating auth routes. The error `Duplicate GlobalKey detected... [GlobalKey#5f22b scaffoldWithNavBar]` indicates the issue still relates to the `ShellRoute` or `ScaffoldWithNavBar` during auth state transitions.
+- **Next Steps:**
+  - **Investigate `ShellRoute` Further:** Research GoRouter issues related to `ShellRoute` rebuilds during redirects triggered by external state changes (like `authStateProvider`). Look for potential workarounds or alternative structuring.
+  - **Consider Router Alternatives (If Necessary):** If the `ShellRoute` issue proves intractable, explore alternative navigation packages or patterns.
+  - **Test Other Flows:** Verify if isolating auth routes impacted sign-out or account deletion flows regarding the `GlobalKey` error.
 
 ## Previous Objectives (Completed)
 

@@ -7,7 +7,7 @@ import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/core/providers/auto_auth_provider.dart';
 import 'package:fftcg_companion/core/providers/email_verification_checker.dart';
 import 'package:talker_flutter/talker_flutter.dart';
-import 'package:fftcg_companion/app/loading_wrapper.dart';
+import 'package:fftcg_companion/app/loading_wrapper.dart'; // Keep import
 import 'package:fftcg_companion/features/cards/presentation/providers/initialization_provider.dart';
 
 class FFTCGCompanionApp extends ConsumerWidget {
@@ -52,6 +52,7 @@ class FFTCGCompanionApp extends ConsumerWidget {
               );
             };
 
+            // *** RESTORED LoadingWrapper ***
             // Wrap the router's child with LoadingWrapper
             // This ensures LoadingWrapper is built within the MaterialApp context
             return LoadingWrapper(child: child ?? const SizedBox.shrink());

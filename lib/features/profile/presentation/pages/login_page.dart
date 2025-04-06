@@ -8,6 +8,16 @@ import 'package:fftcg_companion/shared/widgets/google_sign_in_button.dart';
 import 'package:fftcg_companion/shared/widgets/app_bar_factory.dart';
 import 'package:fftcg_companion/shared/widgets/loading_indicator.dart';
 import 'package:fftcg_companion/shared/widgets/styled_button.dart';
+// Import AuthException and AuthService
+import 'package:fftcg_companion/core/services/auth_service.dart';
+// Import Merge Dialog and helpers
+import 'package:fftcg_companion/features/profile/presentation/widgets/merge_data_decision_dialog.dart';
+import 'package:fftcg_companion/features/collection/data/repositories/collection_repository.dart';
+import 'package:fftcg_companion/features/collection/data/repositories/collection_merge_helper.dart';
+import 'package:fftcg_companion/features/profile/data/repositories/user_repository.dart';
+import 'package:fftcg_companion/features/profile/data/repositories/settings_merge_helper.dart';
+// Import SnackBarHelper (assuming it's needed, based on register_page)
+import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -37,13 +47,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   void _showError(String message, {bool isError = true}) {
     if (!mounted) return;
-    showThemedSnackBar(
-      context: context,
-      message: message,
-      isError: isError,
-      duration:
-          isError ? const Duration(seconds: 10) : const Duration(seconds: 3),
-    );
+    // Use SnackBarHelper for consistency
+    if (isError) {
+      SnackBarHelper.showErrorSnackBar(
+        context: context,
+        message: message,
+        duration: const Duration(seconds: 10),
+      );
+    } else {
+      SnackBarHelper.showSnackBar(
+        context: context,
+        message: message,
+        duration: const Duration(seconds: 3),
+      );
+    }
   }
 
   void _setLoading(bool loading) {
@@ -166,6 +183,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   Future<void> _signInWithGoogle() async {
     _setLoading(true);
+    final currentContext = context; // Capture context
 
     try {
       talker.debug('Login page: Starting Google Sign-In');
@@ -178,31 +196,114 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           // Link the anonymous account with Google
           // This preserves the user's data since the user ID remains the same
           talker.debug('Login page: Linking anonymous account with Google');
-          // Corrected method call
-          await authService.linkGoogleToAnonymous(context);
+          // Corrected method call - removed context argument
+          await authService.linkGoogleToAnonymous();
 
           talker.debug('Login page: Google linking successful');
           _navigateToProfile();
         } catch (linkError) {
           // Handle specific errors during linking
-          if (linkError is FirebaseAuthException) {
-            switch (linkError.code) {
-              case 'credential-already-in-use':
-              case 'provider-already-linked':
-                // Account exists, sign out anonymous user and sign in with existing account
-                talker.debug(
-                    'Login page: Google account exists, signing out anonymous user and signing in with existing Google account');
-                await authService.signOut();
-                await authService.signInWithGoogle();
+          if (linkError is AuthException) {
+            talker.warning(
+                'Login page: Google link failed - ${linkError.code}: ${linkError.message}');
+
+            // Handle the specific 'merge-required' case
+            if (linkError.code == 'merge-required') {
+              if (!currentContext.mounted) {
+                return; // Check context before dialog
+              }
+
+              final anonymousUserId =
+                  linkError.details?['anonymousUserId'] as String?;
+              final signedInCredential =
+                  linkError.details?['signedInCredential'] as UserCredential?;
+
+              if (anonymousUserId == null || signedInCredential?.user == null) {
+                talker.error(
+                    'Merge required error details missing anonymousUserId or signedInCredential.');
+                _showError('An error occurred during account linking.');
+                return; // Exit if details are missing
+              }
+
+              final mergeAction =
+                  await showMergeDataDecisionDialog(currentContext);
+              if (mergeAction != null && currentContext.mounted) {
+                final collectionRepo = CollectionRepository();
+                final userRepo = UserRepository();
+                // Add null assertion here
+                final toUserId = signedInCredential!.user!.uid;
+
+                try {
+                  _setLoading(true); // Show loading during merge
+                  switch (mergeAction) {
+                    case MergeAction.discard:
+                      talker.debug('Discarding anonymous user data');
+                      break;
+                    case MergeAction.merge:
+                      talker.debug('Merging anonymous user data');
+                      await migrateCollectionData(
+                        collectionRepository: collectionRepo,
+                        fromUserId: anonymousUserId,
+                        toUserId: toUserId,
+                      );
+                      await migrateUserSettings(
+                        userRepository: userRepo,
+                        fromUserId: anonymousUserId,
+                        toUserId: toUserId,
+                        overwrite: false,
+                      );
+                      break;
+                    case MergeAction.overwrite:
+                      talker.debug('Overwriting with anonymous user data');
+                      await migrateCollectionData(
+                        collectionRepository: collectionRepo,
+                        fromUserId: anonymousUserId,
+                        toUserId: toUserId,
+                      );
+                      await migrateUserSettings(
+                        userRepository: userRepo,
+                        fromUserId: anonymousUserId,
+                        toUserId: toUserId,
+                        overwrite: true,
+                      );
+                      break;
+                  }
+                  talker.debug('Data migration/handling complete.');
+
+                  // Invalidate and navigate after successful merge/discard
+                  if (mounted) {
+                    ref.invalidate(firebaseUserProvider);
+                    ref.invalidate(authStateProvider);
+                    ref.invalidate(currentUserProvider);
+                    _navigateToProfile(); // Navigate after merge
+                  }
+                } catch (e) {
+                  talker.error('Error during data migration: $e');
+                  _showError('Error merging data. Please try again.');
+                } finally {
+                  _setLoading(false); // Hide loading after merge attempt
+                }
+              } else {
+                talker.debug('Merge data dialog cancelled by user.');
+                // User cancelled, they are now signed in with the Google account.
+                // Navigate to profile as the state is now authenticated.
                 _navigateToProfile();
-                return;
-              default:
-                // For other errors, rethrow
-                rethrow;
+              }
+            } else {
+              // Show specific message for other AuthExceptions
+              _showError(linkError.message);
             }
+          } else if (linkError is FirebaseAuthException) {
+            // Fallback for direct FirebaseAuthException (less likely)
+            talker.error(
+                'FirebaseAuthException during Google link: ${linkError.code}');
+            final readableError = authService.getReadableAuthError(
+                linkError.code, linkError.message);
+            _showError(readableError);
           } else {
-            // For non-Firebase errors, rethrow
-            rethrow;
+            // Handle other errors generically
+            talker.error('Unexpected error during Google link: $linkError');
+            _showError('An unexpected error occurred during linking.');
           }
         }
       } else {
