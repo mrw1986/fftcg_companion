@@ -145,8 +145,10 @@ class AuthService {
   }
 
   /// Signs in or registers a user with Google.
-  Future<UserCredential> signInWithGoogle() async {
+  /// Returns a tuple: (UserCredential, bool isNewUser)
+  Future<(UserCredential, bool)> signInWithGoogle() async {
     talker.info('Attempting Google sign-in...');
+    bool isNewUser = false; // Default to false
     try {
       // Start Google sign-in flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
@@ -177,10 +179,14 @@ class AuthService {
       talker.debug(
           'Firebase user display name: ${userCredential.user?.displayName}');
 
+      // Check if the user is new
+      isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
+      talker.debug('Google sign-in: isNewUser = $isNewUser');
+
       // Reload to ensure latest state is fetched
       // Firestore update will be handled by the authStateChanges listener
       await userCredential.user?.reload();
-      return userCredential;
+      return (userCredential, isNewUser);
     } catch (e) {
       // Handle potential conflict where Google email matches existing Email/Password account
       if (e is FirebaseAuthException) {

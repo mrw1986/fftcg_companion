@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 
 /// A button that follows Google's branding guidelines for Sign-In buttons
@@ -9,49 +8,23 @@ class GoogleSignInButton extends StatelessWidget {
   /// The callback when the button is pressed
   final Future<void> Function()? onPressed;
 
-  /// The text to display on the button
+  /// The text to display on the button (not used with SVG logos)
   final String text;
 
-  /// Optional error handler
+  /// Optional error handler (less critical now, handled in parent)
   final Function(Exception)? onError;
+
+  /// Flag to indicate if the parent process is loading
+  final bool isLoading;
 
   /// Creates a Google Sign-In button
   const GoogleSignInButton({
     super.key,
     required this.onPressed,
-    this.text = 'Sign in with Google',
+    this.text = 'Continue with Google', // Keep for potential future use
     this.onError,
+    this.isLoading = false, // Default to false
   });
-
-  @override
-  Widget build(BuildContext context) {
-    return _GoogleSignInButtonState(
-      onPressed: onPressed,
-      text: text,
-      onError: onError,
-    );
-  }
-}
-
-class _GoogleSignInButtonState extends StatefulWidget {
-  final Future<void> Function()? onPressed;
-  final String text;
-  final Function(Exception)? onError;
-
-  const _GoogleSignInButtonState({
-    required this.onPressed,
-    required this.text,
-    this.onError,
-  });
-
-  @override
-  State<_GoogleSignInButtonState> createState() =>
-      _GoogleSignInButtonStateState();
-}
-
-class _GoogleSignInButtonStateState extends State<_GoogleSignInButtonState> {
-  bool _isLoading = false;
-  String? _errorMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -64,11 +37,12 @@ class _GoogleSignInButtonStateState extends State<_GoogleSignInButtonState> {
         ? 'assets/images/google_branding/signin-assets/android_dark_rd_ctn.svg'
         : 'assets/images/google_branding/signin-assets/android_neutral_rd_ctn.svg';
 
-    if (_isLoading) {
+    // Show loading indicator if isLoading is true
+    if (isLoading) {
       return Center(
         child: Container(
-          width: double.infinity,
-          height: 48,
+          width: double.infinity, // Match button width
+          height: 48, // Match button height
           decoration: BoxDecoration(
             color:
                 isDark ? colorScheme.surfaceContainerHighest : Colors.grey[100],
@@ -92,86 +66,33 @@ class _GoogleSignInButtonStateState extends State<_GoogleSignInButtonState> {
       );
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () async {
-              if (_isLoading) return;
-
-              setState(() {
-                _isLoading = true;
-                _errorMessage = null;
-              });
-
-              try {
-                talker.debug('Google Sign-In button pressed');
-                if (widget.onPressed != null) {
-                  await widget.onPressed!();
-                }
-              } catch (e) {
-                talker.error('Error in Google Sign-In button: $e');
-
-                // Handle specific error cases
-                String errorMessage = 'Failed to sign in with Google';
-
-                if (e is FirebaseAuthException) {
-                  if (e.code == 'requires-recent-login') {
-                    errorMessage =
-                        'Please sign out and sign in again to continue';
-                  } else if (e.code == 'wrong-account') {
-                    errorMessage =
-                        'Please use the same Google account you originally signed in with';
-                  } else if (e.code == 'user-token-expired') {
-                    errorMessage =
-                        'Your session has expired. Please sign in again';
-                  } else if (e.message?.contains('BAD_REQUEST') == true) {
-                    errorMessage = 'Authentication error. Please try again';
+    // Show the actual button if not loading
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        // Disable onTap if already loading (handled by parent now) or no onPressed provided
+        onTap: (isLoading || onPressed == null)
+            ? null
+            : () async {
+                try {
+                  talker.debug('Google Sign-In button tapped');
+                  await onPressed!();
+                } catch (e) {
+                  talker.error('Error caught in GoogleSignInButton onTap: $e');
+                  // Propagate error via onError callback if provided
+                  if (e is Exception && onError != null) {
+                    onError!(e);
                   }
+                  // No internal state update needed here
                 }
-
-                setState(() {
-                  _errorMessage = errorMessage;
-                  if (e is Exception && widget.onError != null) {
-                    widget.onError!(e);
-                  }
-                });
-              } finally {
-                if (mounted) {
-                  setState(() {
-                    _isLoading = false;
-                  });
-                }
-              }
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: SvgPicture.asset(
-              logoAssetPath,
-              height: 48, // Increased size for better visibility
-            ),
-          ),
+                // No finally block needed to set loading state
+              },
+        borderRadius: BorderRadius.circular(8),
+        child: SvgPicture.asset(
+          logoAssetPath,
+          height: 48, // Consistent height
         ),
-        if (_errorMessage != null) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: colorScheme.errorContainer,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              _errorMessage!,
-              style: TextStyle(
-                color: colorScheme.onErrorContainer,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }

@@ -44,11 +44,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     debugLogDiagnostics: true,
-    // Add refreshListenable to react to auth state changes
-    refreshListenable: authStateListenable,
+    // REMOVED refreshListenable, using ref.watch in redirect instead
     // Add redirect logic
     redirect: (BuildContext context, GoRouterState state) {
-      final authState = ref.read(authStateProvider); // Read current auth state
+      // WATCH the auth state provider to react to changes
+      final authState = ref.watch(authStateProvider);
       final location = state.uri.toString(); // Use full path with query params
 
       talker.debug(

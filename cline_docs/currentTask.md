@@ -37,7 +37,7 @@
 
 ### Objective: Plan Implementation for Multiple Copies of Same Card Handling (Phase 2, Task 5)
 
-#### Context
+#### Context (Details)
 
 - Completed Phase 1, Task 4: Finished Favorite/Wishlist Features (UI Implementation).
 - Completed the separation of state management for Cards and Collection pages.

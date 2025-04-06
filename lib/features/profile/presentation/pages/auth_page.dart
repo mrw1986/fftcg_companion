@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
@@ -26,6 +25,64 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _showPassword = false;
+  // Flag to track if sign-in was initiated from this page
+  bool _isSigningInWithGoogle = false;
+  bool _isSigningInWithEmail = false; // Added for email flow consistency
+
+  @override
+  void initState() {
+    super.initState();
+    _setupAuthListener();
+  }
+
+  void _setupAuthListener() {
+    ref.listenManual<AuthState>(authStateProvider, (previous, next) {
+      // Ensure listener runs only when mounted
+      if (!mounted) return;
+
+      final wasUnauthenticated = previous?.isUnauthenticated ?? true;
+      final wasAnonymous = previous?.isAnonymous ?? false;
+      final isAuthenticated = next.isAuthenticated;
+
+      talker.debug(
+          'Auth Listener: Prev=${previous?.status}, Next=${next.status}, GoogleSignIn=$_isSigningInWithGoogle, EmailSignIn=$_isSigningInWithEmail');
+
+      // Navigate after Google Sign-In initiated from this page
+      if (_isSigningInWithGoogle &&
+          (wasUnauthenticated || wasAnonymous) &&
+          isAuthenticated) {
+        talker.debug(
+            'Auth Listener: Detected Google Sign-In completion, navigating...');
+        _showSuccessAndNavigate('Successfully signed in with Google!');
+        _isSigningInWithGoogle = false; // Reset flag
+      }
+      // Navigate after Email Sign-In initiated from this page (if needed, currently handled differently)
+      // else if (_isSigningInWithEmail && (wasUnauthenticated || wasAnonymous) && isAuthenticated) {
+      //   talker.debug('Auth Listener: Detected Email Sign-In completion, navigating...');
+      //   _showSuccessAndNavigate('Successfully signed in!');
+      //   _isSigningInWithEmail = false; // Reset flag
+      // }
+    });
+  }
+
+  void _showSuccessAndNavigate(String message) {
+    // Use ScaffoldMessenger to show snackbar safely even if context is changing
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger != null) {
+      messenger.hideCurrentSnackBar();
+      // Use the correct SnackBarHelper method
+      SnackBarHelper.showSuccessSnackBar(
+        context: context,
+        message: message,
+      );
+    }
+    // Navigate after a short delay to allow snackbar to show
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) {
+        context.go('/profile/account');
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -34,27 +91,22 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     super.dispose();
   }
 
-  // Note: This function implicitly uses context. Ensure it's called only when mounted.
-  void _navigateToProfile() {
-    if (!mounted) return;
-    // Use goNamed for potentially better stack management if needed
-    context.goNamed('profile');
-  }
-
-  // Note: This function uses context. Ensure it's called only when mounted.
+  // Corrected _showError method
   void _showError(String message, {bool isError = true}) {
     if (!mounted) return;
+    // Use the correct SnackBarHelper methods
     if (isError) {
       SnackBarHelper.showErrorSnackBar(
         context: context,
         message: message,
-        duration: const Duration(seconds: 10),
+        duration:
+            const Duration(seconds: 10), // Keep longer duration for errors
       );
     } else {
       SnackBarHelper.showSnackBar(
         context: context,
         message: message,
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 4), // Standard duration for info
       );
     }
   }
@@ -70,8 +122,8 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     if (!_formKey.currentState!.validate()) return;
 
     _setLoading(true);
-    // Capture context before async gap
-    final currentContext = context;
+    _isSigningInWithEmail = true; // Set flag
+    final currentContext = context; // Capture context
 
     try {
       final authState = ref.read(authStateProvider);
@@ -79,43 +131,32 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      // If user is anonymous, sign them out first, then sign in with credentials
       if (authState.isAnonymous) {
-        talker.debug(
-            'Auth page: Anonymous user signing in with Email/Password. Setting skip flag and signing out anonymous first.');
-        // Set flag to prevent auto anonymous sign-in immediately after sign out
+        talker.debug('Auth page: Email/Pass sign-in from anonymous state.');
         ref.read(skipAutoAuthProvider.notifier).state = true;
-        await authService.signOut(); // Sign out anonymous user
-
-        // Now sign in with the provided credentials
+        await authService.signOut();
         await authService.signInWithEmailAndPassword(email, password);
-        talker.debug(
-            'Auth page: Successfully signed in with Email/Password after anonymous sign out.');
-        // Check mounted after await before navigation
-        if (!mounted) return;
-        _navigateToProfile();
-        // Reset skip flag after successful sign-in
-        ref.read(skipAutoAuthProvider.notifier).state = false;
       } else {
-        // Normal sign in for non-anonymous users
-        talker.debug('Auth page: Non-anonymous user signing in.');
+        talker.debug('Auth page: Email/Pass sign-in from non-anonymous state.');
         await authService.signInWithEmailAndPassword(email, password);
-        // Check mounted after await before navigation
-        if (!mounted) return;
-        _navigateToProfile();
-        // Reset skip flag after successful sign-in
-        ref.read(skipAutoAuthProvider.notifier).state = false;
       }
-      // Catch the custom AuthException thrown by AuthService
+      talker
+          .debug('Auth page: Email/Pass sign-in successful (Firebase level).');
+      // Reset skip flag ONLY on success
+      ref.read(skipAutoAuthProvider.notifier).state = false;
+
+      // --- REMOVED EXPLICIT NAVIGATION ---
+      // Rely on the listener _setupAuthListener to navigate
     } on AuthException catch (e) {
+      _isSigningInWithEmail = false; // Reset flag on error
+      ref.read(skipAutoAuthProvider.notifier).state = false; // Reset skip flag
       talker.error(
           'Caught AuthException in auth_page (Email/Password): ${e.code} - ${e.message}');
-
-      // Use captured context after async gap, checking mounted status
       if (!currentContext.mounted) return;
+      // Handle specific errors like user-not-found dialog
       if (e.code == 'user-not-found') {
         showDialog(
-          context: currentContext, // Use captured context
+          context: currentContext,
           builder: (BuildContext dialogContext) {
             return AlertDialog(
               title: const Text('Account Not Found'),
@@ -137,7 +178,6 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                   ),
                   onPressed: () {
                     Navigator.of(dialogContext).pop();
-                    // Use captured context for navigation
                     GoRouter.of(currentContext).go('/profile/register');
                   },
                   child: const Text('Create Account'),
@@ -146,27 +186,16 @@ class _AuthPageState extends ConsumerState<AuthPage> {
             );
           },
         );
-      } else if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
-        // Show SnackBar for incorrect credentials using the message from AuthException
-        // Use captured context for SnackBar
-        SnackBarHelper.showErrorSnackBar(
-            context: currentContext, message: e.message);
-        // Optionally show reset password dialog
-        /* ... dialog code ... */
       } else {
-        // Show generic error SnackBar for other AuthExceptions
-        // Use captured context for SnackBar
-        SnackBarHelper.showErrorSnackBar(
-            context: currentContext, message: e.message);
+        _showError(e.message, isError: true); // Use _showError for consistency
       }
     } catch (e) {
-      // Handle other non-AuthException errors
+      _isSigningInWithEmail = false; // Reset flag on error
+      ref.read(skipAutoAuthProvider.notifier).state = false; // Reset skip flag
       talker.error('Non-AuthException error in auth page (Email/Password): $e');
-      // Use captured context after async gap, checking mounted status
       if (!currentContext.mounted) return;
-      SnackBarHelper.showErrorSnackBar(
-          context: currentContext,
-          message: 'An unexpected error occurred. Please try again.');
+      _showError('An unexpected error occurred. Please try again.',
+          isError: true);
     } finally {
       if (mounted) {
         _setLoading(false);
@@ -174,15 +203,15 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     }
   }
 
-  // *** REVISED Google Sign-In Logic ***
+  // *** FINAL Simplified Google Sign-In Logic - Relying on Listener ***
   Future<void> _signInWithGoogle() async {
     _setLoading(true);
-    // Capture context before any async gaps
+    _isSigningInWithGoogle = true; // Set flag
     final initialContext = context;
     final authService = ref.read(authServiceProvider);
+// Track if the core operation succeeded
 
-    // Set skip flag BEFORE attempting sign-in to prevent auto-anonymous
-    // if this flow is cancelled or fails early.
+    // Set skip flag BEFORE attempting sign-in
     ref.read(skipAutoAuthProvider.notifier).state = true;
     talker.debug(
         'Auth page: Set skipAutoAuthProvider=true before Google sign-in attempt.');
@@ -190,59 +219,52 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     try {
       talker.debug('Auth page: Attempting direct Google Sign-In...');
       // Check mounted before await
-      if (!initialContext.mounted) return;
-      await authService.signInWithGoogle();
-      talker.debug('Auth page: Direct Google Sign-In successful');
-
-      // Force refresh the auth state to ensure it's up to date
-      ref.read(forceRefreshAuthProvider.notifier).state = true;
-      talker.debug('Auth page: Forced auth state refresh after Google sign-in');
-
-      // Add a delay to allow auth state to update
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Reload current user to ensure auth state is fresh
-      await FirebaseAuth.instance.currentUser?.reload();
-      talker.debug('Auth page: Reloaded Firebase user after Google sign-in');
-
-      // Check mounted after await before navigation
-      if (!initialContext.mounted) return;
-
-      // Get current auth state to add diagnostic info
-      final updatedAuthState = ref.read(authStateProvider);
-      talker.debug(
-          'Auth page: Current auth state before navigation: ${updatedAuthState.status}');
-
-      // Show success feedback
-      if (initialContext.mounted) {
-        SnackBarHelper.showSuccessSnackBar(
-          context: initialContext,
-          message: 'Successfully signed in with Google!',
-        );
+      if (!initialContext.mounted) {
+        ref.read(skipAutoAuthProvider.notifier).state = false;
+        _setLoading(false);
+        _isSigningInWithGoogle = false; // Reset flag if exiting early
+        return;
       }
+      await authService.signInWithGoogle(); // The core operation
+// Mark as successful
+      talker.debug(
+          'Auth page: Direct Google Sign-In successful (Firebase level). Waiting for listener...');
 
-      // Navigate to profile
-      _navigateToProfile();
-
-      // Reset skip flag ONLY after successful sign-in
+      // Reset skip flag immediately after successful Firebase operation
       ref.read(skipAutoAuthProvider.notifier).state = false;
       talker.debug(
-          'Auth page: Reset skipAutoAuthProvider=false after successful Google sign-in.');
+          'Auth page: Reset skipAutoAuthProvider=false after successful Google sign-in attempt.');
+
+      // Invalidate providers AFTER successful operation to trigger state change listener
+      ref.invalidate(firebaseUserProvider);
+      ref.invalidate(authStateProvider);
+      ref.invalidate(currentUserProvider);
+      talker
+          .debug('Auth page: Invalidated auth providers after Google sign-in.');
+
+      // --- REMOVED ---
+      // - User reload (handled by listener/sync provider)
+      // - Delays
+      // - Force refresh trigger (invalidate does this)
+      // - Final auth state check (listener does this)
+      // - Success snackbar (listener does this)
+      // - Explicit navigation (listener does this)
+      // --- END REMOVED ---
     } on AuthException catch (e) {
+      _isSigningInWithGoogle = false; // Reset flag on error
+      ref.read(skipAutoAuthProvider.notifier).state = false; // Reset skip flag
       talker.error(
           'Caught AuthException during direct Google Sign-In: ${e.code} - ${e.message}');
-
-      // Check mounted after await before showing dialog/snackbar
-      if (!initialContext.mounted) return;
+      if (!initialContext.mounted) return; // Exit if disposed during await
 
       // Handle specific errors like account not found -> offer creation
-      if (e.code == 'account-not-found' || // Firebase might throw this
-          e.code == 'google-account-not-found' || // Custom code might be used
+      if (e.code == 'account-not-found' ||
+          e.code == 'google-account-not-found' ||
           e.code == 'user-not-found') {
         talker.warning(
             'Auth page: Google account not found, showing creation dialog.');
         showDialog(
-          context: initialContext, // Use captured context
+          context: initialContext,
           builder: (BuildContext dialogContext) {
             return AlertDialog(
               title: const Text('Create New Account?'),
@@ -267,34 +289,24 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                         Theme.of(initialContext).colorScheme.onPrimary,
                   ),
                   onPressed: () async {
-                    // Capture dialog context before async gap
                     final currentDialogContext = dialogContext;
                     Navigator.of(currentDialogContext).pop();
-                    // Try standard Google sign-in again, which should now create the account
-                    // (Firebase handles this implicitly if the user doesn't exist)
                     try {
                       talker.debug(
                           'Auth page: Retrying Google sign-in to create account...');
-                      // Ensure skip flag is still true before this attempt
                       ref.read(skipAutoAuthProvider.notifier).state = true;
-                      // Check mounted before await
                       if (!mounted) return;
                       await authService.signInWithGoogle();
+// Mark success if creation works
                       talker.debug(
-                          'Auth page: Google Sign-In successful (account created).');
-
-                      // Force refresh, delay, reload
-                      ref.read(forceRefreshAuthProvider.notifier).state = true;
-                      await Future.delayed(const Duration(milliseconds: 500));
-                      await FirebaseAuth.instance.currentUser?.reload();
-
-                      // Check mounted after await before navigation
-                      if (!mounted) return;
-                      _navigateToProfile(); // Uses state's context, safe here
-                      // Reset skip flag after successful creation/sign-in
+                          'Auth page: Google Sign-In successful (account created). Waiting for listener...');
+                      // Reset skip flag on success inside dialog too
                       ref.read(skipAutoAuthProvider.notifier).state = false;
+                      // Invalidate providers to trigger listener
+                      ref.invalidate(firebaseUserProvider);
+                      ref.invalidate(authStateProvider);
+                      ref.invalidate(currentUserProvider);
                     } catch (signInError) {
-                      // Check mounted after await before showing error
                       if (!mounted) return;
                       talker.error(
                           'Auth page: Error during Google account creation retry: $signInError');
@@ -303,6 +315,8 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                               ? signInError.message
                               : 'Failed to create account with Google',
                           isError: true);
+                      // Reset skip flag on error here too
+                      ref.read(skipAutoAuthProvider.notifier).state = false;
                     }
                   },
                   child: const Text('Create Account'),
@@ -312,226 +326,256 @@ class _AuthPageState extends ConsumerState<AuthPage> {
           },
         );
       } else {
-        // Handle other AuthExceptions (e.g., cancelled, network error)
         bool isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled';
         _showError(e.message, isError: isError);
       }
     } catch (e) {
-      // Catch any other unexpected errors
+      _isSigningInWithGoogle = false; // Reset flag on error
+      ref.read(skipAutoAuthProvider.notifier).state = false; // Reset skip flag
       talker.error('Non-AuthException during direct Google Sign-In: $e');
       if (initialContext.mounted) {
         _showError('An unexpected error occurred: ${e.toString()}',
             isError: true);
       }
     } finally {
-      // Ensure loading indicator is turned off if mounted
+      // Reset flag and loading state if still mounted
       if (mounted) {
+        // Flag might have been reset already on success/error, but reset again for safety
+        _isSigningInWithGoogle = false;
         _setLoading(false);
+        // Ensure skip flag is false if somehow missed
+        try {
+          ref.read(skipAutoAuthProvider.notifier).state = false;
+        } catch (_) {}
       }
-      // DO NOT reset skip flag here, only on success.
+      talker
+          .debug('Auth page: Google sign-in function finally block executed.');
     }
   }
-  // *** END REVISED Google Sign-In Logic ***
+  // *** END FINAL Simplified Google Sign-In Logic ***
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authStateProvider);
+    // No listener here, moved to initState
+    final authState =
+        ref.watch(authStateProvider); // Still watch for UI updates
     final isAnonymous = authState.isAnonymous;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBarFactory.createAppBar(context, 'Sign In'),
-      body: _isLoading
-          ? const Center(child: LoadingIndicator())
-          : Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 16),
-                    // Logo with rounded rectangle container using primary color
-                    Container(
-                      width: 240,
-                      height: 240,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary,
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Center(
-                        child: Image.asset(
-                          'assets/images/logo_transparent.png',
-                          height: 200,
-                          width: 200,
-                          fit: BoxFit.contain,
-                        ),
+      // Use a conditional loading overlay instead of replacing the whole body
+      body: Stack(
+        children: [
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 16),
+                  // Logo
+                  Container(
+                    width: 240,
+                    height: 240,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Center(
+                      child: Image.asset(
+                        'assets/images/logo_transparent.png',
+                        height: 200,
+                        width: 200,
+                        fit: BoxFit.contain,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                  ),
+                  const SizedBox(height: 16),
 
-                    // Information banner for anonymous users
-                    if (isAnonymous)
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: colorScheme.primary,
-                            width: 1,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'You are currently signed in as a guest.', // Simplified message
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Sign in with Email/Password or Google to save your data permanently.', // Clearer call to action
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Note: Guest data is temporary and may be lost.', // Simplified warning
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontStyle: FontStyle.italic,
-                                color: colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                          ],
+                  // Anonymous user banner
+                  if (isAnonymous)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: colorScheme.primary,
+                          width: 1,
                         ),
                       ),
-
-                    Form(
-                      key: _formKey,
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          TextFormField(
-                            controller: _emailController,
-                            decoration: const InputDecoration(
-                              labelText: 'Email',
-                              border: OutlineInputBorder(),
+                          Text(
+                            'You are currently signed in as a guest.', // Simplified message
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onPrimaryContainer,
                             ),
-                            keyboardType: TextInputType.emailAddress,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                  .hasMatch(value)) {
-                                return 'Please enter a valid email';
-                              }
-                              return null;
-                            },
                           ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _passwordController,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              border: const OutlineInputBorder(),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _showPassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  color: colorScheme.primary,
-                                ),
-                                onPressed: () => setState(
-                                    () => _showPassword = !_showPassword),
-                                tooltip: _showPassword
-                                    ? 'Hide password'
-                                    : 'Show password',
-                              ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Sign in with Email/Password or Google to save your data permanently.', // Clearer call to action
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: colorScheme.onPrimaryContainer,
                             ),
-                            obscureText: !_showPassword,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your password';
-                              }
-                              if (value.length < 6) {
-                                return 'Password must be at least 6 characters';
-                              }
-                              return null;
-                            },
                           ),
-                          const SizedBox(height: 24),
-                          Center(
-                            child: StyledButton(
-                              onPressed: _signInWithEmailAndPassword,
-                              text: 'Sign In with Email', // More specific
+                          const SizedBox(height: 8),
+                          Text(
+                            'Note: Guest data is temporary and may be lost.', // Simplified warning
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                              color: colorScheme.onPrimaryContainer,
                             ),
                           ),
                         ],
                       ),
                     ),
 
-                    const SizedBox(height: 16),
-                    GoogleSignInButton(
-                      onPressed: () async {
-                        await _signInWithGoogle();
-                      },
-                      onError: (e) {
-                        talker.error('Google Sign-In button onError: $e');
-                        // This onError is primarily for the button's internal state,
-                        // main error handling is in _signInWithGoogle now.
-                        // We can still show a generic message here if needed.
-                        if (mounted) {
-                          _showError('An error occurred during Google Sign-In.',
-                              isError: true);
-                        }
-                      },
-                      text: 'Continue with Google',
+                  // Email/Password Form
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _emailController,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your email';
+                            }
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                .hasMatch(value)) {
+                              return 'Please enter a valid email';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _passwordController,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            border: const OutlineInputBorder(),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _showPassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: colorScheme.primary,
+                              ),
+                              onPressed: () => setState(
+                                  () => _showPassword = !_showPassword),
+                              tooltip: _showPassword
+                                  ? 'Hide password'
+                                  : 'Show password',
+                            ),
+                          ),
+                          obscureText: !_showPassword,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your password';
+                            }
+                            if (value.length < 6) {
+                              return 'Password must be at least 6 characters';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        Center(
+                          child: StyledButton(
+                            // Wrap async call in a non-async lambda
+                            onPressed: _isLoading
+                                ? null
+                                : () {
+                                    _signInWithEmailAndPassword();
+                                  },
+                            text: 'Sign In with Email', // More specific
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
 
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        TextButton(
-                          onPressed: () => context.go('/profile/register'),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            foregroundColor: colorScheme.primary,
-                          ),
-                          child: const Text('Create a new account'),
+                  const SizedBox(height: 16),
+                  // Google Sign In Button
+                  GoogleSignInButton(
+                    isLoading: _isLoading, // Pass loading state
+                    onPressed: _isLoading
+                        ? null
+                        : () async {
+                            // Disable if loading
+                            await _signInWithGoogle();
+                          },
+                    // Removed onError handler from button instance
+                    text: 'Continue with Google',
+                  ),
+
+                  const SizedBox(height: 16),
+                  // Other Links
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () => context
+                                .go('/profile/register'), // Disable if loading
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          foregroundColor: colorScheme.primary,
                         ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        TextButton(
-                          onPressed: () =>
-                              context.go('/profile/reset-password'),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            foregroundColor: colorScheme.primary,
-                          ),
-                          child: const Text('Forgot password?'),
+                        child: const Text('Create a new account'),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () => context.go(
+                                '/profile/reset-password'), // Disable if loading
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          foregroundColor: colorScheme.primary,
                         ),
-                      ],
-                    ),
-                  ],
+                        child: const Text('Forgot password?'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Loading overlay
+          if (_isLoading)
+            const Positioned.fill(
+              child: AbsorbPointer(
+                // Prevent interaction with UI below
+                child: Center(
+                  child: LoadingIndicator(),
                 ),
               ),
             ),
+        ],
+      ),
     );
   }
 }

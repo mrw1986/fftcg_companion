@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 /// A styled button that matches the app's design language
 /// This button has a consistent style with the Google Sign-In button
 class StyledButton extends StatelessWidget {
-  /// The callback when the button is pressed
-  final VoidCallback onPressed;
+  /// The callback when the button is pressed (nullable to allow disabling)
+  final VoidCallback? onPressed;
 
   /// The text to display on the button
   final String text;
@@ -21,7 +21,7 @@ class StyledButton extends StatelessWidget {
   /// Creates a styled button
   const StyledButton({
     super.key,
-    required this.onPressed,
+    required this.onPressed, // Still required, but can be null
     required this.text,
     this.backgroundColor,
     this.textColor,
@@ -42,25 +42,36 @@ class StyledButton extends StatelessWidget {
         height: 48, // Standard height for buttons
         child: outlined
             ? OutlinedButton(
-                onPressed: onPressed,
+                onPressed: onPressed, // Can be null
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: bgColor),
                   shape: RoundedRectangleBorder(
                     borderRadius:
                         BorderRadius.circular(24), // Pill-shaped button
                   ),
+                  // Handle disabled state visually if needed
+                  disabledForegroundColor:
+                      theme.colorScheme.onSurface.withValues(alpha: 0.38),
+                  disabledBackgroundColor:
+                      Colors.transparent, // Keep outline style when disabled
                 ),
                 child: Text(
                   text,
-                  style: TextStyle(color: txtColor),
+                  style: TextStyle(
+                      color: onPressed == null
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.38)
+                          : txtColor),
                 ),
               )
             : ElevatedButton(
-                onPressed: onPressed,
+                onPressed: onPressed, // Can be null
                 style: ElevatedButton.styleFrom(
                   backgroundColor: bgColor,
                   foregroundColor: txtColor,
-                  elevation: 2, // Slightly more elevation for better visibility
+                  disabledBackgroundColor: bgColor.withValues(alpha: 0.12),
+                  disabledForegroundColor: txtColor.withValues(alpha: 0.38),
+                  elevation:
+                      onPressed == null ? 0 : 2, // No elevation when disabled
                   shape: RoundedRectangleBorder(
                     borderRadius:
                         BorderRadius.circular(24), // Pill-shaped button
