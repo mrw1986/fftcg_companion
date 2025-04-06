@@ -127,13 +127,43 @@ final currentUserProvider = Provider<User?>((ref) {
       );
 });
 
+/// Force refresh auth provider to trigger auth state refresh
+final forceRefreshAuthProvider = StateProvider<bool>((ref) => false);
+
+/// Provider that watches and resets the forceRefreshAuthProvider
+/// This allows us to avoid modifying the provider during initialization
+final forceRefreshHandlerProvider = Provider<void>((ref) {
+  // Watch the force refresh provider
+  final shouldRefresh = ref.watch(forceRefreshAuthProvider);
+
+  // If the flag is true, schedule a reset after this frame completes
+  if (shouldRefresh) {
+    // Use Future.microtask to reset the flag after the current execution frame
+    Future.microtask(() {
+      try {
+        ref.read(forceRefreshAuthProvider.notifier).state = false;
+        talker.debug('Force auth refresh flag reset');
+      } catch (e) {
+        // Log error if the provider is no longer available
+        talker.error('Error resetting force refresh flag: $e');
+      }
+    });
+  }
+});
+
 // Removed the problematic authStateListenerProvider
 
 /// Provider for the authentication state (derived from the Firebase stream)
 final authStateProvider = Provider<AuthState>((ref) {
   // Ensure the sync provider is active by watching it. This also handles the verification flag reset now.
   ref.watch(firestoreUserSyncProvider);
-  // Removed: ref.watch(authStateListenerProvider); // This caused the cycle
+
+  // Watch the force refresh flag but DON'T modify it here
+  // Simply watch it to rebuild when it changes
+  ref.watch(forceRefreshAuthProvider);
+
+  // Watch the forceRefreshHandlerProvider to ensure it's activated
+  ref.watch(forceRefreshHandlerProvider);
 
   // Watch the raw Firebase user stream
   final userAsync = ref.watch(firebaseUserProvider);

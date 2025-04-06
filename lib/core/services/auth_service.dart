@@ -203,10 +203,9 @@ class AuthService {
               'Google sign-in failed: No account exists for this Google email.');
           // Sign out from Google since sign-in failed
           await _googleSignIn.signOut();
-          // Throw a specific error for the UI to handle account creation flow
+          // Use a more specific error code for non-existent Google accounts
           throw AuthException(
-            code:
-                'not-anonymous', // Reuse this code since UI already handles it properly
+            code: 'google-account-not-found',
             message: 'No account exists for this Google account.',
             category: AuthErrorCategory.authentication,
             originalException: e,
@@ -333,6 +332,11 @@ class AuthService {
           if (finalUser != null) {
             talker.info(
                 'Successfully linked Google. User state: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
+
+            // Immediately update Firestore record to ensure state consistency
+            await _userRepository.createUserFromAuth(finalUser);
+            talker.debug(
+                'Firestore updated immediately after linking Google to anonymous.');
           }
         }
       } on FirebaseAuthException catch (e) {
@@ -403,6 +407,11 @@ class AuthService {
             if (finalUser != null) {
               talker.info(
                   'Successfully signed in with Google. User state: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
+
+              // Immediately update Firestore record to ensure state consistency
+              await _userRepository.createUserFromAuth(finalUser);
+              talker.debug(
+                  'Firestore updated immediately after Google sign-in (credential already in use case).');
             }
           }
         } else {

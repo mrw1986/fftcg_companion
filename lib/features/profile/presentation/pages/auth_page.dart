@@ -34,11 +34,14 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     super.dispose();
   }
 
+  // Note: This function implicitly uses context. Ensure it's called only when mounted.
   void _navigateToProfile() {
     if (!mounted) return;
-    context.go('/profile');
+    // Use goNamed for potentially better stack management if needed
+    context.goNamed('profile');
   }
 
+  // Note: This function uses context. Ensure it's called only when mounted.
   void _showError(String message, {bool isError = true}) {
     if (!mounted) return;
     if (isError) {
@@ -67,6 +70,8 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     if (!_formKey.currentState!.validate()) return;
 
     _setLoading(true);
+    // Capture context before async gap
+    final currentContext = context;
 
     try {
       final authState = ref.read(authStateProvider);
@@ -86,68 +91,82 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         await authService.signInWithEmailAndPassword(email, password);
         talker.debug(
             'Auth page: Successfully signed in with Email/Password after anonymous sign out.');
+        // Check mounted after await before navigation
+        if (!mounted) return;
         _navigateToProfile();
+        // Reset skip flag after successful sign-in
+        ref.read(skipAutoAuthProvider.notifier).state = false;
       } else {
         // Normal sign in for non-anonymous users
         talker.debug('Auth page: Non-anonymous user signing in.');
         await authService.signInWithEmailAndPassword(email, password);
+        // Check mounted after await before navigation
+        if (!mounted) return;
         _navigateToProfile();
+        // Reset skip flag after successful sign-in
+        ref.read(skipAutoAuthProvider.notifier).state = false;
       }
       // Catch the custom AuthException thrown by AuthService
     } on AuthException catch (e) {
       talker.error(
           'Caught AuthException in auth_page (Email/Password): ${e.code} - ${e.message}');
 
-      // Special dialogs for common errors based on the code from AuthException
-      if (mounted) {
-        if (e.code == 'user-not-found') {
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Text('Account Not Found'),
-                content: const Text(
-                    'No account found with this email address. Would you like to create a new account?'),
-                actions: [
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.primary,
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Try Again'),
+      // Use captured context after async gap, checking mounted status
+      if (!currentContext.mounted) return;
+      if (e.code == 'user-not-found') {
+        showDialog(
+          context: currentContext, // Use captured context
+          builder: (BuildContext dialogContext) {
+            return AlertDialog(
+              title: const Text('Account Not Found'),
+              content: const Text(
+                  'No account found with this email address. Would you like to create a new account?'),
+              actions: [
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor:
+                        Theme.of(currentContext).colorScheme.primary,
                   ),
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.primary,
-                    ),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      context.go('/profile/register');
-                    },
-                    child: const Text('Create Account'),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Try Again'),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor:
+                        Theme.of(currentContext).colorScheme.primary,
                   ),
-                ],
-              );
-            },
-          );
-        } else if (e.code == 'wrong-password' ||
-            e.code == 'invalid-credential') {
-          // Show SnackBar for incorrect credentials using the message from AuthException
-          _showError(e.message, isError: true);
-          // Optionally show reset password dialog
-          /* ... dialog code ... */
-        } else {
-          // Show generic error SnackBar for other AuthExceptions
-          _showError(e.message, isError: true);
-        }
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    // Use captured context for navigation
+                    GoRouter.of(currentContext).go('/profile/register');
+                  },
+                  child: const Text('Create Account'),
+                ),
+              ],
+            );
+          },
+        );
+      } else if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        // Show SnackBar for incorrect credentials using the message from AuthException
+        // Use captured context for SnackBar
+        SnackBarHelper.showErrorSnackBar(
+            context: currentContext, message: e.message);
+        // Optionally show reset password dialog
+        /* ... dialog code ... */
+      } else {
+        // Show generic error SnackBar for other AuthExceptions
+        // Use captured context for SnackBar
+        SnackBarHelper.showErrorSnackBar(
+            context: currentContext, message: e.message);
       }
     } catch (e) {
       // Handle other non-AuthException errors
       talker.error('Non-AuthException error in auth page (Email/Password): $e');
-      if (mounted) {
-        _showError('An unexpected error occurred. Please try again.',
-            isError: true);
-      }
+      // Use captured context after async gap, checking mounted status
+      if (!currentContext.mounted) return;
+      SnackBarHelper.showErrorSnackBar(
+          context: currentContext,
+          message: 'An unexpected error occurred. Please try again.');
     } finally {
       if (mounted) {
         _setLoading(false);
@@ -155,254 +174,164 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     }
   }
 
+  // *** REVISED Google Sign-In Logic ***
   Future<void> _signInWithGoogle() async {
     _setLoading(true);
+    // Capture context before any async gaps
+    final initialContext = context;
+    final authService = ref.read(authServiceProvider);
+
+    // Set skip flag BEFORE attempting sign-in to prevent auto-anonymous
+    // if this flow is cancelled or fails early.
+    ref.read(skipAutoAuthProvider.notifier).state = true;
+    talker.debug(
+        'Auth page: Set skipAutoAuthProvider=true before Google sign-in attempt.');
 
     try {
-      talker.debug('Auth page: Starting Google Sign-In');
-      final authState = ref.read(authStateProvider);
-      final authService = ref.read(authServiceProvider);
+      talker.debug('Auth page: Attempting direct Google Sign-In...');
+      // Check mounted before await
+      if (!initialContext.mounted) return;
+      await authService.signInWithGoogle();
+      talker.debug('Auth page: Direct Google Sign-In successful');
 
-      // If user is anonymous, try to link the account first
-      if (authState.isAnonymous) {
-        try {
-          talker.debug(
-              'Auth page: Anonymous user linking with Google. Setting skip flag.');
-          // Set flag to prevent auto anonymous sign-in after sign out
-          ref.read(skipAutoAuthProvider.notifier).state = true;
+      // Force refresh the auth state to ensure it's up to date
+      ref.read(forceRefreshAuthProvider.notifier).state = true;
+      talker.debug('Auth page: Forced auth state refresh after Google sign-in');
 
-          talker
-              .debug('Auth page: Calling authService.linkGoogleToAnonymous()');
-          await authService.linkGoogleToAnonymous(context);
-          talker.debug('Auth page: Google linking successful');
-          _navigateToProfile();
-        } catch (linkError) {
-          if (linkError is AuthException) {
-            if (linkError.code == 'not-anonymous') {
-              talker.warning(
-                  'Auth page: Attempted to link Google, but user was not anonymous. Showing account creation dialog.');
-              if (mounted) {
-                showDialog(
-                  context: context,
-                  builder: (BuildContext context) {
-                    return AlertDialog(
-                      title: const Text('Create New Account?'),
-                      content: const Text(
-                          'Would you like to create a new account with your Google credentials?'),
-                      actions: [
-                        TextButton(
-                          style: TextButton.styleFrom(
-                            foregroundColor: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.8),
-                          ),
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
-                        ),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor:
-                                Theme.of(context).colorScheme.primary,
-                            foregroundColor:
-                                Theme.of(context).colorScheme.onPrimary,
-                          ),
-                          onPressed: () async {
-                            Navigator.of(context).pop();
-                            // Try standard Google sign-in to create new account
-                            try {
-                              await authService.signInWithGoogle();
-                              _navigateToProfile();
-                            } catch (signInError) {
-                              if (mounted) {
-                                _showError(
-                                    signInError is AuthException
-                                        ? signInError.message
-                                        : 'Failed to create account with Google',
-                                    isError: true);
-                              }
-                            }
-                          },
-                          child: const Text('Create Account'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              }
-            } else {
-              // Handle other AuthException errors
-              talker.warning(
-                  'Auth page: Google link failed - ${linkError.code}: ${linkError.message}');
-              if (mounted) {
-                _showError(linkError.message, isError: true);
-              }
-            }
-          } else if (linkError is FirebaseAuthException) {
-            talker.error(
-                'FirebaseAuthException during Google link: ${linkError.code}');
-            if (mounted) {
-              _showError(
-                  authService.getReadableAuthError(
-                      linkError.code, linkError.message),
-                  isError: true);
-            }
-          } else {
-            // Rethrow other unexpected errors
-            rethrow;
-          }
-        }
-      } else {
-        // Normal Google sign in for non-anonymous users
-        try {
-          await authService.signInWithGoogle();
-          talker.debug('Auth page: Google Sign-In successful');
-          _navigateToProfile();
-        } catch (e) {
-          if (e is AuthException && e.code == 'not-anonymous') {
-            // Show account creation dialog for non-existing accounts
-            if (mounted) {
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: const Text('Create New Account?'),
-                    content: const Text(
-                        'Would you like to create a new account with your Google credentials?'),
-                    actions: [
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.8),
-                        ),
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Cancel'),
-                      ),
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primary,
-                          foregroundColor:
-                              Theme.of(context).colorScheme.onPrimary,
-                        ),
-                        onPressed: () async {
-                          Navigator.of(context).pop();
-                          try {
-                            await authService.signInWithGoogle();
-                            _navigateToProfile();
-                          } catch (signInError) {
-                            if (mounted) {
-                              _showError(
-                                  signInError is AuthException
-                                      ? signInError.message
-                                      : 'Failed to create account with Google',
-                                  isError: true);
-                            }
-                          }
-                        },
-                        child: const Text('Create Account'),
-                      ),
-                    ],
-                  );
-                },
-              );
-            }
-          } else {
-            if (mounted) {
-              _showError(e is AuthException ? e.message : e.toString(),
-                  isError: true);
-            }
-          }
-        }
+      // Add a delay to allow auth state to update
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Reload current user to ensure auth state is fresh
+      await FirebaseAuth.instance.currentUser?.reload();
+      talker.debug('Auth page: Reloaded Firebase user after Google sign-in');
+
+      // Check mounted after await before navigation
+      if (!initialContext.mounted) return;
+
+      // Get current auth state to add diagnostic info
+      final updatedAuthState = ref.read(authStateProvider);
+      talker.debug(
+          'Auth page: Current auth state before navigation: ${updatedAuthState.status}');
+
+      // Show success feedback
+      if (initialContext.mounted) {
+        SnackBarHelper.showSuccessSnackBar(
+          context: initialContext,
+          message: 'Successfully signed in with Google!',
+        );
       }
-      // Catch AuthException from sign-in attempts (including fallback)
+
+      // Navigate to profile
+      _navigateToProfile();
+
+      // Reset skip flag ONLY after successful sign-in
+      ref.read(skipAutoAuthProvider.notifier).state = false;
+      talker.debug(
+          'Auth page: Reset skipAutoAuthProvider=false after successful Google sign-in.');
     } on AuthException catch (e) {
       talker.error(
-          'Caught AuthException in auth_page (Google): ${e.code} - ${e.message}');
+          'Caught AuthException during direct Google Sign-In: ${e.code} - ${e.message}');
 
-      if (e.code == 'not-anonymous') {
-        // Handle the case where we tried to link but user wasn't anonymous
+      // Check mounted after await before showing dialog/snackbar
+      if (!initialContext.mounted) return;
+
+      // Handle specific errors like account not found -> offer creation
+      if (e.code == 'account-not-found' || // Firebase might throw this
+          e.code == 'google-account-not-found' || // Custom code might be used
+          e.code == 'user-not-found') {
         talker.warning(
-            'Auth page: User not anonymous, showing account creation dialog');
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Text('Create New Account?'),
-                content: const Text(
-                    'Would you like to create a new account with your Google credentials?'),
-                actions: [
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.8),
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
+            'Auth page: Google account not found, showing creation dialog.');
+        showDialog(
+          context: initialContext, // Use captured context
+          builder: (BuildContext dialogContext) {
+            return AlertDialog(
+              title: const Text('Create New Account?'),
+              content: const Text(
+                  'No account found with this Google profile. Would you like to create a new account?'),
+              actions: [
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(initialContext)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.8),
                   ),
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    ),
-                    onPressed: () async {
-                      Navigator.of(context).pop();
-                      // Try standard Google sign-in to create new account
-                      try {
-                        await ref.read(authServiceProvider).signInWithGoogle();
-                        _navigateToProfile();
-                      } catch (signInError) {
-                        if (mounted) {
-                          _showError(
-                              signInError is AuthException
-                                  ? signInError.message
-                                  : 'Failed to create account with Google',
-                              isError: true);
-                        }
-                      }
-                    },
-                    child: const Text('Create Account'),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor:
+                        Theme.of(initialContext).colorScheme.primary,
+                    foregroundColor:
+                        Theme.of(initialContext).colorScheme.onPrimary,
                   ),
-                ],
-              );
-            },
-          );
-        }
+                  onPressed: () async {
+                    // Capture dialog context before async gap
+                    final currentDialogContext = dialogContext;
+                    Navigator.of(currentDialogContext).pop();
+                    // Try standard Google sign-in again, which should now create the account
+                    // (Firebase handles this implicitly if the user doesn't exist)
+                    try {
+                      talker.debug(
+                          'Auth page: Retrying Google sign-in to create account...');
+                      // Ensure skip flag is still true before this attempt
+                      ref.read(skipAutoAuthProvider.notifier).state = true;
+                      // Check mounted before await
+                      if (!mounted) return;
+                      await authService.signInWithGoogle();
+                      talker.debug(
+                          'Auth page: Google Sign-In successful (account created).');
+
+                      // Force refresh, delay, reload
+                      ref.read(forceRefreshAuthProvider.notifier).state = true;
+                      await Future.delayed(const Duration(milliseconds: 500));
+                      await FirebaseAuth.instance.currentUser?.reload();
+
+                      // Check mounted after await before navigation
+                      if (!mounted) return;
+                      _navigateToProfile(); // Uses state's context, safe here
+                      // Reset skip flag after successful creation/sign-in
+                      ref.read(skipAutoAuthProvider.notifier).state = false;
+                    } catch (signInError) {
+                      // Check mounted after await before showing error
+                      if (!mounted) return;
+                      talker.error(
+                          'Auth page: Error during Google account creation retry: $signInError');
+                      _showError(
+                          signInError is AuthException
+                              ? signInError.message
+                              : 'Failed to create account with Google',
+                          isError: true);
+                    }
+                  },
+                  child: const Text('Create Account'),
+                ),
+              ],
+            );
+          },
+        );
       } else {
+        // Handle other AuthExceptions (e.g., cancelled, network error)
         bool isError = e.code != 'cancelled' && e.code != 'sign-in-cancelled';
-        if (mounted) {
-          _showError(e.message, isError: isError);
-        }
+        _showError(e.message, isError: isError);
       }
     } catch (e) {
       // Catch any other unexpected errors
-      String errorMessage = 'Failed to sign in with Google';
-      bool isError = true;
-
-      // Check if it's a cancellation message string (less reliable)
-      if (e.toString().contains('sign in was cancelled')) {
-        errorMessage =
-            'Sign-in was cancelled. You can try again when you\'re ready.';
-        isError = false;
-      } else {
-        errorMessage = e.toString();
-        talker.error('Non-AuthException Google sign-in error: $e');
-      }
-
-      if (mounted) {
-        _showError(errorMessage, isError: isError);
+      talker.error('Non-AuthException during direct Google Sign-In: $e');
+      if (initialContext.mounted) {
+        _showError('An unexpected error occurred: ${e.toString()}',
+            isError: true);
       }
     } finally {
+      // Ensure loading indicator is turned off if mounted
       if (mounted) {
         _setLoading(false);
       }
+      // DO NOT reset skip flag here, only on success.
     }
   }
+  // *** END REVISED Google Sign-In Logic ***
 
   @override
   Widget build(BuildContext context) {
@@ -459,7 +388,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'You have two options:',
+                              'You are currently signed in as a guest.', // Simplified message
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -468,15 +397,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              '1. Link this anonymous account to preserve your current data',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '2. Sign in with an existing account (will replace anonymous data)',
+                              'Sign in with Email/Password or Google to save your data permanently.', // Clearer call to action
                               style: TextStyle(
                                 fontSize: 16,
                                 color: colorScheme.onPrimaryContainer,
@@ -484,7 +405,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Note: Anonymous accounts are deleted after 30 days of inactivity.',
+                              'Note: Guest data is temporary and may be lost.', // Simplified warning
                               style: TextStyle(
                                 fontSize: 14,
                                 fontStyle: FontStyle.italic,
@@ -552,9 +473,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           Center(
                             child: StyledButton(
                               onPressed: _signInWithEmailAndPassword,
-                              text: isAnonymous
-                                  ? 'Sign In'
-                                  : 'Sign In', // Keep label simple
+                              text: 'Sign In with Email', // More specific
                             ),
                           ),
                         ],
@@ -567,30 +486,13 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                         await _signInWithGoogle();
                       },
                       onError: (e) {
-                        talker.error('Google Sign-In error: $e');
-
-                        // Show a user-friendly error message
-                        String errorMessage = 'Failed to sign in with Google';
-                        bool isError = true;
-
-                        // Catch AuthException first
-                        if (e is AuthException) {
-                          errorMessage = e.message;
-                          isError = e.code != 'cancelled' &&
-                              e.code != 'sign-in-cancelled';
-                        }
-                        // Fallback for other types or string messages
-                        else if (e
-                            .toString()
-                            .contains('sign in was cancelled')) {
-                          errorMessage = 'Google sign-in was cancelled';
-                          isError = false;
-                        } else {
-                          errorMessage = e.toString();
-                        }
-
+                        talker.error('Google Sign-In button onError: $e');
+                        // This onError is primarily for the button's internal state,
+                        // main error handling is in _signInWithGoogle now.
+                        // We can still show a generic message here if needed.
                         if (mounted) {
-                          _showError(errorMessage, isError: isError);
+                          _showError('An error occurred during Google Sign-In.',
+                              isError: true);
                         }
                       },
                       text: 'Continue with Google',
