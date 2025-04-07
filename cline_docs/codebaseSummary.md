@@ -2,6 +2,15 @@
 
 ## Recent Changes
 
+### Fix Email Verification Status Update After Linking (Current Session)
+
+- **Context:** After linking Email/Password to Google and verifying the email, the UI state didn't update to show the verified status because the `EmailVerificationChecker` wasn't running when the `AuthState` was `authenticated` (due to Google), even if the linked email was unverified.
+- **Changes:**
+  - Modified the listener logic in `emailVerificationCheckerProvider` (`lib/core/providers/email_verification_checker.dart`).
+  - The checker now starts polling if the `AuthState` is `emailNotVerified` OR if it's `authenticated` and the `user.emailVerified` flag is false.
+  - Updated the initial check logic in the provider to match this condition.
+- **Status:** Completed. Testing needed.
+
 ### Display Pending Email Update (Current Session)
 
 - **Context:** Improve user feedback after initiating an email change by showing the pending email address in Account Settings.

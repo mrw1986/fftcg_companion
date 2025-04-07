@@ -487,6 +487,23 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               duration: const Duration(seconds: 5),
             );
           }
+        } on RequiresManualLinkException catch (e, st) {
+          // --- NEW: Handle specific manual link exception ---
+          talker.warning(
+              'Register page: RequiresManualLinkException caught during non-anonymous sign-in.',
+              e,
+              st);
+          if (mounted) {
+            if (!currentContext.mounted) return; // Add mounted check
+            SnackBarHelper.showErrorSnackBar(
+              context: currentContext,
+              message: e.message, // Use the specific message from the exception
+              duration: const Duration(seconds: 10), // Longer duration for this
+            );
+            // Optionally, store e.credential if needed for immediate linking UI,
+            // but the current plan is to guide user to settings after regular sign-in.
+          }
+          // --- End NEW ---
         } catch (signInError) {
           if (!mounted) return;
 

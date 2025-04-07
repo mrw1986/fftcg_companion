@@ -37,6 +37,22 @@ class AuthException implements Exception {
   String toString() => message; // User-facing message
 }
 
+/// Custom exception indicating manual linking is required after an email change/unlink scenario.
+class RequiresManualLinkException extends AuthException {
+  final AuthCredential credential; // The credential that needs linking
+
+  RequiresManualLinkException({
+    required this.credential,
+    required super.message, // Use super parameter
+    super.originalException, // Use super parameter
+  }) : super(
+          code: 'requires-manual-link',
+          // message: message, // Handled by super
+          category: AuthErrorCategory.conflict, // Treat as a conflict
+          // originalException: originalException, // Handled by super
+        );
+}
+
 /// Service for handling Firebase Authentication operations, rebuilt for simplicity.
 class AuthService {
   final FirebaseAuth _auth;
@@ -176,17 +192,49 @@ class AuthService {
       // Reload to ensure latest state is fetched
       // Firestore update will be handled by the authStateChanges listener
       await userCredential.user?.reload();
+
+      // **NEW:** Check for the specific email change/unlink/re-signin scenario
+      final firebaseUser = userCredential.user;
+      final isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
+
+      if (isNewUser &&
+          firebaseUser != null &&
+          firebaseUser.email != googleUser.email) {
+        // Scenario detected: A new user was created, but their primary email
+        // doesn't match the Google email they just signed in with. This indicates
+        // the Google email likely belonged to an existing account that had its
+        // primary email changed before this Google provider was unlinked.
+        talker.warning(
+            'Detected potential email change/unlink conflict. New user UID: ${firebaseUser.uid}, New user email: ${firebaseUser.email}, Google email: ${googleUser.email}. Requires manual linking.');
+
+        // Sign out the newly created incorrect user immediately
+        await signOut(isInternalAuthFlow: true);
+
+        // Throw custom exception for UI to handle
+        throw RequiresManualLinkException(
+          credential: credential, // Pass the credential needed for linking
+          message:
+              'It looks like you previously used this Google account (${googleUser.email}) with a different primary email. Please sign in using your current primary method first, then link this Google account from your Account Settings.',
+        );
+      }
+
+      // If not the specific scenario, return the credential as normal
       return userCredential;
     } catch (e) {
-      // Handle potential conflict where Google email matches existing Email/Password account
+      // If it's our custom exception, rethrow it directly
+      if (e is RequiresManualLinkException) {
+        rethrow;
+      }
+
+      // Keep existing handling for other specific errors if the "Link accounts..." setting were disabled
       if (e is FirebaseAuthException) {
         if (e.code == 'account-exists-with-different-credential' ||
             e.code == 'email-already-in-use') {
           talker.warning(
-              'Google sign-in conflict: Email exists with different credential. $e');
-          // Sign out from Google to allow potential linking later if needed
-          await _googleSignIn.signOut();
-          // Rethrow a specific error for the UI to handle
+              'Google sign-in conflict (standard): Email exists with different credential. $e');
+          await _googleSignIn.signOut().catchError((_) {
+            return null;
+          }); // Best effort sign out, return null
           throw AuthException(
             code: e.code,
             message:
@@ -194,22 +242,35 @@ class AuthService {
             category: AuthErrorCategory.conflict,
             originalException: e,
           );
-        } else if (e.code == 'user-not-found') {
+        }
+        // Note: 'user-not-found' shouldn't typically happen with Google Sign-In as it creates users,
+        // but keep the check just in case.
+        else if (e.code == 'user-not-found') {
           talker.warning(
-              'Google sign-in failed: No account exists for this Google email.');
-          // Sign out from Google since sign-in failed
-          await _googleSignIn.signOut();
-          // Use a more specific error code for non-existent Google accounts
+              'Google sign-in failed: Firebase reported user-not-found (unexpected). $e');
+          await _googleSignIn.signOut().catchError((_) {
+            return null;
+          }); // Best effort sign out, return null
           throw AuthException(
-            code: 'google-account-not-found',
+            code: 'google-account-not-found', // Keep custom code
             message: 'No account exists for this Google account.',
             category: AuthErrorCategory.authentication,
             originalException: e,
           );
         }
       }
+
+      // Handle cancellations and other errors
       talker.error('Google sign-in failed: $e');
-      throw _handleAuthException(e);
+      // Ensure Google sign out happens on failure, except for our manual link case or cancellation
+      if (e is! AuthException || e.category != AuthErrorCategory.cancelled) {
+        await _googleSignIn.signOut().catchError((signOutError) {
+          talker.error(
+              'Error signing out from Google after sign-in failure: $signOutError');
+          return null; // Added return null
+        });
+      }
+      throw _handleAuthException(e); // Handle other errors generically
     }
   }
 

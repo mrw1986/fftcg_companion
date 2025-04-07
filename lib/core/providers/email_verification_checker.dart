@@ -48,24 +48,47 @@ final emailVerificationCheckerProvider = Provider.autoDispose<void>((ref) {
   // Listen to auth state changes with explicit types
   ref.listen<AuthState>(authStateProvider,
       (AuthState? previous, AuthState next) {
-    // Start checking only if the specific state is emailNotVerified
-    // Added explicit null check for 'next'
-    if (next.status == AuthStatus.emailNotVerified) {
-      // Check if the previous state was also emailNotVerified to avoid restarting unnecessarily
-      // Type annotation for 'previous' should help analyzer here
-      if (previous?.status != AuthStatus.emailNotVerified) {
+    // Start checking if the state is emailNotVerified OR
+    // if the state is authenticated but the user's email isn't verified yet
+    // (covers linking unverified email to existing authenticated account)
+    bool shouldStartChecking = next.status == AuthStatus.emailNotVerified ||
+        (next.status == AuthStatus.authenticated &&
+            !(next.user?.emailVerified ?? true));
+
+    // Check if the condition to start checking wasn't met previously
+    bool wasCheckingPreviously =
+        previous?.status == AuthStatus.emailNotVerified ||
+            (previous?.status == AuthStatus.authenticated &&
+                !(previous?.user?.emailVerified ?? true));
+
+    if (shouldStartChecking) {
+      // Start only if we weren't already in a state that required checking
+      if (!wasCheckingPreviously) {
+        talker
+            .debug('EmailVerificationChecker: Condition met, starting check.');
         startVerificationCheck();
+      } else {
+        talker.debug(
+            'EmailVerificationChecker: Condition still met, check likely already running.');
       }
     } else {
-      // Stop checking if the state is anything else
-      stopVerificationCheck();
+      // Stop checking if the condition is no longer met
+      if (wasCheckingPreviously) {
+        talker.debug(
+            'EmailVerificationChecker: Condition no longer met, stopping check.');
+        stopVerificationCheck();
+      }
     }
   });
 
   // Initial check in case the provider initializes when already in the target state
   final initialAuthState = ref.read(authStateProvider);
-  // Added null check for initialAuthState as well, though read should provide non-null
-  if (initialAuthState.status == AuthStatus.emailNotVerified) {
+  // Added null check for initialAuthState and check for authenticated but unverified email
+  if (initialAuthState.status == AuthStatus.emailNotVerified ||
+      (initialAuthState.status == AuthStatus.authenticated &&
+          !(initialAuthState.user?.emailVerified ?? true))) {
+    talker.debug(
+        'EmailVerificationChecker: Initial state requires check, starting.');
     startVerificationCheck();
   }
 

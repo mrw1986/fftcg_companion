@@ -67,39 +67,101 @@ final firestoreUserSyncProvider = Provider<void>((ref) {
 
     // --- Logic to sync Firestore document ---
     if (nextUser != null) {
-      // Determine if a sync is needed based on relevant user data changes
-      bool shouldSync = previousUser ==
-              null || // Always sync if it's the first non-null user
-          previousUser.uid !=
-              nextUser.uid || // Should not happen, but safe check
-          previousUser.email != nextUser.email ||
-          previousUser.displayName != nextUser.displayName ||
-          previousUser.photoURL != nextUser.photoURL ||
-          previousUser.emailVerified !=
-              nextUser.emailVerified; // Sync when verification status changes
+      // *** NEW: Verify token validity before proceeding ***
+      try {
+        talker.debug(
+            'firestoreUserSyncProvider: Verifying token validity for ${nextUser.uid}');
+        await nextUser.getIdToken(true); // Force refresh
+        talker.debug(
+            'firestoreUserSyncProvider: Token is valid for ${nextUser.uid}');
 
-      if (shouldSync) {
-        talker.debug(
-            'FirestoreUserSync: Detected relevant user change: ${nextUser.uid}, Email: ${nextUser.email}, Verified: ${nextUser.emailVerified}');
-        try {
-          final userRepository =
-              ref.read(userRepositoryProvider); // Read the new provider
-          await userRepository.createUserFromAuth(nextUser);
+        // --- Existing Firestore Sync Logic (Moved inside try block) ---
+        // Determine if a sync is needed based on relevant user data changes
+        bool shouldSync = previousUser ==
+                null || // Always sync if it's the first non-null user
+            previousUser.uid !=
+                nextUser.uid || // Should not happen, but safe check
+            previousUser.email != nextUser.email ||
+            previousUser.displayName != nextUser.displayName ||
+            previousUser.photoURL != nextUser.photoURL ||
+            previousUser.emailVerified != nextUser.emailVerified;
+
+        // *** ADDED LOGGING ***
+        if (previousUser != null &&
+            previousUser.emailVerified != nextUser.emailVerified) {
           talker.debug(
-              'FirestoreUserSync: Successfully synced user ${nextUser.uid} to Firestore.');
-          // Verify and correct collection count after ensuring user doc exists
-          await userRepository.verifyAndCorrectCollectionCount(nextUser.uid);
-        } catch (e, s) {
-          talker.error(
-              'FirestoreUserSync: Error syncing user ${nextUser.uid} to Firestore',
-              e,
-              s);
-          // Decide if error needs propagation or just logging
+              'FirestoreUserSync: emailVerified changed from ${previousUser.emailVerified} to ${nextUser.emailVerified}');
         }
-      } else {
-        talker.debug(
-            'FirestoreUserSync: User stream emitted, but no relevant data changed for UID: ${nextUser.uid}. Skipping Firestore sync.');
+        // *** END LOGGING ***
+
+        if (shouldSync) {
+          // *** ADDED LOGGING ***
+          talker.debug(
+              'FirestoreUserSync: shouldSync is TRUE. User: ${nextUser.uid}, Email: ${nextUser.email}, Verified: ${nextUser.emailVerified}, PrevVerified: ${previousUser?.emailVerified}');
+          // *** END LOGGING ***
+          try {
+            final userRepository =
+                ref.read(userRepositoryProvider); // Read the new provider
+            await userRepository.createUserFromAuth(nextUser);
+            talker.debug(
+                'FirestoreUserSync: Successfully synced user ${nextUser.uid} to Firestore.');
+            // Verify and correct collection count after ensuring user doc exists
+            await userRepository.verifyAndCorrectCollectionCount(nextUser.uid);
+          } catch (e, s) {
+            talker.error(
+                'FirestoreUserSync: Error syncing user ${nextUser.uid} to Firestore',
+                e,
+                s);
+            // Decide if error needs propagation or just logging
+          }
+        } else {
+          talker.debug(
+              'FirestoreUserSync: User stream emitted, but no relevant data changed for UID: ${nextUser.uid}. Skipping Firestore sync.');
+        }
+        // --- End of Existing Firestore Sync Logic ---
+
+        // --- Existing Pending Email Clear Logic (Moved inside try block) ---
+        final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+        if (pendingEmail != null && nextUser.email == pendingEmail) {
+          talker.debug(
+              'FirestoreUserSync: Detected user email (${nextUser.email}) matches pending email ($pendingEmail). Clearing pending state.');
+          // Use read().notifier as we are in a callback
+          ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+        }
+        // --- End of Existing Pending Email Clear Logic ---
+      } on FirebaseAuthException catch (e) {
+        talker.warning(
+            'firestoreUserSyncProvider: Token refresh failed for ${nextUser.uid}',
+            e);
+        // Check for specific error codes indicating the user is invalid
+        if (e.code == 'user-not-found' ||
+            e.code == 'user-disabled' ||
+            e.code == 'invalid-user-token') {
+          talker.warning(
+              'firestoreUserSyncProvider: User ${nextUser.uid} is invalid on backend. Forcing sign out.');
+          try {
+            // Use read to get AuthService instance within the listener
+            final authService = ref.read(authServiceProvider);
+            // Sign out locally, marking it as internal to prevent dialog loops etc.
+            await authService.signOut(isInternalAuthFlow: true);
+          } catch (signOutError) {
+            talker.error(
+                'firestoreUserSyncProvider: Error during forced sign out after invalid token',
+                signOutError);
+          }
+        }
+        // Do not proceed with Firestore sync or other logic if token is invalid
+        return; // Exit the listener callback for this user emission
+      } catch (e, s) {
+        talker.error(
+            'firestoreUserSyncProvider: Unexpected error during token refresh for ${nextUser.uid}',
+            e,
+            s);
+        // Optional: Decide if other errors should also trigger sign-out or just be logged.
+        // For now, we only force sign-out on specific FirebaseAuthExceptions.
+        // Allow sync logic to proceed/fail for other errors (e.g., network issues).
       }
+      // *** End of NEW token verification logic ***
 
       // --- **NEW:** Logic to clear pending email state ---
       final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
@@ -221,24 +283,20 @@ final authStateProvider = Provider<AuthState>((ref) {
         bool hasGoogleProvider = user.providerData
             .any((userInfo) => userInfo.providerId == 'google.com');
 
-        // If user has an unverified email/password but also has Google,
-        // keep them authenticated but set emailNotVerified flag
-        if (hasPasswordProvider && !user.emailVerified) {
-          if (hasGoogleProvider) {
-            // User has Google auth, so keep them authenticated but mark email as unverified
-            talker.debug('Auth state: authenticated (with unverified email)');
-            // Don't reset the flag here, let the checker manage it
-            return AuthState.authenticated(user);
-          } else {
-            // Only has unverified email/password, show unverified state
-            talker.debug('Auth state: email not verified');
-            // Don't reset the flag here, let the checker manage it
-            return AuthState.emailNotVerified(user);
-          }
+        // *** ADDED LOGGING ***
+        talker.debug(
+            'authStateProvider: Checking user state. hasPassword: $hasPasswordProvider, hasGoogle: $hasGoogleProvider, emailVerified: ${user.emailVerified}');
+        // *** END LOGGING ***
+
+        // If user has ONLY an unverified email/password provider, return emailNotVerified state
+        if (hasPasswordProvider && !user.emailVerified && !hasGoogleProvider) {
+          talker.debug('authStateProvider: Returning emailNotVerified');
+          return AuthState.emailNotVerified(user);
         }
+        // Otherwise (user is verified OR has Google provider), return authenticated state
 
         // User either has no email/password or it's verified
-        talker.debug('Auth state: authenticated');
+        talker.debug('authStateProvider: Returning authenticated (verified)');
         // Resetting is handled by firestoreUserSyncProvider listener
         return AuthState.authenticated(user);
       }
@@ -306,10 +364,9 @@ class AuthState {
   // Removed const keyword as initializers are not constant
   AuthState.authenticated(this.user)
       : status = AuthStatus.authenticated,
-        // Always check for unverified email/password, even in authenticated state
-        emailNotVerified =
-            user?.providerData.any((p) => p.providerId == 'password') == true &&
-                !(user?.emailVerified ?? true),
+        // Authenticated state should always have emailNotVerified as false.
+        // The distinction is handled by the AuthStatus enum itself.
+        emailNotVerified = false,
         errorMessage = null;
 
   AuthState.emailNotVerified(this.user)

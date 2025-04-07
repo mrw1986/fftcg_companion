@@ -1,38 +1,26 @@
 # Current Task
 
-## Current Objective: Display Pending Email Update in Account Settings
+## Current Objective: Fix Email Verification Status Update After Linking (Attempt 2)
 
 ### Context
 
-- When a user initiates an email address change, a verification email is sent to the new address.
-- Previously, there was no immediate visual feedback in the Account Settings page indicating that an email change was pending verification.
-- The goal is to display the new, unverified email address prominently after the verification email is sent, improving user feedback.
+- After linking Email/Password to Google and verifying the email, the UI state still didn't update correctly.
+- Previous fix adjusted the `EmailVerificationChecker` trigger, but the issue persisted.
+- Further analysis suggested the `authStateProvider` might be incorrectly calculating the state or the `AuthState` constructor might be setting the internal `emailNotVerified` flag incorrectly even when the overall status should be `authenticated`.
 
 ### Actions Taken
 
-1. **Created Provider:** Added `EmailUpdateState` and `EmailUpdateNotifier` (`emailUpdateNotifierProvider`) in `lib/features/profile/presentation/providers/email_update_provider.dart` to manage the pending email address state. Ran build runner.
-2. **Updated Account Settings Page:**
-    - Modified `_updateEmail` in `account_settings_page.dart` to call `ref.read(emailUpdateNotifierProvider.notifier).setPendingEmail(newEmail)` upon successfully initiating the email verification process.
-    - Modified `_signOutWithoutConfirmation` and `_handleSuccessfulDeletion` to call `ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail()` to clear the state on sign-out or deletion.
-    - Watched `emailUpdateNotifierProvider` in the `build` method.
-    - Passed the `pendingEmail` state to the `AccountInfoCard` widget.
-3. **Updated Account Info Card:**
-    - Added an optional `pendingEmail` parameter to `AccountInfoCard` (`lib/features/profile/presentation/widgets/account_info_card.dart`).
-    - Added UI logic to display the `pendingEmail` using a `ListTile` with an `Icon` and a styled `Chip` when `pendingEmail` is not null.
-4. **Updated Auth Provider Listener:**
-    - Modified the listener within `firestoreUserSyncProvider` in `lib/core/providers/auth_provider.dart`.
-    - Added logic to check if the `nextUser.email` matches the `pendingEmail` read from `emailUpdateNotifierProvider`.
-    - If they match, it calls `ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail()` to clear the state automatically once the email change is confirmed in Firebase Auth.
-    - Added logic to clear the pending email state on sign-out or auth stream errors as well.
+1. **Modified `authStateProvider` Logic:** Updated the state calculation logic in `lib/core/providers/auth_provider.dart`. It now returns `AuthStatus.emailNotVerified` *only* if the user has *only* an unverified email/password provider. Otherwise (if email is verified OR Google is linked), it returns `AuthStatus.authenticated`.
+2. **Modified `AuthState` Constructor:** Simplified the `AuthState.authenticated` constructor to always set its internal `emailNotVerified` flag to `false`. The distinction between verified/unverified is now solely handled by the `AuthStatus` enum returned by `authStateProvider`.
 
 ### Status
 
-- Completed. The Account Settings page now displays the pending email address with an "Unverified" chip after initiating an email change. The pending state is cleared automatically upon successful verification, sign-out, or auth error.
+- Completed. This change should ensure the correct `AuthState` (with `emailNotVerified: false`) is emitted once the underlying `User` object reports `emailVerified: true`.
 
 ### Next Steps
 
 - Update `codebaseSummary.md` to reflect these changes.
-- Test the email update flow thoroughly for users with only email/password and users with linked providers (e.g., Google).
+- Request user testing for the scenario: Link Email/Pass to Google -> Verify Email -> Check if UI updates correctly.
 
 ## Previous Objectives (Completed)
 

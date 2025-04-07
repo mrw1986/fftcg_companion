@@ -313,6 +313,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         talker.debug('Login page: Google Sign-In successful');
         // _navigateToProfile(); // Rely on router redirect via authStateProvider
       }
+    } on RequiresManualLinkException catch (e, st) {
+      // --- NEW: Handle specific manual link exception ---
+      talker.warning('Login page: RequiresManualLinkException caught.', e, st);
+      if (mounted) {
+        _showError(e.message, isError: true); // Show the specific message
+        // Optionally, store e.credential if needed for immediate linking UI,
+        // but the current plan is to guide user to settings after regular sign-in.
+      }
+      // --- End NEW ---
     } catch (e) {
       String errorMessage = 'Failed to sign in with Google';
       bool isError = true;
@@ -334,8 +343,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             'Sign-in was cancelled. You can try again when you\'re ready.';
         isError = false;
       } else {
-        errorMessage = e.toString();
-        talker.error('Non-Firebase Google sign-in error: $e');
+        // Check if it's an AuthException (could be from linking)
+        if (e is AuthException) {
+          errorMessage = e.message;
+          isError = e.category != AuthErrorCategory.cancelled;
+          talker.error(
+              'AuthException during Google Sign-In/Link: ${e.code} - ${e.message}');
+        } else {
+          errorMessage = e.toString();
+          talker.error('Non-Firebase Google sign-in error: $e');
+        }
       }
 
       _showError(errorMessage, isError: isError);
