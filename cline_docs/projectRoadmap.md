@@ -128,19 +128,24 @@
 
 ### Recently Completed Tasks
 
-1. **Analysis Errors & Provider Refactoring (Current Session)**
+1. **Auth Flow Fixes & Analysis Errors (Current Session)**
+    - Resolved various analysis errors (`unused_element`, `unused_local_variable`, `use_build_context_synchronously`, dead code) across `app_router.dart`, `register_page.dart`, `account_settings_page.dart`, `auth_service.dart`.
+    - Fixed `use_build_context_synchronously` warnings by ensuring `BuildContext` is handled correctly across `await` gaps (using context capturing and `mounted` checks).
+    - Resolved `ref` access issue after `await` in `auth_page.dart`.
+    - Refactored `linkGoogleToAnonymous` merge conflict logic to UI layer (`register_page.dart`, `login_page.dart`).
+
+2. **Analysis Errors & Provider Refactoring (Previous Session)**
     - Addressed multiple analysis errors (`unused_import`, `invalid_use_of_protected_member`, `deprecated_member_use`, `use_super_parameters`, `unused_local_variable`).
     - Refactored `cardSearchQueryProvider`, `collectionSpecificFilterProvider`, and `collectionSearchQueryProvider` from `StateProvider` to `NotifierProvider` to correctly handle state persistence and side effects (fixing `listenSelf` deprecation).
     - Updated UI components to interact correctly with the refactored `NotifierProvider`s using their methods.
-
-2. **Collection Management Fixes & Enhancements (Objective 50)**
+3. **Collection Management Fixes & Enhancements (Objective 50)**
     - Fixed Firestore `PERMISSION_DENIED` errors when adding/updating collection items by correcting `CollectionItem.toMap()` serialization (`cardId` type, `null` map handling).
     - Implemented robust `collectionCount` tracking in `UserRepository` using Firestore transactions and added a verification/correction mechanism triggered on auth sync.
     - Implemented automatic deletion of collection items when both regular and foil quantities are updated to zero (`CollectionRepository`).
     - Added `TextField` for direct quantity input on the collection edit page.
     - Fixed capitalization of "Regular"/"Foil" labels in the grading section of the collection item detail page.
 
-3. **Fixed Account Limits Dialog Issue After Google Sign-In (Objective 31)**
+4. **Fixed Account Limits Dialog Issue After Google Sign-In (Objective 31)**
     - Prevented the Account Limits dialog from appearing after cancelling Google sign-in or linking:
         - Modified the auto-sign-in logic in `auto_auth_provider.dart` to pass `isInternalAuthFlow=true` when creating temporary anonymous users.
         - This ensures the dialog timestamp isn't reset during internal auth flows like Google sign-in.
@@ -177,19 +182,24 @@
 
 ### Recently Completed
 
-1. **Analysis Errors & Provider Refactoring (Current Session)**
+1. **Auth Flow Fixes & Analysis Errors (Current Session)**
+    - Resolved various analysis errors (`unused_element`, `unused_local_variable`, `use_build_context_synchronously`, dead code) across `app_router.dart`, `register_page.dart`, `account_settings_page.dart`, `auth_service.dart`.
+    - Fixed `use_build_context_synchronously` warnings by ensuring `BuildContext` is handled correctly across `await` gaps (using context capturing and `mounted` checks).
+    - Resolved `ref` access issue after `await` in `auth_page.dart`.
+    - Refactored `linkGoogleToAnonymous` merge conflict logic to UI layer (`register_page.dart`, `login_page.dart`).
+
+2. **Analysis Errors & Provider Refactoring (Previous Session)**
     - Addressed multiple analysis errors (`unused_import`, `invalid_use_of_protected_member`, `deprecated_member_use`, `use_super_parameters`, `unused_local_variable`).
     - Refactored `cardSearchQueryProvider`, `collectionSpecificFilterProvider`, and `collectionSearchQueryProvider` from `StateProvider` to `NotifierProvider` to correctly handle state persistence and side effects (fixing `listenSelf` deprecation).
     - Updated UI components to interact correctly with the refactored `NotifierProvider`s using their methods.
-
-2. **Collection Management Fixes & Enhancements (Objective 50)**
+3. **Collection Management Fixes & Enhancements (Objective 50)**
     - Fixed Firestore permission errors during add/update.
     - Implemented transactional `collectionCount` updates and verification.
     - Implemented delete-on-zero-quantity logic.
     - Added quantity text input UI.
     - Fixed grading label capitalization UI.
 
-3. **Fixed Google Authentication Display Name Issue (Objective 30)**
+4. **Fixed Google Authentication Display Name Issue (Objective 30)**
     - Fixed issue where Google display name wasn't storing in Firestore:
         - Added code to extract display name directly from Google provider data
         - Updated logic to prioritize Google provider display name
@@ -201,7 +211,7 @@
     - **Remaining Issue:**
         - Account Limits dialog appears after Google sign-in (separate concern - Fixed in Obj 31)
 
-4. **Data Migration and Firestore Rules Updates (Objective 27)**
+5. **Data Migration and Firestore Rules Updates (Objective 27)**
     - Updated Firestore rules to handle migrations:
         - Added special case for collection updates during migration
         - Added permission for initial user document creation
@@ -216,7 +226,7 @@
         - Need to verify and fix Firestore rules for all migration scenarios **(Partially addressed in Obj 50)**
         - Ensure proper user document creation timing
 
-5. **Fixed Email Update Flow and UI Updates (Objective 26)**
+6. **Fixed Email Update Flow and UI Updates (Objective 26)**
     - Fixed UI not updating after linking Google authentication:
         - Added explicit provider invalidation after successful Google linking
         - Ensured UI immediately reflects newly linked authentication methods

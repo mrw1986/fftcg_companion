@@ -28,7 +28,17 @@ import 'package:fftcg_companion/shared/widgets/app_bar_factory.dart';
 final rootNavigatorKeyProvider = Provider<GlobalKey<NavigatorState>>((ref) {
   return GlobalKey<NavigatorState>(debugLabel: 'root');
 });
-final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
+// Define navigator keys for each branch of the StatefulShellRoute
+final _shellNavigatorKeyCards =
+    GlobalKey<NavigatorState>(debugLabel: 'shellCards');
+final _shellNavigatorKeyCollection =
+    GlobalKey<NavigatorState>(debugLabel: 'shellCollection');
+final _shellNavigatorKeyDecks =
+    GlobalKey<NavigatorState>(debugLabel: 'shellDecks');
+final _shellNavigatorKeyScanner =
+    GlobalKey<NavigatorState>(debugLabel: 'shellScanner');
+final _shellNavigatorKeyProfile =
+    GlobalKey<NavigatorState>(debugLabel: 'shellProfile');
 
 // Provider for the GoRouter instance
 final routerProvider = Provider<GoRouter>((ref) {
@@ -86,6 +96,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         talker.debug(
             'Router Redirect: Authenticated/EmailNotVerified on public auth route -> /profile/account');
         // Redirect to account settings page (still inside the shell)
+        // Note: The target path '/profile/account' must exist within one of the StatefulShellRoute branches.
         return '/profile/account';
       }
 
@@ -96,108 +107,140 @@ final routerProvider = Provider<GoRouter>((ref) {
     // Add error handler
     errorBuilder: (context, state) => ErrorPage(error: state.error),
     routes: [
-      // ShellRoute for main app navigation with bottom bar
-      ShellRoute(
-        navigatorKey: _shellNavigatorKey,
-        builder: (context, state, child) {
-          // Pass child without explicit key
-          return ScaffoldWithNavBar(child: child);
+      // StatefulShellRoute for main app navigation with bottom bar
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          // Pass the navigationShell to the ScaffoldWithNavBar
+          return ScaffoldWithNavBar(navigationShell: navigationShell);
         },
-        routes: [
-          GoRoute(
-            path: '/',
-            builder: (context, state) => const CardsPage(),
-          ),
-          GoRoute(
-            path: '/collection',
-            builder: (context, state) => const CollectionPage(),
+        branches: [
+          // Branch 1: Cards Tab
+          StatefulShellBranch(
+            navigatorKey: _shellNavigatorKeyCards,
             routes: [
               GoRoute(
-                path: 'add',
-                builder: (context, state) {
-                  final cardId = state.uri.queryParameters['cardId'] ?? '';
-                  final startWithSearch =
-                      state.uri.queryParameters['search'] == 'true';
-                  return CollectionEditPage(
-                    cardId: cardId.isNotEmpty ? cardId : null,
-                    startWithSearch: startWithSearch,
-                  );
-                },
-              ),
-              GoRoute(
-                path: 'edit/:cardId',
-                builder: (context, state) {
-                  final cardId = state.pathParameters['cardId'] ?? '';
-                  final item = state.extra as CollectionItem?;
-                  return CollectionEditPage(
-                    cardId: cardId,
-                    existingItem: item,
-                  );
-                },
-              ),
-              GoRoute(
-                path: ':cardId',
-                builder: (context, state) {
-                  final cardId = state.pathParameters['cardId'] ?? '';
-                  final item = state.extra as CollectionItem?;
-                  return CollectionItemDetailPage(
-                    cardId: cardId,
-                    initialItem: item,
-                  );
-                },
-              ),
-            ],
-          ),
-          GoRoute(
-            path: '/decks',
-            builder: (context, state) => const Scaffold(
-              body: Center(child: Text('Decks Screen')),
-            ),
-          ),
-          GoRoute(
-            path: '/scanner',
-            builder: (context, state) => const Scaffold(
-              body: Center(child: Text('Scanner Screen')),
-            ),
-          ),
-          GoRoute(
-            path: '/cards',
-            builder: (context, state) => const CardsPage(),
-            routes: [
-              GoRoute(
-                path: ':id',
-                builder: (context, state) {
-                  final card = state.extra as models.Card;
-                  return CardDetailsPage(initialCard: card);
-                },
-              ),
-            ],
-          ),
-          GoRoute(
-            path: '/profile', // Profile root remains in shell
-            builder: (context, state) => const ProfilePage(),
-            routes: [
-              // Sub-routes that SHOULD be within the shell
-              GoRoute(
-                path: 'theme',
-                builder: (context, state) => const ThemeSettingsPage(),
-              ),
-              GoRoute(
-                path: 'account',
-                builder: (context, state) => const AccountSettingsPage(),
-              ),
-              GoRoute(
-                path: 'logs',
-                builder: (context, state) => TalkerScreen(
-                  talker: talker,
-                  theme: const TalkerScreenTheme(
-                    backgroundColor: Color(0xFF2D2D2D),
-                    textColor: Colors.white,
-                    cardColor: Color(0xFF1E1E1E),
+                path: '/', // Root path for the first tab
+                builder: (context, state) => const CardsPage(),
+                routes: [
+                  GoRoute(
+                    path: 'cards/:id', // Nested route within Cards tab
+                    builder: (context, state) {
+                      final card = state.extra as models.Card;
+                      return CardDetailsPage(initialCard: card);
+                    },
                   ),
+                ],
+              ),
+            ],
+          ),
+          // Branch 2: Collection Tab
+          StatefulShellBranch(
+            navigatorKey: _shellNavigatorKeyCollection,
+            routes: [
+              GoRoute(
+                path: '/collection',
+                builder: (context, state) => const CollectionPage(),
+                routes: [
+                  GoRoute(
+                    path: 'add',
+                    builder: (context, state) {
+                      final cardId = state.uri.queryParameters['cardId'] ?? '';
+                      final startWithSearch =
+                          state.uri.queryParameters['search'] == 'true';
+                      return CollectionEditPage(
+                        cardId: cardId.isNotEmpty ? cardId : null,
+                        startWithSearch: startWithSearch,
+                      );
+                    },
+                  ),
+                  GoRoute(
+                    path: 'edit/:cardId',
+                    builder: (context, state) {
+                      final cardId = state.pathParameters['cardId'] ?? '';
+                      final item = state.extra as CollectionItem?;
+                      return CollectionEditPage(
+                        cardId: cardId,
+                        existingItem: item,
+                      );
+                    },
+                  ),
+                  GoRoute(
+                    path:
+                        ':cardId', // Note: Path changed to avoid conflict with /collection/add and /collection/edit
+                    builder: (context, state) {
+                      final cardId = state.pathParameters['cardId'] ?? '';
+                      final item = state.extra as CollectionItem?;
+                      // Ensure cardId is not 'add' or 'edit' before proceeding
+                      if (cardId == 'add' || cardId == 'edit') {
+                        // Optionally handle this case, e.g., show an error or redirect
+                        return ErrorPage(
+                            error: Exception(
+                                'Invalid path parameter for collection item detail: $cardId'));
+                      }
+                      return CollectionItemDetailPage(
+                        cardId: cardId,
+                        initialItem: item,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // Branch 3: Decks Tab
+          StatefulShellBranch(
+            navigatorKey: _shellNavigatorKeyDecks,
+            routes: [
+              GoRoute(
+                path: '/decks',
+                builder: (context, state) => const Scaffold(
+                  body: Center(child: Text('Decks Screen')),
                 ),
               ),
-              // Removed auth routes from here
+            ],
+          ),
+          // Branch 4: Scanner Tab
+          StatefulShellBranch(
+            navigatorKey: _shellNavigatorKeyScanner,
+            routes: [
+              GoRoute(
+                path: '/scanner',
+                builder: (context, state) => const Scaffold(
+                  body: Center(child: Text('Scanner Screen')),
+                ),
+              ),
+            ],
+          ),
+          // Branch 5: Profile Tab
+          StatefulShellBranch(
+            navigatorKey: _shellNavigatorKeyProfile,
+            routes: [
+              GoRoute(
+                path: '/profile',
+                builder: (context, state) => const ProfilePage(),
+                routes: [
+                  // Sub-routes within the Profile tab
+                  GoRoute(
+                    path: 'theme',
+                    builder: (context, state) => const ThemeSettingsPage(),
+                  ),
+                  GoRoute(
+                    path: 'account',
+                    builder: (context, state) => const AccountSettingsPage(),
+                  ),
+                  GoRoute(
+                    path: 'logs',
+                    builder: (context, state) => TalkerScreen(
+                      talker: talker,
+                      theme: const TalkerScreenTheme(
+                        backgroundColor: Color(0xFF2D2D2D),
+                        textColor: Colors.white,
+                        cardColor: Color(0xFF1E1E1E),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ],
@@ -219,6 +262,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile/login',
         redirect: (_, __) => '/auth', // Redirect to the new top-level auth path
+      ),
+      // Redirect for old /cards/:id path (now nested under '/')
+      GoRoute(
+        path: '/cards/:id',
+        redirect: (context, state) {
+          final id = state.pathParameters['id'];
+          // Assuming state.extra contains the card object needed by CardDetailsPage
+          // We need to preserve the extra data during redirect if possible,
+          // but GoRouter redirect doesn't directly support passing 'extra'.
+          // A common workaround is to use query parameters or a state management solution
+          // to pass the required data. For simplicity here, we redirect without 'extra'.
+          // The target route might need adjustment to fetch the card data if 'extra' is missing.
+          talker.warning(
+              'Redirecting from old /cards/$id to /cards/$id. Extra data might be lost.');
+          return '/cards/$id'; // Redirect to the new nested path
+        },
       ),
     ],
   );
@@ -299,13 +358,13 @@ Color _getTextColorForBackground(Color backgroundColor) {
   return luminance > 0.5 ? Colors.black : Colors.white;
 }
 
+// Updated ScaffoldWithNavBar to accept StatefulNavigationShell
 class ScaffoldWithNavBar extends ConsumerStatefulWidget {
-  final Widget child;
+  final StatefulNavigationShell navigationShell; // Changed from Widget child
 
-  // Accept the key passed from ShellRoute
   const ScaffoldWithNavBar({
-    super.key, // Use the key passed by GoRouter/ShellRoute
-    required this.child,
+    super.key,
+    required this.navigationShell, // Accept navigationShell
   });
 
   @override
@@ -373,16 +432,36 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
     }
   }
 
+  // Updated back press handling for StatefulShellRoute
   Future<bool> _handleBackPress() async {
-    final historyNotifier = ref.read(rootRouteHistoryProvider.notifier);
-
-    if (historyNotifier.canGoBack) {
-      historyNotifier.removeLastHistory();
-      final newIndex = historyNotifier.currentIndex;
-      _navigateToIndex(newIndex);
-      return true;
+    // Check if the current branch navigator can pop
+    // Create a list of the navigator keys for easier access by index
+    final List<GlobalKey<NavigatorState>> navigatorKeys = [
+      _shellNavigatorKeyCards,
+      _shellNavigatorKeyCollection,
+      _shellNavigatorKeyDecks,
+      _shellNavigatorKeyScanner,
+      _shellNavigatorKeyProfile,
+    ];
+    final currentNavigator =
+        navigatorKeys[widget.navigationShell.currentIndex].currentState;
+    if (currentNavigator != null && currentNavigator.canPop()) {
+      currentNavigator.pop();
+      return true; // Stay in the app, handled pop within the branch
     }
 
+    // If the current branch can't pop, check if we can switch to a previous branch
+    final historyNotifier = ref.read(rootRouteHistoryProvider.notifier);
+    if (historyNotifier.canGoBack) {
+      historyNotifier.removeLastHistory();
+      final previousIndex = historyNotifier.currentIndex;
+      widget.navigationShell.goBranch(previousIndex,
+          initialLocation:
+              previousIndex == widget.navigationShell.currentIndex);
+      return true; // Stay in the app, switched branch
+    }
+
+    // If no navigation handled, prompt to exit
     final now = DateTime.now();
     if (_lastBackPress == null ||
         now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
@@ -395,77 +474,49 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
         centered: true,
         width: MediaQuery.of(context).size.width * 0.5,
       );
-      return false;
+      return true; // Stay in the app, showed exit prompt
     }
 
     _lastBackPress = null; // Reset the timer
-    return false; // Let the platform handle the exit
+    return false; // Allow exit
   }
 
-  void _navigateToIndex(int index) {
-    switch (index) {
-      case 0:
-        context.go('/');
-        break;
-      case 1:
-        context.go('/collection');
-        break;
-      case 2:
-        context.go('/decks');
-        break;
-      case 3:
-        context.go('/scanner');
-        break;
-      case 4:
-        context.go('/profile');
-        break;
-    }
-  }
-
-  static int _calculateSelectedIndex(BuildContext context) {
-    final location = GoRouterState.of(context).uri.path;
-
-    // Check top-level routes first
-    if (location == '/') return 0;
-    if (location.startsWith('/collection')) return 1;
-    if (location.startsWith('/decks')) return 2;
-    if (location.startsWith('/scanner')) return 3;
-    if (location.startsWith('/profile')) {
-      return 4; // Includes /profile and its sub-routes in shell
-    }
-
-    // Handle cases where we might be on a non-shell route (like /auth)
-    // In this case, no bottom nav item should be selected.
-    // Returning -1 or an index outside the bounds might cause errors depending on NavigationBar implementation.
-    // Returning 0 (or any valid index) is safer, though visually might not be ideal.
-    // Consider if NavigationBar should be hidden entirely on non-shell routes.
-    return 0; // Default to first item if route doesn't match shell routes
-  }
-
+  // Use navigationShell.goBranch to navigate between tabs
   void _onItemTapped(int index, BuildContext context) {
-    // No need to check for /settings anymore as auth routes are top-level
     final historyNotifier = ref.read(rootRouteHistoryProvider.notifier);
-    historyNotifier.addHistory(index);
-    _navigateToIndex(index);
+    // Only add to history if it's a different tab
+    if (index != widget.navigationShell.currentIndex) {
+      historyNotifier.addHistory(index);
+    }
+    widget.navigationShell.goBranch(
+      index,
+      // Use initialLocation: true to reset the branch stack if navigating to the same tab again
+      initialLocation: index == widget.navigationShell.currentIndex,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = _calculateSelectedIndex(context);
+    // Use navigationShell.currentIndex for the selected index
+    final selectedIndex = widget.navigationShell.currentIndex;
     final themeColor = ref.watch(themeColorControllerProvider);
     final textColor = _getTextColorForBackground(themeColor);
 
     return PopScope(
-      canPop: false,
+      canPop: false, // Let our custom handler manage pops
       onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
+        if (didPop) return; // Should not happen with canPop: false
         final shouldStayInApp = await _handleBackPress();
         if (!shouldStayInApp && mounted) {
-          await platform.invokeMethod('exitApp');
+          // Use SystemNavigator.pop() for a cleaner exit on Android/iOS
+          await SystemNavigator.pop();
+          // Fallback for web or other platforms if needed
+          // await platform.invokeMethod('exitApp');
         }
       },
       child: Scaffold(
-        body: widget.child,
+        // Use the navigationShell as the body
+        body: widget.navigationShell,
         bottomNavigationBar: NavigationBar(
           backgroundColor: themeColor,
           indicatorColor: textColor.withValues(alpha: 0.2), // 0.2 * 255 = 51

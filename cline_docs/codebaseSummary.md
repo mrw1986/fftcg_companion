@@ -2,6 +2,26 @@
 
 ## Recent Changes
 
+### Auth Flow Fixes & Analysis Errors (Session 1)
+
+- **Context:** Resolved various analysis errors (`unused_element`, `unused_local_variable`, `use_build_context_synchronously`, dead code) and ensured correct `BuildContext` handling across `await` gaps in authentication-related pages.
+- **Changes:**
+  - Removed dead code in `auth_service.dart`.
+  - Fixed `use_build_context_synchronously` warnings in `register_page.dart` and `account_settings_page.dart` using context capturing and `mounted` checks.
+  - Resolved `ref` access issue after `await` in `auth_page.dart`.
+  - Refactored `linkGoogleToAnonymous` merge conflict logic from `AuthService` to UI layer (`register_page.dart`, `login_page.dart`).
+- **Status:** Completed. Testing required.
+
+### Auth Flow Fixes & Analysis Errors (Current Session)
+
+- **Context:** Resolved various analysis errors (`unused_element`, `unused_local_variable`, `use_build_context_synchronously`, dead code) and ensured correct `BuildContext` handling across `await` gaps in authentication-related pages.
+- **Changes:**
+  - Removed dead code in `auth_service.dart`.
+  - Fixed `use_build_context_synchronously` warnings in `register_page.dart` and `account_settings_page.dart` using context capturing and `mounted` checks.
+  - Resolved `ref` access issue after `await` in `auth_page.dart`.
+  - Refactored `linkGoogleToAnonymous` merge conflict logic from `AuthService` to UI layer (`register_page.dart`, `login_page.dart`).
+- **Status:** Completed. Testing required.
+
 ### Analysis Errors & Provider Refactoring (Current Session)
 
 - **Context:** Addressed various analysis errors (`unused_import`, `invalid_use_of_protected_member`, `deprecated_member_use`, `use_super_parameters`, `unused_local_variable`) and refactored providers using deprecated `listenSelf` for persistence.

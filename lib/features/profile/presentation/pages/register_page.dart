@@ -313,8 +313,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
             // Handle the specific 'merge-required' case
             if (linkError.code == 'merge-required') {
-              if (!currentContext.mounted)
+              if (!currentContext.mounted) {
                 return; // Check context before dialog
+              }
 
               final anonymousUserId =
                   linkError.details?['anonymousUserId'] as String?;
@@ -391,6 +392,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 } catch (e) {
                   talker.error('Error during data migration: $e');
                   if (mounted) {
+                    // Add mounted check for context before showing snackbar
+                    if (!currentContext.mounted) return;
                     SnackBarHelper.showErrorSnackBar(
                       context: currentContext,
                       message: 'Error merging data. Please try again.',

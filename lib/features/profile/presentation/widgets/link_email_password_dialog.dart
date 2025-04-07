@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
+import 'package:fftcg_companion/core/routing/app_router.dart'; // Import for rootNavigatorKeyProvider
 import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 
 class LinkEmailPasswordDialog extends ConsumerStatefulWidget {
@@ -101,25 +102,28 @@ class _LinkEmailPasswordDialogState
             );
       }
 
+      // Get root context before async gap potentially invalidates local context
+      final rootContext = ref.read(rootNavigatorKeyProvider).currentContext;
+
       if (mounted) {
-        // Invalidate providers to force UI refresh
-        ref.invalidate(authStateProvider);
-        ref.invalidate(currentUserProvider);
+        // REMOVED explicit invalidation - rely on auth stream
+        // REMOVED Future.delayed
 
-        // Wait a moment for providers to update before closing dialog
-        await Future.delayed(const Duration(milliseconds: 100));
-
-        if (mounted) {
+        // Check state mounted status AND root context validity before showing SnackBar/Popping
+        if (mounted && rootContext != null && rootContext.mounted) {
           // Add mounted check
-          // Show verification email notification with consistent styling
+          // Show verification email notification using root context
           SnackBarHelper.showSuccessSnackBar(
-            context: context,
+            context: rootContext, // Use root context
             message:
                 'Email/password authentication added successfully. Please check your email to verify your account.',
             duration: const Duration(seconds: 6),
           );
 
-          Navigator.of(context).pop();
+          // Pop using the original dialog context (if still valid)
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
           widget
               .onSuccess(); // Call the onSuccess callback provided by the parent
         }

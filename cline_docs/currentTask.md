@@ -1,42 +1,45 @@
 # Current Task
 
-## Current Objective: Fix Google Authentication Issues
+## Current Objective: Test Authentication Flows
 
 ### Context
 
-- When users attempted to sign in with Google but the account didn't exist, they were being silently redirected back to the sign-in page without any notification.
-- Logs revealed successful authentication with Firebase but issues in the app's state management during the auth flow.
-
-### Actions Taken
-
-1. **Refactored `GoogleSignInButton`:** Removed internal loading state (`setState`) to prevent errors when the parent page (`AuthPage`) was disposed during the async sign-in operation. Passed loading state down from `AuthPage`. Corrected deprecated `withOpacity` usage to `withValues`.
-2. **Simplified `_signInWithGoogle`:** Removed all post-`await` logic (reloads, delays, state checks, snackbars, explicit navigation) to prevent operations on a potentially disposed widget context/ref. Focused on triggering the core auth operation and resetting flags.
-3. **Implemented `ref.listen` in `AuthPage`:** Added a listener to `authStateProvider` within `AuthPage`'s `initState` to specifically handle the transition from non-authenticated to authenticated *after* a Google sign-in initiated from that page. This listener now handles showing the success snackbar and navigating to `/profile/account`.
-4. **Corrected `SnackBarHelper` Usage:** Fixed incorrect method calls in `AuthPage` (replaced hallucinated `buildThemedSnackBar` with correct methods).
-5. **Corrected `StyledButton` Deprecations & Nullability:** Updated `StyledButton` to use `withValues` instead of `withOpacity` and accept a nullable `onPressed`. Fixed type mismatch in `AuthPage` button usage.
-6. **Router Adjustments:** Modified `app_router.dart` to use `ref.watch` for reactive redirects and removed the potentially conflicting `refreshListenable`.
-7. **Provider Invalidation:** Added provider invalidation (`firebaseUserProvider`, `authStateProvider`, `currentUserProvider`) after successful Google sign-in/linking in `AuthPage` to ensure the reactive chain updates correctly, similar to the working `RegisterPage` flow.
-8. **Refined `_signInWithGoogle` Error/Flag Handling:** Ensured `skipAutoAuthProvider` flag is reset reliably in `try`/`catch`/`finally` blocks, checking `mounted` status before accessing `ref`.
-9. **Added Extra `mounted` Check in `AuthPage`:** Added an additional `mounted` check immediately before the `ref.read` call within the `finally` block of `_signInWithGoogle`. (Note: This was insufficient).
-10. **Simplified Router Page Building:** Changed `pageBuilder:` to `builder:` for profile sub-routes. (Note: Did not resolve GlobalKey issue).
-11. **Added GlobalKey to `ScaffoldWithNavBar`:** Added a persistent key to the shell scaffold. (Note: Did not resolve GlobalKey issue).
-12. **Temporarily Removed `LoadingWrapper`:** Removed wrapper from `app.dart` for diagnosis. (Note: Did not resolve GlobalKey issue).
-13. **Refactored `_signInWithGoogle` Ref Access:** Moved all `ref` interactions before the `await` call in `AuthPage`. (Note: This appears to have fixed the `ref` disposal error).
-14. **Isolated Auth Routes:** Moved `/auth`, `/register`, `/reset-password` outside the `ShellRoute` in `app_router.dart`.
-15. **Fixed Registration Redirect:** Added explicit `context.go('/profile/account')` after dialog dismissal in `RegisterPage`.
-16. **Restored `LoadingWrapper`:** Added the wrapper back in `app.dart`.
+- Recent work focused on resolving various analysis errors (`unused_element`, `unused_local_variable`, `use_build_context_synchronously`, dead code) across several files (`app_router.dart`, `register_page.dart`, `account_settings_page.dart`, `auth_service.dart`).
+- Specific attention was given to fixing `use_build_context_synchronously` warnings by ensuring `BuildContext` is handled correctly across `await` gaps, primarily using the context-capturing pattern with `mounted` checks.
+- A `ref` access issue after `await` in `auth_page.dart` was also resolved.
+- The `linkGoogleToAnonymous` flow was refactored to handle merge conflicts in the UI layer (`register_page.dart`, `login_page.dart`).
 
 ### Status
 
-- **`ref` Disposal Error:** Appears **resolved** by refactoring `_signInWithGoogle` in `AuthPage`.
-- **Registration Redirect:** Explicit navigation added in `RegisterPage` to ensure correct redirection after email/password registration.
-- **`GlobalKey` Error:** **Persists** even after isolating auth routes. The error `Duplicate GlobalKey detected... [GlobalKey#5f22b scaffoldWithNavBar]` indicates the issue still relates to the `ShellRoute` or `ScaffoldWithNavBar` during auth state transitions.
-- **Next Steps:**
-  - **Investigate `ShellRoute` Further:** Research GoRouter issues related to `ShellRoute` rebuilds during redirects triggered by external state changes (like `authStateProvider`). Look for potential workarounds or alternative structuring.
-  - **Consider Router Alternatives (If Necessary):** If the `ShellRoute` issue proves intractable, explore alternative navigation packages or patterns.
-  - **Test Other Flows:** Verify if isolating auth routes impacted sign-out or account deletion flows regarding the `GlobalKey` error.
+- **Analysis Errors:** Resolved in relevant files.
+- **`use_build_context_synchronously`:** Warnings addressed using context capturing and `mounted` checks.
+- **`ref` Disposal Error:** Believed to be resolved in `auth_page.dart`.
+- **Merge Conflict Logic:** Refactored to UI layer in `register_page.dart` and `login_page.dart`.
+- **`GlobalKey` Error:** Still potentially persists (related to `ShellRoute`). Needs verification during testing.
+
+### Next Steps
+
+1. **Comprehensive Testing:** Execute the detailed test plan for all authentication flows to ensure recent fixes are effective and no regressions were introduced. Pay close attention to edge cases and transitions involving anonymous users.
+2. **Verify `GlobalKey` Error:** Specifically test scenarios involving authentication state changes (sign-in, sign-out, linking, deletion) to see if the `Duplicate GlobalKey detected... [GlobalKey#... scaffoldWithNavBar]` error still occurs.
+3. **Address `GlobalKey` Error (If Persists):** If the error remains, investigate GoRouter `ShellRoute` behavior during redirects or consider alternative structuring as previously planned.
 
 ## Previous Objectives (Completed)
+
+### Objective: Fix Auth Flow Analysis Errors & BuildContext Warnings
+
+- **Context:** Address remaining analysis errors (`unused_element`, `unused_local_variable`) and `use_build_context_synchronously` warnings identified after previous fixes. Refactor `linkGoogleToAnonymous` merge logic.
+- **Actions:**
+  - Removed dead code in `auth_service.dart`.
+  - Refactored `linkGoogleToAnonymous` in `AuthService` to remove `BuildContext` and throw `AuthException` with details for merge conflicts.
+  - Updated `register_page.dart` and `login_page.dart` to catch the `merge-required` exception and handle the merge dialog/data migration logic.
+  - Corrected `use_build_context_synchronously` warnings in `register_page.dart` and `account_settings_page.dart` by capturing `BuildContext` before `await` and using the captured context within appropriate `mounted` checks after `await`.
+- **Status:** Completed.
+
+### Objective: Fix Google Authentication Issues & Related Errors
+
+- **Context:** Address `ref` disposal error, `GlobalKey` error, and silent redirect issues during Google Sign-In and registration flows.
+- **Actions:** Refactored `GoogleSignInButton`, simplified `_signInWithGoogle`, added `ref.listen` in `AuthPage`, corrected `SnackBarHelper` usage, fixed `StyledButton` issues, adjusted router logic, added provider invalidation, moved `ref` access before `await` in `AuthPage`, isolated auth routes, fixed registration redirect.
+- **Status:** `ref` disposal error resolved. Registration redirect fixed. `GlobalKey` error persists.
 
 ### Objective: Plan Implementation for Multiple Copies of Same Card Handling (Phase 2, Task 5)
 
@@ -47,7 +50,7 @@
 - **Completed fixing analysis errors and refactoring providers.**
 - The next major task identified in `projectRoadmap.md` is Phase 2, Task 5: Handle multiple copies of the same card, implementing **Solution C (Subcollection per Card)**.
 
-#### Next Steps
+#### Next Steps for Phase 2, Task 5
 
 1. **Analyze Solution C:** Review the implications of using a subcollection (`/users/{userId}/collection/{cardId}/copies/{copyId}`) for each individual copy of a card. Consider data structure, Firestore rules, and impact on existing collection logic (add/update/delete, count).
 2. **Plan Data Model Changes:** Define the data model for an individual card copy document within the subcollection (e.g., fields for condition, purchase info, grading info, foil status).

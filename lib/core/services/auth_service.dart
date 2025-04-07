@@ -5,11 +5,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'package:fftcg_companion/features/profile/data/repositories/user_repository.dart';
 import 'package:flutter/foundation.dart'; // Required for kReleaseMode
-import 'package:flutter/material.dart';
-import 'package:fftcg_companion/features/profile/presentation/widgets/merge_data_decision_dialog.dart';
-import 'package:fftcg_companion/features/collection/data/repositories/collection_repository.dart';
-import 'package:fftcg_companion/features/collection/data/repositories/collection_merge_helper.dart';
-import 'package:fftcg_companion/features/profile/data/repositories/settings_merge_helper.dart';
 
 /// Enum for categorizing authentication errors
 enum AuthErrorCategory {
@@ -366,21 +361,6 @@ class AuthService {
                 'anonymousUserId': anonymousUserId,
                 'signedInCredential': signedInCredential,
               });
-
-          // Reload user to ensure we have latest provider data
-          if (userCredential.user != null) {
-            await userCredential.user!.reload();
-            final finalUser = _auth.currentUser;
-            if (finalUser != null) {
-              talker.info(
-                  'Successfully signed in with Google. User state: isAnonymous=${finalUser.isAnonymous}, providers=${finalUser.providerData.map((p) => p.providerId).join(", ")}');
-
-              // Immediately update Firestore record to ensure state consistency
-              await _userRepository.createUserFromAuth(finalUser);
-              talker.debug(
-                  'Firestore updated immediately after Google sign-in (credential already in use case).');
-            }
-          }
         } else {
           rethrow;
         }

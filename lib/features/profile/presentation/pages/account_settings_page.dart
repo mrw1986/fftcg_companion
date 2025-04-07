@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
+import 'package:fftcg_companion/core/routing/app_router.dart'; // Import for rootNavigatorKeyProvider
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_display_name.dart'
     as display_name;
@@ -282,11 +283,14 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   Future<void> _handleSuccessfulDeletion() async {
     talker.info(
         'Account deletion successful, showing confirmation and signing out.');
+    // Get the root navigator context BEFORE the async gap of signOut
+    final rootContext = ref.read(rootNavigatorKeyProvider).currentContext;
+
     // Add mounted check before showing snackbar and navigating
-    if (mounted) {
-      // Show success snackbar using the imported display_name alias
+    if (mounted && rootContext != null) {
+      // Show success snackbar using the root context
       display_name.showThemedSnackBar(
-          context: context,
+          context: rootContext, // Use root context here
           message: 'Account deleted successfully.',
           isError: false);
 
@@ -738,42 +742,69 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
   /// Link the current account with Google
   Future<void> _linkWithGoogle() async {
+    // Get root context and capture local context before async operations
+    final rootContext = ref.read(rootNavigatorKeyProvider).currentContext;
+// Capture local context
+
+    // Set loading state
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
 
+    Object? error;
+
     try {
       await ref.read(linkGoogleToEmailPasswordProvider.future);
-      // Explicitly invalidate providers to ensure UI updates
-      ref.invalidate(firebaseUserProvider); // Use the base stream provider
-      ref.invalidate(authStateProvider);
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        display_name.showThemedSnackBar(
-            context: context,
-            message: 'Successfully linked with Google',
-            isError: false);
-      }
+      // REMOVED explicit invalidation - rely on Firebase stream
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      error = e; // Capture error
+    } finally {
+      // Reset loading state AFTER await completes or fails
       if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+
+    // Show SnackBar using root context AFTER state is reset
+    // Check State mounted AND rootContext mounted
+    if (mounted && rootContext != null && rootContext.mounted) {
+      if (error != null) {
         display_name.showThemedSnackBar(
-            context: context,
-            message: e is AuthException ? e.message : e.toString(),
+            context: rootContext, // Use root context
+            message: error is AuthException ? error.message : error.toString(),
             isError: true);
+      } else {
+        // Check State mounted AND rootContext mounted before showing success SnackBar
+        if (mounted && rootContext.mounted) {
+          // Removed redundant rootContext != null check
+          display_name.showThemedSnackBar(
+              context: rootContext, // Use root context
+              message: 'Successfully linked with Google',
+              isError: false);
+        }
+        // Navigation is handled by GoRouter's reaction to auth state changes
+        // REMOVED explicit context.go call
       }
     }
   }
 
   /// Link the current account with Email/Password
   Future<void> _linkWithEmailPassword(String email, String password) async {
+    // Get root context and capture local context before async operations
+    final rootContext = ref.read(rootNavigatorKeyProvider).currentContext;
+// Capture local context
+
+    // Set loading state
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
+
+    String? successMessage;
+    Object? error;
 
     try {
       final user = ref.read(authStateProvider).user;
@@ -783,35 +814,51 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           false;
 
       if (hasGoogleProvider && user != null && !user.isAnonymous) {
-        // Added null check for user
         await ref.read(linkEmailPasswordToGoogleProvider(
                 EmailPasswordCredentials(email: email, password: password))
             .future);
+        successMessage = 'Successfully added Email/Password authentication';
       } else {
+        // Assuming this case is for linking to anonymous, which might have different logic
+        // For now, keep the original call but adjust message/error handling if needed
         await ref.read(authServiceProvider).linkEmailAndPasswordToAnonymous(
               email,
               password,
             );
+        successMessage =
+            'Successfully linked Email/Password'; // Adjust if needed
       }
-      // Invalidation handled by provider
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        display_name.showThemedSnackBar(
-            context: context,
-            message: 'Successfully added Email/Password authentication',
-            isError: false);
-      }
+      // Auth state invalidation is handled by the providers themselves
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      error = e; // Capture error
+    } finally {
+      // Reset loading state AFTER await completes or fails
       if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+
+    // Show SnackBar using root context AFTER state is reset
+    // Check State mounted AND rootContext mounted
+    if (mounted && rootContext != null && rootContext.mounted) {
+      if (error != null) {
         display_name.showThemedSnackBar(
-            context: context,
-            message: e is AuthException ? e.message : e.toString(),
+            context: rootContext, // Use root context
+            message: error is AuthException ? error.message : error.toString(),
             isError: true);
+      } else if (successMessage != null) {
+        // Check State mounted AND rootContext mounted before showing success SnackBar
+        if (mounted && rootContext.mounted) {
+          // Removed redundant rootContext != null check
+          display_name.showThemedSnackBar(
+              context: rootContext, // Use root context
+              message: successMessage,
+              isError: false);
+        }
+        // Navigation is handled by GoRouter's reaction to auth state changes
+        // REMOVED explicit context.go call
       }
     }
   }
@@ -913,26 +960,36 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           Center(
             child: ElevatedButton.icon(
               onPressed: () async {
+                // Capture context before async gap
+                final capturedContext = context;
                 // Resend verification email
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                final scaffoldMessenger = ScaffoldMessenger.of(capturedContext);
                 SnackBarHelper.showSnackBar(
-                  context: context,
+                  context: capturedContext,
                   message: 'Sending verification email...',
                   duration: const Duration(seconds: 2),
                 );
 
                 try {
                   await ref.read(authServiceProvider).sendEmailVerification();
-                  if (context.mounted) {
+                  // Add mounted check *after* await
+                  if (mounted) {
                     scaffoldMessenger.clearSnackBars();
                     // Use the same fallback for the dialog
+                    if (!mounted) return; // Check state mounted
+                    if (!capturedContext.mounted) {
+                      return; // Check captured context mounted
+                    }
                     await showVerificationEmailSentDialog(
-                        context, user.email ?? 'your email address');
+                        capturedContext,
+                        user.email ??
+                            'your email address'); // Use captured context
                   }
                 } catch (error) {
                   talker.error('Error sending verification email', error);
 
-                  if (context.mounted) {
+                  // Add mounted check *after* await
+                  if (mounted) {
                     scaffoldMessenger.clearSnackBars();
 
                     String errorMessage =
@@ -945,8 +1002,13 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                       }
                     }
 
+                    // Add mounted check before snackbar
+                    if (!mounted) return; // Check state mounted
+                    if (!capturedContext.mounted) {
+                      return; // Check captured context mounted
+                    }
                     SnackBarHelper.showErrorSnackBar(
-                      context: context,
+                      context: capturedContext, // Use captured context
                       message: errorMessage,
                     );
                   }
