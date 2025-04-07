@@ -1,34 +1,52 @@
 # Current Task
 
-## Current Objective: Fix Unlinking Navigation/GlobalKey Issue
+## Current Objective: Display Pending Email Update in Account Settings
 
 ### Context
 
-- Recent work involved refactoring the app router to use `StatefulShellRoute`, simplifying dialogs, fixing context warnings, and ensuring correct SnackBar usage.
-- The provider **linking** flow works correctly.
-- The provider **unlinking** flow showed the success SnackBar correctly but incorrectly navigated to `/` and threw a `Duplicate GlobalKey` error.
-- **Previous Attempts:**
-  - Refined router `redirect` logic to explicitly stay put on `/profile/account` if authenticated. (Did not fix the `GlobalKey` error).
-  - Removed explicit navigation from `_unlinkProvider` in `account_settings_page.dart`. (Did not fix the `GlobalKey` error).
-- **Latest Fix Applied:**
-  - Created a new `authStatusProvider` in `auth_provider.dart` that only exposes the `AuthStatus` enum.
-  - Updated the GoRouter `redirect` logic in `app_router.dart` to watch `authStatusProvider` instead of the full `authStateProvider`. This decouples the redirect from internal `User` object changes and should prevent the router from reacting unnecessarily during unlinking.
+- When a user initiates an email address change, a verification email is sent to the new address.
+- Previously, there was no immediate visual feedback in the Account Settings page indicating that an email change was pending verification.
+- The goal is to display the new, unverified email address prominently after the verification email is sent, improving user feedback.
+
+### Actions Taken
+
+1. **Created Provider:** Added `EmailUpdateState` and `EmailUpdateNotifier` (`emailUpdateNotifierProvider`) in `lib/features/profile/presentation/providers/email_update_provider.dart` to manage the pending email address state. Ran build runner.
+2. **Updated Account Settings Page:**
+    - Modified `_updateEmail` in `account_settings_page.dart` to call `ref.read(emailUpdateNotifierProvider.notifier).setPendingEmail(newEmail)` upon successfully initiating the email verification process.
+    - Modified `_signOutWithoutConfirmation` and `_handleSuccessfulDeletion` to call `ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail()` to clear the state on sign-out or deletion.
+    - Watched `emailUpdateNotifierProvider` in the `build` method.
+    - Passed the `pendingEmail` state to the `AccountInfoCard` widget.
+3. **Updated Account Info Card:**
+    - Added an optional `pendingEmail` parameter to `AccountInfoCard` (`lib/features/profile/presentation/widgets/account_info_card.dart`).
+    - Added UI logic to display the `pendingEmail` using a `ListTile` with an `Icon` and a styled `Chip` when `pendingEmail` is not null.
+4. **Updated Auth Provider Listener:**
+    - Modified the listener within `firestoreUserSyncProvider` in `lib/core/providers/auth_provider.dart`.
+    - Added logic to check if the `nextUser.email` matches the `pendingEmail` read from `emailUpdateNotifierProvider`.
+    - If they match, it calls `ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail()` to clear the state automatically once the email change is confirmed in Firebase Auth.
+    - Added logic to clear the pending email state on sign-out or auth stream errors as well.
 
 ### Status
 
-- **Analysis Errors:** Resolved.
-- **`use_build_context_synchronously`:** Warnings addressed.
-- **Provider Linking Flow:** Functional, `GlobalKey` error resolved.
-- **Provider Unlinking SnackBar:** Functional (uses root context).
-- **Provider Unlinking Redirect & `GlobalKey` Error:** **Fix Applied (Pending Testing).** Router logic updated to watch `authStatusProvider`, decoupling it from internal `User` changes. This is expected to resolve both the incorrect redirect and the `GlobalKey` error.
+- Completed. The Account Settings page now displays the pending email address with an "Unverified" chip after initiating an email change. The pending state is cleared automatically upon successful verification, sign-out, or auth error.
 
 ### Next Steps
 
-- **Test Unlinking:** Verify that the app stays on `/profile/account` and the `GlobalKey` error no longer occurs after unlinking a provider.
-- **Comprehensive Auth Testing:** Ensure no regressions in other authentication flows (linking, deletion, sign-in, sign-out, registration, password reset).
-- **Update Documentation:** Update `codebaseSummary.md` and `projectRoadmap.md` once testing confirms the fix.
+- Update `codebaseSummary.md` to reflect these changes.
+- Test the email update flow thoroughly for users with only email/password and users with linked providers (e.g., Google).
 
 ## Previous Objectives (Completed)
+
+### Objective: Fix Auth Flow Issues (Unlinking, Linking UI, Email Pre-population)
+
+- **Context:** Resolved several issues related to provider linking/unlinking, including incorrect navigation after unlinking, `GlobalKey` conflicts, email pre-population regressions, and UI update failures.
+- **Action:** Introduced `authStatusProvider`, updated GoRouter `redirect` logic, added delay to `AuthService.unlinkProvider` for Google, corrected email lookup logic in `AccountInfoCard`, added provider invalidation to `linkEmailPasswordToGoogleProvider`.
+- **Status:** Completed. All reported auth flow issues resolved.
+
+### Objective: Verify Auth Flow Fixes (Unlinking, Linking UI, Email Pre-population)
+
+- **Context:** After unlinking a provider while remaining authenticated, the app incorrectly navigated to `/` and threw a `Duplicate GlobalKey` error.
+- **Action:** Created `authStatusProvider`, updated router `redirect` logic, added delay to Google unlink in `AuthService`, corrected email lookup logic in `AccountInfoCard`, added provider invalidation to `linkEmailPasswordToGoogleProvider`.
+- **Status:** Completed. All reported issues resolved and confirmed by user.
 
 ### Objective: Attempt to Fix Navigation/Context Errors After Auth Changes
 

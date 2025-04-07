@@ -5,6 +5,8 @@ import 'package:fftcg_companion/core/services/auth_service.dart';
 import 'package:fftcg_companion/features/profile/data/repositories/user_repository.dart'; // Import UserRepository
 import 'package:fftcg_companion/core/utils/logger.dart';
 // Import for deep equality check
+// Import the email update provider
+import 'package:fftcg_companion/features/profile/presentation/providers/email_update_provider.dart';
 
 /// Provider for the AuthService
 final authServiceProvider = Provider<AuthService>((ref) {
@@ -21,6 +23,7 @@ final firebaseUserProvider = StreamProvider<User?>((ref) {
 /// Provider that ensures the Firestore user document is synced with the auth state.
 /// This provider listens to the Firebase user stream and triggers Firestore updates.
 /// It also resets the emailVerificationDetectedProvider flag when appropriate.
+/// **NEW:** It also clears the pending email state when the user's email is updated.
 final firestoreUserSyncProvider = Provider<void>((ref) {
   // Use the raw Firebase user stream provider here
   ref.listen<AsyncValue<User?>>(firebaseUserProvider, (previous, next) async {
@@ -97,12 +100,36 @@ final firestoreUserSyncProvider = Provider<void>((ref) {
         talker.debug(
             'FirestoreUserSync: User stream emitted, but no relevant data changed for UID: ${nextUser.uid}. Skipping Firestore sync.');
       }
+
+      // --- **NEW:** Logic to clear pending email state ---
+      final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+      if (pendingEmail != null && nextUser.email == pendingEmail) {
+        talker.debug(
+            'FirestoreUserSync: Detected user email (${nextUser.email}) matches pending email ($pendingEmail). Clearing pending state.');
+        // Use read().notifier as we are in a callback
+        ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+      }
+      // --- End of clear pending email logic ---
     } else if (previousUser != null && nextUser == null) {
       talker.debug('FirestoreUserSync: Detected user signed out.');
       // Firestore cleanup is handled by Firebase Extension or specific delete logic
+      // **NEW:** Also clear pending email on sign out
+      final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+      if (pendingEmail != null) {
+        talker.debug(
+            'FirestoreUserSync: Clearing pending email state due to sign out.');
+        ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+      }
     } else if (next is AsyncError) {
       talker.error('FirestoreUserSync: Error in user stream', next.error,
           next.stackTrace);
+      // **NEW:** Also clear pending email on auth error
+      final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+      if (pendingEmail != null) {
+        talker.debug(
+            'FirestoreUserSync: Clearing pending email state due to auth error.');
+        ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+      }
     }
     // --- End of Firestore sync logic ---
   });
@@ -369,11 +396,22 @@ final linkEmailPasswordToGoogleProvider =
     FutureProvider.autoDispose.family<UserCredential, EmailPasswordCredentials>(
   (ref, credentials) async {
     final authService = ref.watch(authServiceProvider);
-    // Corrected method name
-    return await authService.linkEmailPasswordToGoogle(
-      credentials.email,
-      credentials.password,
-    );
+    try {
+      // Corrected method name
+      final userCredential = await authService.linkEmailPasswordToGoogle(
+        credentials.email,
+        credentials.password,
+      );
+      // Invalidate providers on success to force UI refresh
+      ref.invalidate(firebaseUserProvider);
+      ref.invalidate(authStateProvider);
+      talker.debug(
+          'Successfully linked Email/Password to Google, invalidated providers.');
+      return userCredential;
+    } catch (e) {
+      talker.error('Error linking Email/Password to Google: $e');
+      rethrow; // Rethrow the error to be caught by the caller
+    }
   },
 );
 

@@ -15,7 +15,7 @@
   - AsyncNotifierProvider for async operations
   - StateNotifierProvider for mutable state
   - NotifierProvider for synchronous state with side effects (e.g., persistence) - **Used for refactored search/filter persistence**
-  - Provider for dependency injection
+  - Provider for dependency injection and derived state (e.g., `authStatusProvider`)
   - ConsumerWidget for reactive UI updates
 
 ### UI/UX Components

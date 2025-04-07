@@ -62,7 +62,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
         // Pass the flag to skip the dialog timestamp reset
         await ref
             .read(authServiceProvider)
-            .signOut(skipAccountLimitsDialog: true);
+            .signOut(); // Removed skipAccountLimitsDialog argument
       }
 
       setState(() {

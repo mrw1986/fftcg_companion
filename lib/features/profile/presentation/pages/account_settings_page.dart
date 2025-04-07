@@ -18,6 +18,8 @@ import 'package:fftcg_companion/features/profile/presentation/widgets/update_pas
 import 'package:fftcg_companion/core/services/auth_service.dart';
 // Import SnackBarHelper
 import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
+// Import the new provider
+import 'package:fftcg_companion/features/profile/presentation/providers/email_update_provider.dart';
 
 class AccountSettingsPage extends ConsumerStatefulWidget {
   const AccountSettingsPage({super.key});
@@ -142,7 +144,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   }
 
   Future<void> _updateEmail() async {
-    if (_emailController.text.trim().isEmpty) {
+    final newEmail = _emailController.text.trim(); // Store new email
+    if (newEmail.isEmpty) {
       display_name.showThemedSnackBar(
           context: context,
           message: 'Please enter a valid email address',
@@ -161,8 +164,12 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
     try {
       await ref.read(authServiceProvider).verifyBeforeUpdateEmail(
-            _emailController.text.trim(),
+            newEmail,
           );
+
+      // **NEW:** Update the pending email provider on success
+      ref.read(emailUpdateNotifierProvider.notifier).setPendingEmail(newEmail);
+
       setState(() {
         _isLoading = false;
         _showChangeEmail = false; // Hide the input field after initiating
@@ -170,8 +177,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
       // Show confirmation dialog (updated message)
       if (mounted) {
-        await showEmailUpdateInitiatedDialog(
-            context, _emailController.text.trim());
+        await showEmailUpdateInitiatedDialog(context, newEmail);
       }
     } on AuthException catch (e) {
       // Catch custom AuthException
@@ -250,6 +256,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     });
 
     try {
+      // **NEW:** Clear pending email state before signing out
+      ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
       await ref.read(authServiceProvider).signOut();
       // UI will update via provider watch
 
@@ -286,6 +294,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     // Get the root navigator context BEFORE the async gap of signOut
     final rootContext = ref.read(rootNavigatorKeyProvider).currentContext;
 
+    // **NEW:** Clear pending email state before signing out
+    ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+
     // Add mounted check before showing snackbar and navigating
     if (mounted && rootContext != null) {
       // Show success snackbar using the root context
@@ -297,7 +308,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       // Sign out, skipping the dialog trigger
       await ref
           .read(authServiceProvider)
-          .signOut(skipAccountLimitsDialog: true);
+          .signOut(); // Removed skipAccountLimitsDialog argument
 
       // Add another mounted check immediately before using context after await
       if (mounted) {
@@ -650,16 +661,20 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           _isLoading = true;
         });
         try {
+          final newEmail = _emailController.text.trim(); // Store new email
           await ref.read(authServiceProvider).verifyBeforeUpdateEmail(
-                _emailController.text.trim(),
+                newEmail,
               );
+          // **NEW:** Update the pending email provider on success
+          ref
+              .read(emailUpdateNotifierProvider.notifier)
+              .setPendingEmail(newEmail);
           setState(() {
             _isLoading = false;
             _showChangeEmail = false;
           });
           if (mounted) {
-            await showEmailUpdateInitiatedDialog(
-                context, _emailController.text.trim());
+            await showEmailUpdateInitiatedDialog(context, newEmail);
           }
         } catch (emailError) {
           setState(() {
@@ -703,7 +718,6 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
   Future<void> _unlinkProvider(String providerId) async {
     // Capture contexts before async gap
-    // final capturedContext = context; // No longer needed for navigation
     final rootContext = ref.read(rootNavigatorKeyProvider).currentContext;
     if (!mounted) return;
     setState(() {
@@ -711,11 +725,16 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     });
 
     try {
-      // Call unlink and wait for the reloaded user
-      await ref.read(unlinkProviderProvider(providerId).future); // Use .future
-      // Invalidation is handled by the provider now, state will update via watch
+      // Call unlink and wait for the provider to complete (which includes invalidation)
+      await ref.read(unlinkProviderProvider(providerId).future);
+      talker.debug('unlinkProviderProvider future completed for $providerId.');
 
-      // Reset loading state AFTER await
+      // *** ADD A SMALL DELAY ***
+      // Hypothesis: Give potential background Google tasks or state propagation extra time to settle after unlink.
+      await Future.delayed(const Duration(milliseconds: 300));
+      talker.debug('Small delay completed after unlinking $providerId');
+
+      // Reset loading state AFTER await and delay
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -731,12 +750,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
             isError: false);
       }
 
-      // REMOVED explicit navigation call:
-      // WidgetsBinding.instance.addPostFrameCallback((_) {
-      //   if (mounted && capturedContext.mounted) {
-      //     capturedContext.go('/profile/account');
-      //   }
-      // });
+      // No explicit navigation needed, rely on router watching authStatusProvider
     } catch (e) {
       // Reset loading state on error
       if (mounted) {
@@ -1062,6 +1076,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
     // **NEW:** Watch the immediate verification detection provider
     final verificationDetected = ref.watch(emailVerificationDetectedProvider);
+    // **NEW:** Watch the pending email update provider
+    final emailUpdateState = ref.watch(emailUpdateNotifierProvider);
+    final pendingEmail = emailUpdateState.pendingEmail;
 
     // Determine the user object to use for the UI
     // Prioritize the direct user stream value if available, fallback to authState
@@ -1136,16 +1153,18 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     }
 
     // Determine if the email verification banner should be shown
-    // **UPDATED LOGIC:** Show if auth state is emailNotVerified AND verification hasn't been immediately detected yet.
+    // Show if the specific state is emailNotVerified AND verification hasn't been immediately detected yet.
     final bool showVerificationBanner =
         authState.status == AuthStatus.emailNotVerified &&
             !verificationDetected;
 
     // Determine if the AccountInfoCard should show the "Email Not Verified" text/chip
-    // Use the same logic as the banner for consistency
+    // ** REVISED LOGIC: Directly use the flag from AuthState for the chip **
     final bool showUnverifiedChip =
-        authState.status == AuthStatus.emailNotVerified &&
-            !verificationDetected;
+        authState.emailNotVerified; // Removed && !verificationDetected
+    talker.debug(
+        'showUnverifiedChip determined by: authState.emailNotVerified (${authState.emailNotVerified}) = $showUnverifiedChip');
+    // Note: The banner logic still uses verificationDetected, but the chip logic does not.
 
     return Scaffold(
       appBar: AppBarFactory.createAppBar(context, 'Account Settings'),
@@ -1183,8 +1202,10 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                   // Account Information
                   AccountInfoCard(
                     user: userForUI, // Pass userForUI down
-                    // Use the consistent logic for showing the unverified state
+                    // Use the revised logic for showing the unverified state chip
                     isEmailNotVerified: showUnverifiedChip,
+                    // **NEW:** Pass pending email
+                    pendingEmail: pendingEmail,
                     emailController: _emailController,
                     showChangeEmail: _showChangeEmail,
                     onToggleChangeEmail: () {

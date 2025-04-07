@@ -7,11 +7,13 @@ import 'package:fftcg_companion/features/profile/presentation/pages/profile_emai
 import 'package:fftcg_companion/features/profile/presentation/widgets/profile_auth_methods.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/link_email_password_dialog.dart';
 // Removed auth_provider import
+// Removed incorrect UnverifiedChip import
 
 // Reverted to StatelessWidget
 class AccountInfoCard extends StatelessWidget {
   final User? user; // Use user prop passed from parent
   final bool isEmailNotVerified;
+  final String? pendingEmail; // NEW: Add pending email parameter
   final TextEditingController emailController;
   final bool showChangeEmail;
   final Function() onToggleChangeEmail;
@@ -26,6 +28,7 @@ class AccountInfoCard extends StatelessWidget {
     super.key,
     required this.user, // Expect user from parent
     required this.isEmailNotVerified,
+    this.pendingEmail, // NEW: Make pendingEmail optional
     required this.emailController,
     required this.showChangeEmail,
     required this.onToggleChangeEmail,
@@ -37,18 +40,35 @@ class AccountInfoCard extends StatelessWidget {
     required this.isLoading,
   });
 
-  // Reverted dialog showing logic to use the passed user prop
+  // Updated dialog showing logic to check providerData for email
   void _showLinkEmailPasswordDialog(BuildContext context) {
-    final initialEmailValue = user?.email; // Use email from user prop
+    String? initialEmailValue = user?.email; // Try primary email first
+
+    // If primary email is null/empty, try finding the Google provider email
+    if ((initialEmailValue == null || initialEmailValue.isEmpty) &&
+        user != null) {
+      try {
+        final googleProvider = user!.providerData.firstWhere(
+          (userInfo) => userInfo.providerId == 'google.com',
+        );
+        initialEmailValue = googleProvider.email;
+        talker.debug(
+            'AccountInfoCard: Primary email null/empty, using Google provider email: $initialEmailValue');
+      } catch (_) {
+        // No Google provider found or it doesn't have an email
+        talker.debug(
+            'AccountInfoCard: Primary email null/empty, no Google provider email found.');
+      }
+    }
 
     talker.debug(
-        'AccountInfoCard: Showing LinkEmailPasswordDialog. User email from prop: $initialEmailValue');
+        'AccountInfoCard: Showing LinkEmailPasswordDialog with initial email: $initialEmailValue');
 
     showDialog(
       context: context,
-      barrierDismissible: false, // Added this line
+      barrierDismissible: false,
       builder: (context) => LinkEmailPasswordDialog(
-        initialEmail: initialEmailValue, // Pass the email from user prop
+        initialEmail: initialEmailValue, // Pass the potentially found email
         onSuccess:
             () {}, // Empty callback since we show the message in the dialog
       ),
@@ -62,6 +82,7 @@ class AccountInfoCard extends StatelessWidget {
     if (user == null) return const SizedBox.shrink();
 
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final providers = user!.providerData.map((e) => e.providerId).toList();
     final hasPassword = providers.contains('password');
 
@@ -96,6 +117,30 @@ class AccountInfoCard extends StatelessWidget {
               ],
             ),
             const Divider(height: 24),
+
+            // NEW: Display Pending Email if present
+            if (pendingEmail != null) ...[
+              ListTile(
+                leading: Icon(Icons.hourglass_top_rounded,
+                    color: colorScheme.secondary),
+                title: Text(pendingEmail!,
+                    style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                subtitle: const Text('Pending Verification'),
+                // Use a standard Chip widget
+                trailing: Chip(
+                  label: Text('Unverified', style: textTheme.labelSmall),
+                  backgroundColor: colorScheme.secondaryContainer,
+                  labelStyle:
+                      TextStyle(color: colorScheme.onSecondaryContainer),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  side: BorderSide.none,
+                ),
+                dense: true,
+              ),
+              const SizedBox(height: 8),
+            ],
 
             if (showChangeEmail) ...[
               Padding(

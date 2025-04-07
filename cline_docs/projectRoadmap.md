@@ -128,11 +128,13 @@
 
 ### Recently Completed Tasks
 
-1. **Auth Flow Fixes & Analysis Errors (Current Session)**
-    - Resolved various analysis errors (`unused_element`, `unused_local_variable`, `use_build_context_synchronously`, dead code) across `app_router.dart`, `register_page.dart`, `account_settings_page.dart`, `auth_service.dart`.
-    - Fixed `use_build_context_synchronously` warnings by ensuring `BuildContext` is handled correctly across `await` gaps (using context capturing and `mounted` checks).
-    - Resolved `ref` access issue after `await` in `auth_page.dart`.
-    - Refactored `linkGoogleToAnonymous` merge conflict logic to UI layer (`register_page.dart`, `login_page.dart`).
+1. **Auth Flow Stability & Linking Fixes (Current Session)**
+    - Resolved `GlobalKey` conflict and incorrect navigation after unlinking providers by introducing `authStatusProvider` and refining router logic.
+    - Fixed email pre-population regression in the link dialog.
+    - Ensured UI updates correctly after linking Email/Password to Google by adding provider invalidation.
+    - Added delay to Google unlink process in `AuthService` to improve stability.
+    - Resolved various analysis errors and `use_build_context_synchronously` warnings.
+    - Refactored `linkGoogleToAnonymous` merge conflict logic.
 
 2. **Analysis Errors & Provider Refactoring (Previous Session)**
     - Addressed multiple analysis errors (`unused_import`, `invalid_use_of_protected_member`, `deprecated_member_use`, `use_super_parameters`, `unused_local_variable`).
@@ -182,11 +184,13 @@
 
 ### Recently Completed
 
-1. **Auth Flow Fixes & Analysis Errors (Current Session)**
-    - Resolved various analysis errors (`unused_element`, `unused_local_variable`, `use_build_context_synchronously`, dead code) across `app_router.dart`, `register_page.dart`, `account_settings_page.dart`, `auth_service.dart`.
-    - Fixed `use_build_context_synchronously` warnings by ensuring `BuildContext` is handled correctly across `await` gaps (using context capturing and `mounted` checks).
-    - Resolved `ref` access issue after `await` in `auth_page.dart`.
-    - Refactored `linkGoogleToAnonymous` merge conflict logic to UI layer (`register_page.dart`, `login_page.dart`).
+1. **Auth Flow Stability & Linking Fixes (Current Session)**
+    - Resolved `GlobalKey` conflict and incorrect navigation after unlinking providers.
+    - Fixed email pre-population regression in the link dialog.
+    - Fixed UI update failure after linking Email/Password to Google.
+    - Added delay to Google unlink process for stability.
+    - Resolved various analysis errors and `use_build_context_synchronously` warnings.
+    - Refactored `linkGoogleToAnonymous` merge conflict logic.
 
 2. **Analysis Errors & Provider Refactoring (Previous Session)**
     - Addressed multiple analysis errors (`unused_import`, `invalid_use_of_protected_member`, `deprecated_member_use`, `use_super_parameters`, `unused_local_variable`).

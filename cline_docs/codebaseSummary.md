@@ -2,21 +2,41 @@
 
 ## Recent Changes
 
-### Auth Flow Fixes & Navigation/Context Issues (Current Session)
+### Display Pending Email Update (Current Session)
 
-- **Context:** Resolved various analysis errors, `use_build_context_synchronously` warnings, and context issues related to SnackBars after async operations. Refactored the router to use `StatefulShellRoute` to address `GlobalKey` conflicts during auth state changes. Addressed incorrect redirect after unlinking.
+- **Context:** Improve user feedback after initiating an email change by showing the pending email address in Account Settings.
 - **Changes:**
-  - Refactored `app_router.dart` to use `StatefulShellRoute.indexedStack`.
-  - Updated `ScaffoldWithNavBar` to work with `StatefulShellRoute`.
-  - Corrected `use_build_context_synchronously` warnings in `account_settings_page.dart` and `link_email_password_dialog.dart` using appropriate `mounted` checks for different contexts.
-  - Used root navigator context for SnackBars in `account_settings_page.dart` and `link_email_password_dialog.dart`.
-  - Simplified `LinkEmailPasswordDialog` (removed explicit invalidations/delays).
-  - Removed explicit navigation calls from linking/unlinking functions in `account_settings_page.dart` to rely on GoRouter state changes.
-- **Status:** Completed. **Linking flow fixed.** **Unlinking flow still exhibits `GlobalKey` error and incorrect redirect.**
+  - Created `emailUpdateNotifierProvider` to store the pending email.
+  - Updated `account_settings_page.dart` to set the pending email state on initiating verification and clear it on sign-out/deletion.
+  - Updated `account_info_card.dart` to display the pending email with a chip.
+  - Updated `firestoreUserSyncProvider` in `auth_provider.dart` to automatically clear the pending state when the user's email updates in Firebase Auth or on sign-out/error.
+- **Status:** Completed.
 
-*Section removed as changes are consolidated into the entry above.*
+### Removed Account Limits Dialog (Previous Session)
 
-### Analysis Errors & Provider Refactoring (Current Session)
+### Removed Account Limits Dialog (Current Session)
+
+- **Context:** The `AccountLimitsDialog` (previously shown to anonymous/unverified users) is being removed in favor of a future onboarding experience. This involved removing the dialog widget, its invocation logic, and related parameters/logic in the authentication service.
+- **Changes:**
+  - Deleted `lib/features/profile/presentation/widgets/account_limits_dialog.dart`.
+  - Removed calls to `AccountLimitsDialog.showIfNeeded` and associated Hive timestamp reset logic from `lib/app/loading_wrapper.dart`.
+  - Removed the `skipAccountLimitsDialog` parameter and related Hive timestamp logic from `AuthService.signOut` in `lib/core/services/auth_service.dart`.
+  - Removed the `skipAccountLimitsDialog` argument from `signOut` calls in `lib/features/profile/presentation/pages/account_settings_page.dart` and `lib/features/profile/presentation/pages/reset_password_page.dart`.
+- **Status:** Completed.
+
+### Auth Flow Stability & Linking Fixes (Previous Session)
+
+- **Context:** Resolved several issues related to provider linking/unlinking, including incorrect navigation after unlinking, `GlobalKey` conflicts, email pre-population regressions, and UI update failures.
+- **Changes:**
+  - Introduced `authStatusProvider` to decouple router redirects from internal `User` object changes.
+  - Updated GoRouter `redirect` logic to watch `authStatusProvider`.
+  - Added a delay to `AuthService.unlinkProvider` for Google unlinking to prevent timing issues.
+  - Corrected email lookup logic in `AccountInfoCard` for pre-population.
+  - Added provider invalidation to `linkEmailPasswordToGoogleProvider` for UI updates.
+  - Removed explicit navigation from `_unlinkProvider` in `account_settings_page.dart`.
+- **Status:** Completed. All reported auth flow issues (unlinking navigation, linking UI updates, email pre-population) are resolved.
+
+### Analysis Errors & Provider Refactoring (Previous Session)
 
 - **Context:** Addressed various analysis errors (`unused_import`, `invalid_use_of_protected_member`, `deprecated_member_use`, `use_super_parameters`, `unused_local_variable`) and refactored providers using deprecated `listenSelf` for persistence.
 - **Changes:**
@@ -85,11 +105,11 @@
 - **Changes:** Centralized Firestore updates via `firestoreUserSyncProvider`. Added router logic.
 - **Result:** Linking error resolved. Navigation fixed. Router improved. Revealed email verification UI delay (Obj 42). Riverpod error fixed (Obj 46).
 
-### Prevent Anonymous Dialog After Password Reset (Objective 40) - Completed
+### Prevent Anonymous Dialog After Password Reset (Objective 40) - Completed (Now Removed)
 
 - **Context:** "Account Limits" dialog appeared after authenticated user password reset.
-- **Changes:** Added `skipAccountLimitsDialog` flag to `AuthService.signOut`.
-- **Status:** Implemented.
+- **Changes:** Added `skipAccountLimitsDialog` flag to `AuthService.signOut`. **This flag and related logic have now been removed.**
+- **Status:** Logic removed as part of Account Limits Dialog removal.
 
 ### Email Verification Status Update Fix (Objective 39) - Completed
 
@@ -99,9 +119,9 @@
 
 ## Key Components
 
-### Auth Service (lib/core/services/auth_service.dart)
+### Auth Service (lib/core/services/auth_service.dart) - **Updated**
 
-- **Status:** Centralized Firestore user document creation/updates via `firestoreUserSyncProvider`. `deleteUser` only deletes the Firebase Auth user. Linking/unlinking logic handled via providers/service methods.
+- **Status:** Centralized Firestore user document creation/updates via `firestoreUserSyncProvider`. `deleteUser` only deletes the Firebase Auth user. Linking/unlinking logic handled via providers/service methods. **Removed `skipAccountLimitsDialog` parameter and related Hive logic from `signOut` method.**
 - **Pending:** None directly related to recent changes.
 
 ### User Repository (lib/features/profile/data/repositories/user_repository.dart) - **Updated (Obj 50)**
@@ -124,13 +144,16 @@
 - **Status:** Updated `allow update` rule for `/users/{userId}`. **Corrected `isValidCollectionItem` quantity check.**
 - **Pending:** Testing required.
 
-#### Riverpod Providers (lib/core/providers/)
+#### Riverpod Providers (lib/core/providers/ & lib/features/profile/presentation/providers/) - **Updated**
 
-- **`auth_provider.dart`:** `authStateProvider` calculates state. `firestoreUserSyncProvider` handles sync, resets verification flag, triggers count verification. `linkEmailPasswordToGoogleProvider`, `unlinkProviderProvider` handle specific auth operations.
+- **`auth_provider.dart`:**
+  - `authStateProvider` calculates state.
+  - `firestoreUserSyncProvider` handles Firestore sync, resets `emailVerificationDetectedProvider`, triggers count verification, **and now clears `emailUpdateNotifierProvider` when email is updated or on sign-out/error.**
+  - `linkEmailPasswordToGoogleProvider`, `unlinkProviderProvider` handle specific auth operations.
 - **`email_verification_checker.dart`:** Polls, updates Firestore, sets detection flag.
-- **`firestoreUserSyncProvider`:** Listens to `firebaseUserProvider`. Handles sync, resets detection flag, triggers count verification.
 - **`emailVerificationDetectedProvider`:** Simple `StateProvider<bool>`. Reset logic in `firestoreUserSyncProvider`.
 - **`auto_auth_provider.dart`:** Handles initial anonymous sign-in logic.
+- **`email_update_provider.dart`:** **NEW** `emailUpdateNotifierProvider` (NotifierProvider) manages the state of a pending email update (`pendingEmail`).
 - Core auth state and action providers.
 
 #### Cards Feature Providers (lib/features/cards/presentation/providers/) - **Refactored**
@@ -153,7 +176,9 @@
 
 #### Profile Page Components
 
-- **`account_settings_page.dart`:** **Updated.** Manages account details, re-auth, linking/unlinking calls. Uses root context for SnackBars. Corrected `mounted` checks. **Unlinking still causes navigation issues.**
+- **`account_settings_page.dart`:** **Updated.** Manages account details, re-auth, linking/unlinking calls. Uses root context for SnackBars. Corrected `mounted` checks. Removed `skipAccountLimitsDialog` from `signOut` call. **Now sets/clears `emailUpdateNotifierProvider` state and passes `pendingEmail` to `AccountInfoCard`.**
+- **`account_info_card.dart`:** **Updated.** Added optional `pendingEmail` parameter. Displays pending email using a `ListTile` and `Chip`.
+- **`account_limits_dialog.dart`:** **DELETED.**
 
 #### Collection Page Components - **Updated**
 
@@ -174,7 +199,11 @@
 #### Authentication Pages
 
 - **`register_page.dart`:** Relies on router redirect logic.
-- **`reset_password_page.dart`:** **Updated** to call `signOut` with `skipAccountLimitsDialog: true`.
+- **`reset_password_page.dart`:** **Updated** to remove `skipAccountLimitsDialog` from `signOut` call.
+
+#### App Initialization
+
+- **`loading_wrapper.dart`:** **Updated.** Removed calls to `AccountLimitsDialog.showIfNeeded` and related Hive timestamp logic.
 
 ## Data Flow (Refactored & Updated)
 
@@ -185,8 +214,9 @@
 - **Firestore User Document Creation/Update:** Triggers count verification.
 - **Collection Add/Update Flow:** Deletes on zero quantity.
 - **Email Verification Flow:** Hybrid approach implemented.
-- **Password Reset Flow:** Updated.
-- **Account Deletion Flow:** Simplified, uses helper for cleanup.
+- **Password Reset Flow:** Updated. No longer skips dialog timestamp reset (logic removed).
+- **Account Deletion Flow:** Simplified, uses helper for cleanup. No longer skips dialog timestamp reset (logic removed). **Now clears pending email state.**
+- **Email Update Flow:** **Updated.** Initiating an update now sets a pending email state (`emailUpdateNotifierProvider`). The UI (`AccountInfoCard`) displays this pending email. The state is cleared automatically by `firestoreUserSyncProvider` upon successful verification or sign-out/error.
 - **Cards/Collection Filtering/Search/View:** (Flow Refactored)
   - Each feature uses its own providers.
   - State changes isolated to the respective feature.
@@ -262,9 +292,8 @@ graph TD
 
     subgraph Password Reset Flow
         ResetPage[Reset Password Page] -- Authenticated User --> SendResetEmail[UI Calls AuthService.sendPasswordResetEmail];
-        SendResetEmail --> SignOutWithFlag[UI Calls AuthService.signOut(skipAccountLimitsDialog=true)];
-        SignOutWithFlag --> SkipTimestampReset[AuthService: Skips Hive Timestamp Reset];
-        SkipTimestampReset --> SignOutFirebase[AuthService: Signs out Firebase/Google];
+        SendResetEmail --> SignOutAfterReset[UI Calls AuthService.signOut]; %% Removed skip flag
+        SignOutAfterReset --> SignOutFirebase[AuthService: Signs out Firebase/Google]; %% Removed skip timestamp step
         SignOutFirebase --> AuthState;
         ResetPage -- Unauthenticated User --> SendResetEmail2[UI Calls AuthService.sendPasswordResetEmail];
         SendResetEmail2 --> ShowSuccessMessage[UI Shows Success Message];
@@ -274,8 +303,7 @@ graph TD
         B -- Yes --> SignedInUser;
         SignedInUser --> ActionChoice{Choose Action};
         ActionChoice -- Sign Out --> SignOutNormal[UI Calls AuthService.signOut];
-        SignOutNormal --> ResetTimestamp[AuthService: Resets Hive Timestamp];
-        ResetTimestamp --> SignOutFirebase2[AuthService: Signs out Firebase/Google];
+        SignOutNormal --> SignOutFirebase2[AuthService: Signs out Firebase/Google]; %% Removed timestamp reset step
         SignOutFirebase2 --> AuthState;
         ActionChoice -- Delete Account --> AttemptDelete[UI Calls AuthService.deleteUser];
         AttemptDelete --> DeleteAuth{AuthService: Delete Auth User}; %% Removed Firestore Step
@@ -288,8 +316,8 @@ graph TD
         HandleReauth -- User Re-authenticates --> AttemptDelete; %% Retry the same simplified delete
         HandleReauth -- User Cancels --> SignedInUser;
         HandleSuccess --> ShowSnackbar[Helper: Show Success Snackbar];
-        ShowSnackbar --> FinalSignOut[Helper: Sign Out User (skipAccountLimitsDialog=true)]; %% Updated Node Text
-        FinalSignOut --> NavigateAway[Helper: Navigate Away (with mounted check)]; %% Updated Node Text
+        ShowSnackbar --> FinalSignOut[Helper: Sign Out User]; %% Removed skip flag
+        FinalSignOut --> NavigateAway[Helper: Navigate Away (with mounted check)];
         NavigateAway --> AuthState;
     end
 
@@ -313,11 +341,9 @@ graph TD
     style CancelTimer fill:#ffecb3,stroke:#ffa000,stroke-width:1px
     style UpdateUIImmediate fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
     style StreamEmit fill:#dcedc8,stroke:#689f38,stroke-width:1px
-    style SignOutWithFlag fill:#cce5ff,stroke:#005cb2,stroke-width:1px
-    style SkipTimestampReset fill:#cce5ff,stroke:#005cb2,stroke-width:1px
+    style SignOutAfterReset fill:#cce5ff,stroke:#005cb2,stroke-width:1px %% Updated node name
     style SignOutFirebase fill:#cce5ff,stroke:#005cb2,stroke-width:1px
     style SignOutNormal fill:#e1f5fe,stroke:#0277bd,stroke-width:1px
-    style ResetTimestamp fill:#e1f5fe,stroke:#0277bd,stroke-width:1px
     style SignOutFirebase2 fill:#e1f5fe,stroke:#0277bd,stroke-width:1px
     style ListenAuthState fill:#d1c4e9,stroke:#512da8,stroke-width:2px
     style UserEvent fill:#d1c4e9,stroke:#512da8,stroke-width:1px

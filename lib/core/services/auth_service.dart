@@ -73,9 +73,8 @@ class AuthService {
         final storage = HiveStorage();
         final isBoxAvailable = await storage.isBoxAvailable('settings');
         if (isBoxAvailable) {
-          await storage.put('last_limits_dialog_shown', 0, boxName: 'settings');
-          talker.debug(
-              'Reset account limits dialog timestamp for new anonymous user');
+          // Removed: await storage.put('last_limits_dialog_shown', 0, boxName: 'settings');
+          // Removed: talker.debug('Reset account limits dialog timestamp for new anonymous user');
         }
       }
 
@@ -602,10 +601,8 @@ class AuthService {
   ///
   /// [isInternalAuthFlow] indicates whether this sign out is part of an internal auth flow
   /// (like Google sign-in clean up) rather than an actual user-initiated sign out.
-  /// [skipAccountLimitsDialog] prevents the anonymous account limits dialog timestamp from being reset.
-  Future<void> signOut(
-      {bool isInternalAuthFlow = false,
-      bool skipAccountLimitsDialog = false}) async {
+  // Removed skipAccountLimitsDialog parameter
+  Future<void> signOut({bool isInternalAuthFlow = false}) async {
     talker.info('Attempting sign out...');
     try {
       // Check which providers are linked to sign out appropriately
@@ -625,17 +622,15 @@ class AuthService {
       await _auth.signOut();
       talker.info('Signed out from Firebase.');
 
-      // Only reset the dialog timestamp for actual sign outs, not during auth flows or if skipped
-      if (!isInternalAuthFlow && !skipAccountLimitsDialog) {
-        final storage = HiveStorage();
-        final isBoxAvailable = await storage.isBoxAvailable('settings');
-        if (isBoxAvailable) {
-          await storage.put('last_limits_dialog_shown', 0, boxName: 'settings');
-          talker.debug('Reset account limits dialog timestamp');
-        }
-      } else if (skipAccountLimitsDialog) {
-        talker.debug('Skipped resetting account limits dialog timestamp.');
-      }
+      // Removed logic related to skipAccountLimitsDialog and resetting the timestamp
+      // if (!isInternalAuthFlow) {
+      //   final storage = HiveStorage();
+      //   final isBoxAvailable = await storage.isBoxAvailable('settings');
+      //   if (isBoxAvailable) {
+      //     await storage.put('last_limits_dialog_shown', 0, boxName: 'settings');
+      //     talker.debug('Reset account limits dialog timestamp');
+      //   }
+      // }
 
       // Add a small delay to ensure auth state updates properly
       await Future.delayed(const Duration(milliseconds: 500));
