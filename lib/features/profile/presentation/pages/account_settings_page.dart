@@ -1153,18 +1153,20 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     }
 
     // Determine if the email verification banner should be shown
-    // Show if the specific state is emailNotVerified AND verification hasn't been immediately detected yet.
-    final bool showVerificationBanner =
-        authState.status == AuthStatus.emailNotVerified &&
-            !verificationDetected;
+    // ** REVISED LOGIC: Show only if the user has ONLY password provider and it's unverified **
+    final bool showVerificationBanner = userForUI != null &&
+        userForUI.providerData.length == 1 &&
+        userForUI.providerData.first.providerId == 'password' &&
+        !userForUI.emailVerified &&
+        !verificationDetected;
 
     // Determine if the AccountInfoCard should show the "Email Not Verified" text/chip
-    // ** REVISED LOGIC: Directly use the flag from AuthState for the chip **
+    // ** REVISED LOGIC: Hide chip if verificationDetected is true **
     final bool showUnverifiedChip =
-        authState.emailNotVerified; // Removed && !verificationDetected
+        authState.emailNotVerified && !verificationDetected;
+    // ** CORRECTED LOG V2 **
     talker.debug(
-        'showUnverifiedChip determined by: authState.emailNotVerified (${authState.emailNotVerified}) = $showUnverifiedChip');
-    // Note: The banner logic still uses verificationDetected, but the chip logic does not.
+        'showUnverifiedChip determined by: authState.emailNotVerified (${authState.emailNotVerified}) && !verificationDetected ($verificationDetected) = $showUnverifiedChip');
 
     return Scaffold(
       appBar: AppBarFactory.createAppBar(context, 'Account Settings'),
@@ -1187,8 +1189,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                 children: [
                   // --- Conditionally show Verification Banner ---
                   // Use the updated showVerificationBanner logic
-                  if (showVerificationBanner && userForUI != null)
-                    _buildVerificationBanner(context, colorScheme, userForUI),
+                  if (showVerificationBanner) // Removed redundant null check
+                    _buildVerificationBanner(context, colorScheme,
+                        userForUI), // Removed unnecessary null assertion
                   // --- END: Verification Banner ---
 
                   // Profile Header with display name

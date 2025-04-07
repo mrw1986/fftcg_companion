@@ -597,255 +597,287 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     final authState = ref.watch(authStateProvider);
     final isAnonymous = authState.isAnonymous;
 
-    return Scaffold(
-      appBar: AppBarFactory.createAppBar(
-          context, isAnonymous ? 'Complete Registration' : 'Register'),
-      body: _isLoading
-          ? const Center(child: LoadingIndicator())
-          : Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 16),
-                    // Logo with rounded rectangle container using primary color
-                    Container(
-                      width: 240,
-                      height: 240,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary,
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Center(
-                        child: Image.asset(
-                          'assets/images/logo_transparent.png',
-                          height: 200,
-                          width: 200,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16), // Reduced spacing
-                    if (isAnonymous)
+    // Wrap the Scaffold with PopScope
+    return PopScope(
+      canPop: false, // Prevent default system pop
+      // Use onPopInvokedWithResult instead of onPopInvoked
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        // Removed '?' from dynamic
+        // If pop was prevented by canPop: false, 'didPop' will be false.
+        // If didPop is true, it means the pop happened for some other reason (e.g. programmatic pop)
+        if (didPop) {
+          return;
+        }
+        // Perform custom navigation when system back gesture is used
+        talker.debug(
+            'RegisterPage PopScope: System back gesture detected, navigating to /profile');
+        GoRouter.of(context).go('/profile');
+      },
+      child: Scaffold(
+        appBar: AppBarFactory.createAppBar(
+          context,
+          isAnonymous ? 'Complete Registration' : 'Register',
+          automaticallyImplyLeading: false, // Keep this false
+          // Always add a BackButton to the leading position
+          leading: BackButton(
+            // Use context.go to navigate back to the profile page
+            onPressed: () => GoRouter.of(context).go('/profile'),
+          ),
+        ),
+        body: _isLoading
+            ? const Center(child: LoadingIndicator())
+            : Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 16),
+                      // Logo with rounded rectangle container using primary color
                       Container(
-                        padding: const EdgeInsets.all(16),
-                        margin:
-                            const EdgeInsets.only(bottom: 16), // Reduced margin
+                        width: 240,
+                        height: 240,
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.primary,
-                            width: 1,
-                          ),
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(24),
                         ),
-                        child: Text(
-                          'You\'re currently using the app without an account. Complete your registration to save your collection, decks, and settings.',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer,
+                        child: Center(
+                          child: Image.asset(
+                            'assets/images/logo_transparent.png',
+                            height: 200,
+                            width: 200,
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),
-                    Form(
-                      key: _formKey,
-                      child: Column(
-                        children: [
-                          TextFormField(
-                            controller: _emailController,
-                            decoration: const InputDecoration(
-                              labelText: 'Email',
-                              border: OutlineInputBorder(),
+                      const SizedBox(height: 16), // Reduced spacing
+                      if (isAnonymous)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          margin: const EdgeInsets.only(
+                              bottom: 16), // Reduced margin
+                          decoration: BoxDecoration(
+                            color:
+                                Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 1,
                             ),
-                            keyboardType: TextInputType.emailAddress,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                  .hasMatch(value)) {
-                                return 'Please enter a valid email';
-                              }
-                              return null;
-                            },
                           ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _passwordController,
-                            decoration: InputDecoration(
-                              labelText: 'Password (8+ characters)',
-                              border: const OutlineInputBorder(),
-                              helperText:
-                                  'Must include uppercase, lowercase, number, and special character',
-                              helperMaxLines: 2,
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _showPassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                onPressed: () => setState(
-                                    () => _showPassword = !_showPassword),
-                              ),
+                          child: Text(
+                            'You\'re currently using the app without an account. Complete your registration to save your collection, decks, and settings.',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onPrimaryContainer,
                             ),
-                            obscureText: !_showPassword,
-                            focusNode: _passwordFocusNode, // Assign FocusNode
-                            // onTap removed, focus handled by FocusNode listener
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter a password';
-                              }
-                              if (value.length < 8) {
-                                return 'Password must be at least 8 characters long.';
-                              }
-                              // Check for uppercase letter
-                              if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
-                                return 'Password must contain an uppercase letter.';
-                              }
-                              // Check for lowercase letter
-                              if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
-                                return 'Password must contain a lowercase letter.';
-                              }
-                              // Check for numeric character
-                              if (!RegExp(r'(?=.*[0-9])').hasMatch(value)) {
-                                return 'Password must contain a number.';
-                              }
-                              // Check for special character
-                              if (!RegExp(r'(?=.*[!@#$%^&*(),.?":{}|<>])')
-                                  .hasMatch(value)) {
-                                return 'Password must contain a special character.';
-                              }
-                              return null; // Password is valid
-                            },
                           ),
-                          // Conditionally show requirements based on focus state
-                          if (_isPasswordFocused) ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surface,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .outline
-                                      .withValues(
-                                          alpha: 0.5), // 0.5 * 255 = 128
-                                ),
+                        ),
+                      Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            TextFormField(
+                              controller: _emailController,
+                              decoration: const InputDecoration(
+                                labelText: 'Email',
+                                border: OutlineInputBorder(),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Password Requirements:',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                    ),
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your email';
+                                }
+                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                    .hasMatch(value)) {
+                                  return 'Please enter a valid email';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _passwordController,
+                              decoration: InputDecoration(
+                                labelText: 'Password (8+ characters)',
+                                border: const OutlineInputBorder(),
+                                helperText:
+                                    'Must include uppercase, lowercase, number, and special character',
+                                helperMaxLines: 2,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _showPassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text('• At least 8 characters long'),
-                                  Text('• At least one uppercase letter (A-Z)'),
-                                  Text('• At least one lowercase letter (a-z)'),
-                                  Text('• At least one number (0-9)'),
-                                  Text(
-                                      '• At least one special character (!@#\$%^&*(),.?":{}|<>)'),
-                                ],
+                                  onPressed: () => setState(
+                                      () => _showPassword = !_showPassword),
+                                ),
+                              ),
+                              obscureText: !_showPassword,
+                              focusNode: _passwordFocusNode, // Assign FocusNode
+                              // onTap removed, focus handled by FocusNode listener
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter a password';
+                                }
+                                if (value.length < 8) {
+                                  return 'Password must be at least 8 characters long.';
+                                }
+                                // Check for uppercase letter
+                                if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
+                                  return 'Password must contain an uppercase letter.';
+                                }
+                                // Check for lowercase letter
+                                if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
+                                  return 'Password must contain a lowercase letter.';
+                                }
+                                // Check for numeric character
+                                if (!RegExp(r'(?=.*[0-9])').hasMatch(value)) {
+                                  return 'Password must contain a number.';
+                                }
+                                // Check for special character
+                                if (!RegExp(r'(?=.*[!@#$%^&*(),.?":{}|<>])')
+                                    .hasMatch(value)) {
+                                  return 'Password must contain a special character.';
+                                }
+                                return null; // Password is valid
+                              },
+                            ),
+                            // Conditionally show requirements based on focus state
+                            if (_isPasswordFocused) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .outline
+                                        .withValues(
+                                            alpha: 0.5), // 0.5 * 255 = 128
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Password Requirements:',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text('• At least 8 characters long'),
+                                    Text(
+                                        '• At least one uppercase letter (A-Z)'),
+                                    Text(
+                                        '• At least one lowercase letter (a-z)'),
+                                    Text('• At least one number (0-9)'),
+                                    Text(
+                                        '• At least one special character (!@#\$%^&*(),.?":{}|<>)'),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _confirmPasswordController,
+                              decoration: InputDecoration(
+                                labelText: 'Confirm Password',
+                                border: const OutlineInputBorder(),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _showConfirmPassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                  ),
+                                  onPressed: () => setState(() =>
+                                      _showConfirmPassword =
+                                          !_showConfirmPassword),
+                                ),
+                              ),
+                              obscureText: !_showConfirmPassword,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please confirm your password';
+                                }
+                                if (value != _passwordController.text) {
+                                  return 'Passwords do not match';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            Center(
+                              child: StyledButton(
+                                onPressed: _isLoading
+                                    ? null
+                                    : _submitEmailPasswordForm, // Updated onPressed
+                                text: isAnonymous
+                                    ? 'Complete Registration'
+                                    : 'Register',
                               ),
                             ),
                           ],
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _confirmPasswordController,
-                            decoration: InputDecoration(
-                              labelText: 'Confirm Password',
-                              border: const OutlineInputBorder(),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _showConfirmPassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                onPressed: () => setState(() =>
-                                    _showConfirmPassword =
-                                        !_showConfirmPassword),
-                              ),
-                            ),
-                            obscureText: !_showConfirmPassword,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please confirm your password';
-                              }
-                              if (value != _passwordController.text) {
-                                return 'Passwords do not match';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 24),
-                          Center(
-                            child: StyledButton(
+                        ),
+                      ),
+
+                      // Add Google Sign-In button below the Complete Registration button (no divider)
+                      const SizedBox(height: 16),
+                      GoogleSignInButton(
+                        isLoading: _isLoading, // Pass loading state
+                        onPressed: _isLoading
+                            ? null
+                            : () async {
+                                await _signInWithGoogle();
+                              },
+                        // onError removed, handled within _signInWithGoogle
+                        text: isAnonymous
+                            ? 'Continue with Google'
+                            : 'Register with Google',
+                      ),
+
+                      if (!isAnonymous) ...[
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            TextButton(
                               onPressed: _isLoading
                                   ? null
-                                  : _submitEmailPasswordForm, // Updated onPressed
-                              text: isAnonymous
-                                  ? 'Complete Registration'
-                                  : 'Register',
+                                  : () => context.go(
+                                      '/auth'), // Navigate to top-level /auth
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.primary,
+                              ),
+                              child:
+                                  const Text('Already have an account? Login'),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Add Google Sign-In button below the Complete Registration button (no divider)
-                    const SizedBox(height: 16),
-                    GoogleSignInButton(
-                      isLoading: _isLoading, // Pass loading state
-                      onPressed: _isLoading
-                          ? null
-                          : () async {
-                              await _signInWithGoogle();
-                            },
-                      // onError removed, handled within _signInWithGoogle
-                      text: isAnonymous
-                          ? 'Continue with Google'
-                          : 'Register with Google',
-                    ),
-
-                    if (!isAnonymous) ...[
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          TextButton(
-                            onPressed: _isLoading
-                                ? null
-                                : () => context
-                                    .go('/auth'), // Navigate to top-level /auth
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
-                              foregroundColor:
-                                  Theme.of(context).colorScheme.primary,
-                            ),
-                            child: const Text('Already have an account? Login'),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
+      ),
     );
   }
 }

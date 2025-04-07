@@ -192,7 +192,8 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                   ),
                   onPressed: () {
                     Navigator.of(dialogContext).pop();
-                    GoRouter.of(currentContext).go('/profile/register');
+                    GoRouter.of(currentContext)
+                        .go('/register'); // Corrected path
                   },
                   child: const Text('Create Account'),
                 ),
@@ -398,218 +399,244 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Scaffold(
-      appBar: AppBarFactory.createAppBar(context, 'Sign In'),
-      // Use a conditional loading overlay instead of replacing the whole body
-      body: Stack(
-        children: [
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 16),
-                  // Logo
-                  Container(
-                    width: 240,
-                    height: 240,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Center(
-                      child: Image.asset(
-                        'assets/images/logo_transparent.png',
-                        height: 200,
-                        width: 200,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Anonymous user banner
-                  if (isAnonymous)
+    // Wrap the Scaffold with PopScope
+    return PopScope(
+      canPop: false, // Prevent default system pop
+      // Use onPopInvokedWithResult instead of onPopInvoked
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        // Removed '?' from dynamic
+        // If pop was prevented by canPop: false, 'didPop' will be false.
+        // If didPop is true, it means the pop happened for some other reason (e.g. programmatic pop)
+        if (didPop) {
+          return;
+        }
+        // Perform custom navigation when system back gesture is used
+        talker.debug(
+            'AuthPage PopScope: System back gesture detected, navigating to /profile');
+        GoRouter.of(context).go('/profile');
+      },
+      child: Scaffold(
+        // Use AppBarFactory and pass the BackButton to the leading parameter
+        appBar: AppBarFactory.createAppBar(
+          context,
+          'Sign In',
+          automaticallyImplyLeading: false, // Keep this false
+          // Always add a BackButton to the leading position
+          leading: BackButton(
+            // Use context.go to navigate back to the profile page
+            onPressed: () => GoRouter.of(context).go('/profile'),
+          ),
+        ),
+        // Use a conditional loading overlay instead of replacing the whole body
+        body: Stack(
+          children: [
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 16),
+                    // Logo
                     Container(
-                      padding: const EdgeInsets.all(16),
-                      margin: const EdgeInsets.only(bottom: 16),
+                      width: 240,
+                      height: 240,
                       decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: colorScheme.primary,
-                          width: 1,
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Center(
+                        child: Image.asset(
+                          'assets/images/logo_transparent.png',
+                          height: 200,
+                          width: 200,
+                          fit: BoxFit.contain,
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Anonymous user banner
+                    if (isAnonymous)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: colorScheme.primary,
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'You are currently signed in as a guest.', // Simplified message
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Sign in with Email/Password or Google to save your data permanently.', // Clearer call to action
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Note: Guest data is temporary and may be lost.', // Simplified warning
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontStyle: FontStyle.italic,
+                                color: colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Email/Password Form
+                    Form(
+                      key: _formKey,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'You are currently signed in as a guest.', // Simplified message
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onPrimaryContainer,
+                          TextFormField(
+                            controller: _emailController,
+                            decoration: const InputDecoration(
+                              labelText: 'Email',
+                              border: OutlineInputBorder(),
                             ),
+                            keyboardType: TextInputType.emailAddress,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your email';
+                              }
+                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                  .hasMatch(value)) {
+                                return 'Please enter a valid email';
+                              }
+                              return null;
+                            },
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Sign in with Email/Password or Google to save your data permanently.', // Clearer call to action
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: colorScheme.onPrimaryContainer,
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _passwordController,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              border: const OutlineInputBorder(),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _showPassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: colorScheme.primary,
+                                ),
+                                onPressed: () => setState(
+                                    () => _showPassword = !_showPassword),
+                                tooltip: _showPassword
+                                    ? 'Hide password'
+                                    : 'Show password',
+                              ),
                             ),
+                            obscureText: !_showPassword,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your password';
+                              }
+                              if (value.length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
+                              return null;
+                            },
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Note: Guest data is temporary and may be lost.', // Simplified warning
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontStyle: FontStyle.italic,
-                              color: colorScheme.onPrimaryContainer,
+                          const SizedBox(height: 24),
+                          Center(
+                            child: StyledButton(
+                              // Wrap async call in a non-async lambda
+                              onPressed: _isLoading
+                                  ? null
+                                  : () {
+                                      _signInWithEmailAndPassword();
+                                    },
+                              text: 'Sign In with Email', // More specific
                             ),
                           ),
                         ],
                       ),
                     ),
 
-                  // Email/Password Form
-                  Form(
-                    key: _formKey,
-                    child: Column(
+                    const SizedBox(height: 16),
+                    // Google Sign In Button
+                    GoogleSignInButton(
+                      isLoading: _isLoading, // Pass loading state
+                      onPressed: _isLoading
+                          ? null
+                          : () async {
+                              // Disable if loading
+                              await _signInWithGoogle();
+                            },
+                      // Removed onError handler from button instance
+                      text: 'Continue with Google',
+                    ),
+
+                    const SizedBox(height: 16),
+                    // Other Links
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        TextFormField(
-                          controller: _emailController,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                            border: OutlineInputBorder(),
+                        TextButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () => context.go('/register'), // Corrected path
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            foregroundColor: colorScheme.primary,
                           ),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your email';
-                            }
-                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                .hasMatch(value)) {
-                              return 'Please enter a valid email';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            border: const OutlineInputBorder(),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _showPassword
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                                color: colorScheme.primary,
-                              ),
-                              onPressed: () => setState(
-                                  () => _showPassword = !_showPassword),
-                              tooltip: _showPassword
-                                  ? 'Hide password'
-                                  : 'Show password',
-                            ),
-                          ),
-                          obscureText: !_showPassword,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your password';
-                            }
-                            if (value.length < 6) {
-                              return 'Password must be at least 6 characters';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 24),
-                        Center(
-                          child: StyledButton(
-                            // Wrap async call in a non-async lambda
-                            onPressed: _isLoading
-                                ? null
-                                : () {
-                                    _signInWithEmailAndPassword();
-                                  },
-                            text: 'Sign In with Email', // More specific
-                          ),
+                          child: const Text('Create a new account'),
                         ),
                       ],
                     ),
-                  ),
-
-                  const SizedBox(height: 16),
-                  // Google Sign In Button
-                  GoogleSignInButton(
-                    isLoading: _isLoading, // Pass loading state
-                    onPressed: _isLoading
-                        ? null
-                        : () async {
-                            // Disable if loading
-                            await _signInWithGoogle();
-                          },
-                    // Removed onError handler from button instance
-                    text: 'Continue with Google',
-                  ),
-
-                  const SizedBox(height: 16),
-                  // Other Links
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      TextButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () => context
-                                .go('/profile/register'), // Disable if loading
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          foregroundColor: colorScheme.primary,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        TextButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () => context
+                                  .go('/reset-password'), // Corrected path
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            foregroundColor: colorScheme.primary,
+                          ),
+                          child: const Text('Forgot password?'),
                         ),
-                        child: const Text('Create a new account'),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      TextButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () => context.go(
-                                '/profile/reset-password'), // Disable if loading
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          foregroundColor: colorScheme.primary,
-                        ),
-                        child: const Text('Forgot password?'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Loading overlay
-          if (_isLoading)
-            const Positioned.fill(
-              child: AbsorbPointer(
-                // Prevent interaction with UI below
-                child: Center(
-                  child: LoadingIndicator(),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
-        ],
+            // Loading overlay
+            if (_isLoading)
+              const Positioned.fill(
+                child: AbsorbPointer(
+                  // Prevent interaction with UI below
+                  child: Center(
+                    child: LoadingIndicator(),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

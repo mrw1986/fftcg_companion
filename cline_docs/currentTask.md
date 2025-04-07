@@ -1,26 +1,25 @@
 # Current Task
 
-## Current Objective: Fix Email Verification Status Update After Linking (Attempt 2)
+## Current Objective: Fix System Back Gesture from Auth/Register Pages (Final)
 
 ### Context
 
-- After linking Email/Password to Google and verifying the email, the UI state still didn't update correctly.
-- Previous fix adjusted the `EmailVerificationChecker` trigger, but the issue persisted.
-- Further analysis suggested the `authStateProvider` might be incorrectly calculating the state or the `AuthState` constructor might be setting the internal `emailNotVerified` flag incorrectly even when the overall status should be `authenticated`.
+- After fixing the AppBar back button navigation from `/auth` and `/register` to explicitly go to `/profile`, the system back button/gesture still didn't work correctly on `RegisterPage`.
+- This was because the `PopScope` widget was needed to intercept the system back action and perform the custom navigation (`context.go('/profile')`).
+- Previous attempts added `PopScope` but used deprecated APIs or had implementation issues.
 
 ### Actions Taken
 
-1. **Modified `authStateProvider` Logic:** Updated the state calculation logic in `lib/core/providers/auth_provider.dart`. It now returns `AuthStatus.emailNotVerified` *only* if the user has *only* an unverified email/password provider. Otherwise (if email is verified OR Google is linked), it returns `AuthStatus.authenticated`.
-2. **Modified `AuthState` Constructor:** Simplified the `AuthState.authenticated` constructor to always set its internal `emailNotVerified` flag to `false`. The distinction between verified/unverified is now solely handled by the `AuthStatus` enum returned by `authStateProvider`.
+1. **Corrected `PopScope` in `AuthPage`:** Updated `lib/features/profile/presentation/pages/auth_page.dart` to use the correct `onPopInvokedWithResult` callback and removed an unnecessary nullable type (`dynamic?` -> `dynamic`).
+2. **Corrected `PopScope` in `RegisterPage`:** Updated `lib/features/profile/presentation/pages/register_page.dart` to use the correct `onPopInvokedWithResult` callback and removed an unnecessary nullable type.
 
 ### Status
 
-- Completed. This change should ensure the correct `AuthState` (with `emailNotVerified: false`) is emitted once the underlying `User` object reports `emailVerified: true`.
+- Completed. Both `AuthPage` and `RegisterPage` now correctly use `PopScope` with `onPopInvokedWithResult` to handle the system back gesture by navigating explicitly to `/profile`.
 
 ### Next Steps
 
-- Update `codebaseSummary.md` to reflect these changes.
-- Request user testing for the scenario: Link Email/Pass to Google -> Verify Email -> Check if UI updates correctly.
+- Request final user testing to confirm that both the AppBar back button and the system back gesture correctly navigate back to the Profile page from the Sign In (`/auth`) and Register (`/register`) pages.
 
 ## Previous Objectives (Completed)
 

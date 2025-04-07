@@ -60,7 +60,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => context.go('/profile/auth'),
+                    onPressed: () => context.go('/auth'), // Corrected path
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colorScheme.primary,
                       foregroundColor: colorScheme.onPrimary,
@@ -74,7 +74,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => context.go('/profile/register'),
+                    onPressed: () => context.go('/register'), // Corrected path
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colorScheme.primary,
                       foregroundColor: colorScheme.onPrimary,

@@ -9,6 +9,7 @@ class AppBarFactory {
     List<Widget>? actions,
     bool automaticallyImplyLeading = true,
     PreferredSizeWidget? bottom,
+    Widget? leading, // Added leading parameter
   }) {
     // Get the color scheme from the current theme
     final colorScheme = Theme.of(context).colorScheme;
@@ -21,6 +22,7 @@ class AppBarFactory {
       iconTheme: IconThemeData(color: colorScheme.onPrimary),
       actions: actions,
       automaticallyImplyLeading: automaticallyImplyLeading,
+      leading: leading, // Pass leading widget
       bottom: bottom,
       elevation: 1,
     );
@@ -35,6 +37,7 @@ class AppBarFactory {
     List<Widget>? actions,
     bool automaticallyImplyLeading = true,
     PreferredSizeWidget? bottom,
+    Widget? leading, // Added leading parameter
   }) {
     final textColor = _getTextColorForBackground(backgroundColor);
     return AppBar(
@@ -44,6 +47,7 @@ class AppBarFactory {
       iconTheme: IconThemeData(color: textColor),
       actions: actions,
       automaticallyImplyLeading: automaticallyImplyLeading,
+      leading: leading, // Pass leading widget
       bottom: bottom,
       elevation: 1,
     );

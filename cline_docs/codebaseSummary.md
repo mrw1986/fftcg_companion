@@ -2,6 +2,15 @@
 
 ## Recent Changes
 
+### Fix Email Verification UI (Chip/Banner) (Current Session - Attempts 3, 4, 5)
+
+- **Context:** After linking Email/Password to Google, the "Unverified" chip appeared correctly (Attempt 3), but the top banner also appeared incorrectly (Attempt 4). After fixing the banner, the chip then failed to disappear after email verification (Attempt 5).
+- **Changes:**
+  - **Attempt 3:** Corrected `authStateProvider` logic (`lib/core/providers/auth_provider.dart`) to return `AuthStatus.emailNotVerified` if `hasPasswordProvider && !user.emailVerified`, regardless of other providers.
+  - **Attempt 4:** Refined banner visibility logic in `AccountSettingsPage` to only show if the *sole* auth method is unverified email/password.
+  - **Attempt 5:** Refined chip visibility logic in `AccountSettingsPage` to hide the chip immediately when `emailVerificationDetectedProvider` becomes true (`showUnverifiedChip = authState.emailNotVerified && !verificationDetected`). Fixed related debug log and lint error.
+- **Status:** Banner logic fixed. Chip logic fixed. **Testing needed** to confirm the chip now disappears correctly after verification.
+
 ### Fix Email Verification Status Update After Linking (Current Session)
 
 - **Context:** After linking Email/Password to Google and verifying the email, the UI state didn't update to show the verified status because the `EmailVerificationChecker` wasn't running when the `AuthState` was `authenticated` (due to Google), even if the linked email was unverified.

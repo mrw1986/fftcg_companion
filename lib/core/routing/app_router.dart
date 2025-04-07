@@ -83,16 +83,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       // 2. Unauthenticated on Protected Route -> /auth
-      if ((authStatus == AuthStatus.unauthenticated ||
-              authStatus == AuthStatus.anonymous) &&
-          !isPublicRoute) {
+      //    (Anonymous users are now ALLOWED on protected routes)
+      if (authStatus == AuthStatus.unauthenticated && !isPublicRoute) {
         talker.debug(
-            'Router Redirect: Unauthenticated/Anonymous on protected route -> /auth');
+            'Router Redirect: Unauthenticated on protected route -> /auth');
         return '/auth';
       }
 
-      // 3. Authenticated on Public Auth Route -> /profile/account
-      //    (Includes emailNotVerified state as they are technically authenticated)
+      // 3. Authenticated or EmailNotVerified on Public Auth Route -> /profile/account
       if ((authStatus == AuthStatus.authenticated ||
               authStatus == AuthStatus.emailNotVerified) &&
           isPublicRoute) {
@@ -101,15 +99,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/profile/account';
       }
 
-      // 4. Authenticated on a PROTECTED route
-      //    Since we are now watching only the status, if the status is authenticated
-      //    and we are on a protected route, no redirect is needed, even if the
-      //    underlying User object changes (like after unlinking).
+      // 4. Authenticated, EmailNotVerified, or Anonymous on a PROTECTED route
+      //    No redirect needed.
       if ((authStatus == AuthStatus.authenticated ||
-              authStatus == AuthStatus.emailNotVerified) &&
+              authStatus == AuthStatus.emailNotVerified ||
+              authStatus == AuthStatus.anonymous) && // Allow anonymous here
           !isPublicRoute) {
         talker.debug(
-            'Router Redirect: Authenticated on protected route ($location), staying put.');
+            'Router Redirect: Authenticated/EmailNotVerified/Anonymous on protected route ($location), staying put.');
         return null; // Explicitly stay
       }
 

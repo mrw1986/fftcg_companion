@@ -288,12 +288,13 @@ final authStateProvider = Provider<AuthState>((ref) {
             'authStateProvider: Checking user state. hasPassword: $hasPasswordProvider, hasGoogle: $hasGoogleProvider, emailVerified: ${user.emailVerified}');
         // *** END LOGGING ***
 
-        // If user has ONLY an unverified email/password provider, return emailNotVerified state
-        if (hasPasswordProvider && !user.emailVerified && !hasGoogleProvider) {
+        // If user has an email/password provider and the email is not verified, return emailNotVerified state
+        // This takes precedence over other providers being linked.
+        if (hasPasswordProvider && !user.emailVerified) {
           talker.debug('authStateProvider: Returning emailNotVerified');
           return AuthState.emailNotVerified(user);
         }
-        // Otherwise (user is verified OR has Google provider), return authenticated state
+        // Otherwise (user has no email/password OR it's verified), return authenticated state
 
         // User either has no email/password or it's verified
         talker.debug('authStateProvider: Returning authenticated (verified)');
