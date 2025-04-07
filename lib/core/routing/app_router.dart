@@ -44,11 +44,12 @@ final _shellNavigatorKeyProfile =
 final routerProvider = Provider<GoRouter>((ref) {
   final rootNavigatorKey = ref.watch(rootNavigatorKeyProvider);
   // Listen to auth state changes to trigger redirects
-  final authStateListenable =
-      ValueNotifier<AuthState>(const AuthState.loading());
-  ref.listen(authStateProvider, (_, next) {
-    authStateListenable.value = next;
-  });
+  // No longer needed as redirect directly watches the provider
+  // final authStateListenable =
+  //     ValueNotifier<AuthState>(const AuthState.loading());
+  // ref.listen(authStateProvider, (_, next) {
+  //   authStateListenable.value = next;
+  // });
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -57,51 +58,63 @@ final routerProvider = Provider<GoRouter>((ref) {
     // REMOVED refreshListenable, using ref.watch in redirect instead
     // Add redirect logic
     redirect: (BuildContext context, GoRouterState state) {
-      // WATCH the auth state provider to react to changes
-      final authState = ref.watch(authStateProvider);
+      // WATCH the NEW authStatusProvider to react ONLY to status changes
+      final authStatus = ref.watch(authStatusProvider);
       final location = state.uri.toString(); // Use full path with query params
 
       talker.debug(
-          'Router Redirect Check: Location="$location", AuthStatus=${authState.status}');
+          'Router Redirect Check: Location="$location", AuthStatus=$authStatus');
 
       // Define public routes accessible without full authentication
-      // These are now top-level routes, but the logic remains the same
       final publicRoutes = [
-        '/auth', // Changed from /profile/auth
-        '/register', // Changed from /profile/register
-        '/reset-password', // Changed from /profile/reset-password
+        '/auth',
+        '/register',
+        '/reset-password',
       ];
 
       // Check if the current route is one of the public routes
       final isPublicRoute =
           publicRoutes.any((route) => location.startsWith(route));
 
-      // If loading, don't redirect yet
-      if (authState.isLoading) {
+      // 1. Loading State
+      if (authStatus == AuthStatus.loading) {
         talker.debug('Router Redirect: Auth loading, no redirect.');
         return null;
       }
 
-      // If unauthenticated or anonymous AND trying to access a protected route
-      if ((authState.isUnauthenticated || authState.isAnonymous) &&
+      // 2. Unauthenticated on Protected Route -> /auth
+      if ((authStatus == AuthStatus.unauthenticated ||
+              authStatus == AuthStatus.anonymous) &&
           !isPublicRoute) {
         talker.debug(
             'Router Redirect: Unauthenticated/Anonymous on protected route -> /auth');
-        return '/auth'; // Redirect to login/auth page (now top-level)
+        return '/auth';
       }
 
-      // If authenticated or emailNotVerified AND currently on a public auth route
-      if ((authState.isAuthenticated || authState.isEmailNotVerifiedState) &&
+      // 3. Authenticated on Public Auth Route -> /profile/account
+      //    (Includes emailNotVerified state as they are technically authenticated)
+      if ((authStatus == AuthStatus.authenticated ||
+              authStatus == AuthStatus.emailNotVerified) &&
           isPublicRoute) {
         talker.debug(
             'Router Redirect: Authenticated/EmailNotVerified on public auth route -> /profile/account');
-        // Redirect to account settings page (still inside the shell)
-        // Note: The target path '/profile/account' must exist within one of the StatefulShellRoute branches.
         return '/profile/account';
       }
 
-      // No redirect needed
-      talker.debug('Router Redirect: No redirect needed.');
+      // 4. Authenticated on a PROTECTED route
+      //    Since we are now watching only the status, if the status is authenticated
+      //    and we are on a protected route, no redirect is needed, even if the
+      //    underlying User object changes (like after unlinking).
+      if ((authStatus == AuthStatus.authenticated ||
+              authStatus == AuthStatus.emailNotVerified) &&
+          !isPublicRoute) {
+        talker.debug(
+            'Router Redirect: Authenticated on protected route ($location), staying put.');
+        return null; // Explicitly stay
+      }
+
+      // 5. Default: Should theoretically not be reached if logic above is sound, but return null just in case.
+      talker.debug('Router Redirect: No redirect needed (default/fallback).');
       return null;
     },
     // Add error handler

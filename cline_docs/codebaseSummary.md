@@ -2,25 +2,19 @@
 
 ## Recent Changes
 
-### Auth Flow Fixes & Analysis Errors (Session 1)
+### Auth Flow Fixes & Navigation/Context Issues (Current Session)
 
-- **Context:** Resolved various analysis errors (`unused_element`, `unused_local_variable`, `use_build_context_synchronously`, dead code) and ensured correct `BuildContext` handling across `await` gaps in authentication-related pages.
+- **Context:** Resolved various analysis errors, `use_build_context_synchronously` warnings, and context issues related to SnackBars after async operations. Refactored the router to use `StatefulShellRoute` to address `GlobalKey` conflicts during auth state changes. Addressed incorrect redirect after unlinking.
 - **Changes:**
-  - Removed dead code in `auth_service.dart`.
-  - Fixed `use_build_context_synchronously` warnings in `register_page.dart` and `account_settings_page.dart` using context capturing and `mounted` checks.
-  - Resolved `ref` access issue after `await` in `auth_page.dart`.
-  - Refactored `linkGoogleToAnonymous` merge conflict logic from `AuthService` to UI layer (`register_page.dart`, `login_page.dart`).
-- **Status:** Completed. Testing required.
+  - Refactored `app_router.dart` to use `StatefulShellRoute.indexedStack`.
+  - Updated `ScaffoldWithNavBar` to work with `StatefulShellRoute`.
+  - Corrected `use_build_context_synchronously` warnings in `account_settings_page.dart` and `link_email_password_dialog.dart` using appropriate `mounted` checks for different contexts.
+  - Used root navigator context for SnackBars in `account_settings_page.dart` and `link_email_password_dialog.dart`.
+  - Simplified `LinkEmailPasswordDialog` (removed explicit invalidations/delays).
+  - Removed explicit navigation calls from linking/unlinking functions in `account_settings_page.dart` to rely on GoRouter state changes.
+- **Status:** Completed. **Linking flow fixed.** **Unlinking flow still exhibits `GlobalKey` error and incorrect redirect.**
 
-### Auth Flow Fixes & Analysis Errors (Current Session)
-
-- **Context:** Resolved various analysis errors (`unused_element`, `unused_local_variable`, `use_build_context_synchronously`, dead code) and ensured correct `BuildContext` handling across `await` gaps in authentication-related pages.
-- **Changes:**
-  - Removed dead code in `auth_service.dart`.
-  - Fixed `use_build_context_synchronously` warnings in `register_page.dart` and `account_settings_page.dart` using context capturing and `mounted` checks.
-  - Resolved `ref` access issue after `await` in `auth_page.dart`.
-  - Refactored `linkGoogleToAnonymous` merge conflict logic from `AuthService` to UI layer (`register_page.dart`, `login_page.dart`).
-- **Status:** Completed. Testing required.
+*Section removed as changes are consolidated into the entry above.*
 
 ### Analysis Errors & Provider Refactoring (Current Session)
 
@@ -105,10 +99,10 @@
 
 ## Key Components
 
-### Auth Service (lib/core/services/auth_service.dart) - **Refactored & Updated (Obj 45)**
+### Auth Service (lib/core/services/auth_service.dart)
 
-- **Status:** Centralized Firestore user document creation/updates via `firestoreUserSyncProvider`. `deleteUser` now *only* deletes the Firebase Auth user.
-- **Pending:** Test deletion flow.
+- **Status:** Centralized Firestore user document creation/updates via `firestoreUserSyncProvider`. `deleteUser` only deletes the Firebase Auth user. Linking/unlinking logic handled via providers/service methods.
+- **Pending:** None directly related to recent changes.
 
 ### User Repository (lib/features/profile/data/repositories/user_repository.dart) - **Updated (Obj 50)**
 
@@ -132,11 +126,11 @@
 
 #### Riverpod Providers (lib/core/providers/)
 
-- **`auth_provider.dart`:** **Updated (Objective 46, 50)** `authStateProvider` calculates state. `firestoreUserSyncProvider` handles sync, resets verification flag, triggers count verification. Removed incorrect listener.
-- **`email_verification_checker.dart`:** **Updated (Objective 42 - Attempt 2, Obj 46)** Polls, updates Firestore, sets detection flag. **Testing needed.**
+- **`auth_provider.dart`:** `authStateProvider` calculates state. `firestoreUserSyncProvider` handles sync, resets verification flag, triggers count verification. `linkEmailPasswordToGoogleProvider`, `unlinkProviderProvider` handle specific auth operations.
+- **`email_verification_checker.dart`:** Polls, updates Firestore, sets detection flag.
 - **`firestoreUserSyncProvider`:** Listens to `firebaseUserProvider`. Handles sync, resets detection flag, triggers count verification.
-- **`emailVerificationDetectedProvider`:** **NEW (Objective 42 - Attempt 2)** Simple `StateProvider<bool>`. Reset logic in `firestoreUserSyncProvider`.
-- **`auto_auth_provider.dart`:** **Updated (Objective 46)** Added null safety checks.
+- **`emailVerificationDetectedProvider`:** Simple `StateProvider<bool>`. Reset logic in `firestoreUserSyncProvider`.
+- **`auto_auth_provider.dart`:** Handles initial anonymous sign-in logic.
 - Core auth state and action providers.
 
 #### Cards Feature Providers (lib/features/cards/presentation/providers/) - **Refactored**
@@ -159,7 +153,7 @@
 
 #### Profile Page Components
 
-- **`account_settings_page.dart`:** **Updated (Objective 42, 44, 45, 46)** Manages account details, re-auth. Watches providers for verification banner. Added `if (mounted)` checks. **Aligned "Unverified" chip logic.** **Added `_handleSuccessfulDeletion` helper.** Calls simplified `AuthService.deleteUser`.
+- **`account_settings_page.dart`:** **Updated.** Manages account details, re-auth, linking/unlinking calls. Uses root context for SnackBars. Corrected `mounted` checks. **Unlinking still causes navigation issues.**
 
 #### Collection Page Components - **Updated**
 
@@ -184,12 +178,15 @@
 
 ## Data Flow (Refactored & Updated)
 
-- **Authentication Flow (Rebuilt & Refined - Testing)**
-- **Firestore User Document Creation/Update:** (Flow unchanged, but now triggers count verification)
-- **Collection Add/Update Flow:** (Flow updated for zero quantity deletion)
-- **Email Verification Flow (Fixed - Attempt 2 - Testing Needed - Obj 42, 44, 46)**
-- **Password Reset Flow (Updated)**
-- **Account Deletion Flow (Updated - Objective 45 & 46 - Simplified)**
+- **Authentication Flow (Rebuilt & Refined)**
+  - **Linking:** Works correctly.
+  - **Unlinking:** **Incorrect redirect and GlobalKey error persist.**
+  - **Deletion:** Works correctly, including SnackBar context.
+- **Firestore User Document Creation/Update:** Triggers count verification.
+- **Collection Add/Update Flow:** Deletes on zero quantity.
+- **Email Verification Flow:** Hybrid approach implemented.
+- **Password Reset Flow:** Updated.
+- **Account Deletion Flow:** Simplified, uses helper for cleanup.
 - **Cards/Collection Filtering/Search/View:** (Flow Refactored)
   - Each feature uses its own providers.
   - State changes isolated to the respective feature.

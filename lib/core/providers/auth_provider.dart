@@ -228,6 +228,22 @@ final authStateProvider = Provider<AuthState>((ref) {
   );
 });
 
+/// NEW: Provider that exposes only the AuthStatus enum from AuthState.
+/// This is useful for reacting only to changes in the overall authentication
+/// status (e.g., authenticated, unauthenticated) without triggering rebuilds
+/// for internal User object changes (like providerData updates).
+final authStatusProvider = Provider<AuthStatus>((ref) {
+  // Watch the full authStateProvider
+  final authState = ref.watch(authStateProvider);
+  // Select and return only the status enum
+  talker.debug(
+      'authStatusProvider returning status: ${authState.status}'); // Changed detail to debug
+  return authState.status;
+  // Note: Using .select might be slightly more efficient if AuthState was complex,
+  // but simply returning the status achieves the goal here.
+  // return ref.watch(authStateProvider.select((state) => state.status));
+}, name: 'authStatusProvider'); // Added name for clarity
+
 /// NEW: StateProvider to signal immediate verification detection by the checker.
 /// This helps bridge the gap until the main authStateProvider updates via the stream.
 final emailVerificationDetectedProvider = StateProvider<bool>((ref) => false);

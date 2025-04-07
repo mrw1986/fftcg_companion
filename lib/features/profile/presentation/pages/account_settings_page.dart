@@ -702,6 +702,10 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   }
 
   Future<void> _unlinkProvider(String providerId) async {
+    // Capture contexts before async gap
+    // final capturedContext = context; // No longer needed for navigation
+    final rootContext = ref.read(rootNavigatorKeyProvider).currentContext;
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
@@ -711,27 +715,41 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       await ref.read(unlinkProviderProvider(providerId).future); // Use .future
       // Invalidation is handled by the provider now, state will update via watch
 
-      setState(() {
-        _isLoading = false;
-      });
-
-      // Show success message
+      // Reset loading state AFTER await
       if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+
+      // Show success message using root context
+      if (mounted && rootContext != null && rootContext.mounted) {
         display_name.showThemedSnackBar(
-            context: context,
+            context: rootContext, // Use root context
             message:
                 'Successfully unlinked ${_getProviderDisplayName(providerId)}',
             isError: false);
       }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
 
-      // Show error message
+      // REMOVED explicit navigation call:
+      // WidgetsBinding.instance.addPostFrameCallback((_) {
+      //   if (mounted && capturedContext.mounted) {
+      //     capturedContext.go('/profile/account');
+      //   }
+      // });
+    } catch (e) {
+      // Reset loading state on error
       if (mounted) {
+        // Added mounted check before setState
+        setState(() {
+          _isLoading = false;
+        });
+      }
+
+      // Show error message using root context
+      if (mounted && rootContext != null && rootContext.mounted) {
         display_name.showThemedSnackBar(
-            context: context,
+            context: rootContext, // Use root context
             message: e is AuthException // Catch custom AuthException
                 ? e.message // Use message from AuthException
                 : e.toString(),

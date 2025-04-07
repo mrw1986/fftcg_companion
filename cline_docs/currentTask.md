@@ -1,29 +1,45 @@
 # Current Task
 
-## Current Objective: Test Authentication Flows
+## Current Objective: Fix Unlinking Navigation/GlobalKey Issue
 
 ### Context
 
-- Recent work focused on resolving various analysis errors (`unused_element`, `unused_local_variable`, `use_build_context_synchronously`, dead code) across several files (`app_router.dart`, `register_page.dart`, `account_settings_page.dart`, `auth_service.dart`).
-- Specific attention was given to fixing `use_build_context_synchronously` warnings by ensuring `BuildContext` is handled correctly across `await` gaps, primarily using the context-capturing pattern with `mounted` checks.
-- A `ref` access issue after `await` in `auth_page.dart` was also resolved.
-- The `linkGoogleToAnonymous` flow was refactored to handle merge conflicts in the UI layer (`register_page.dart`, `login_page.dart`).
+- Recent work involved refactoring the app router to use `StatefulShellRoute`, simplifying dialogs, fixing context warnings, and ensuring correct SnackBar usage.
+- The provider **linking** flow works correctly.
+- The provider **unlinking** flow showed the success SnackBar correctly but incorrectly navigated to `/` and threw a `Duplicate GlobalKey` error.
+- **Previous Attempts:**
+  - Refined router `redirect` logic to explicitly stay put on `/profile/account` if authenticated. (Did not fix the `GlobalKey` error).
+  - Removed explicit navigation from `_unlinkProvider` in `account_settings_page.dart`. (Did not fix the `GlobalKey` error).
+- **Latest Fix Applied:**
+  - Created a new `authStatusProvider` in `auth_provider.dart` that only exposes the `AuthStatus` enum.
+  - Updated the GoRouter `redirect` logic in `app_router.dart` to watch `authStatusProvider` instead of the full `authStateProvider`. This decouples the redirect from internal `User` object changes and should prevent the router from reacting unnecessarily during unlinking.
 
 ### Status
 
-- **Analysis Errors:** Resolved in relevant files.
-- **`use_build_context_synchronously`:** Warnings addressed using context capturing and `mounted` checks.
-- **`ref` Disposal Error:** Believed to be resolved in `auth_page.dart`.
-- **Merge Conflict Logic:** Refactored to UI layer in `register_page.dart` and `login_page.dart`.
-- **`GlobalKey` Error:** Still potentially persists (related to `ShellRoute`). Needs verification during testing.
+- **Analysis Errors:** Resolved.
+- **`use_build_context_synchronously`:** Warnings addressed.
+- **Provider Linking Flow:** Functional, `GlobalKey` error resolved.
+- **Provider Unlinking SnackBar:** Functional (uses root context).
+- **Provider Unlinking Redirect & `GlobalKey` Error:** **Fix Applied (Pending Testing).** Router logic updated to watch `authStatusProvider`, decoupling it from internal `User` changes. This is expected to resolve both the incorrect redirect and the `GlobalKey` error.
 
 ### Next Steps
 
-1. **Comprehensive Testing:** Execute the detailed test plan for all authentication flows to ensure recent fixes are effective and no regressions were introduced. Pay close attention to edge cases and transitions involving anonymous users.
-2. **Verify `GlobalKey` Error:** Specifically test scenarios involving authentication state changes (sign-in, sign-out, linking, deletion) to see if the `Duplicate GlobalKey detected... [GlobalKey#... scaffoldWithNavBar]` error still occurs.
-3. **Address `GlobalKey` Error (If Persists):** If the error remains, investigate GoRouter `ShellRoute` behavior during redirects or consider alternative structuring as previously planned.
+- **Test Unlinking:** Verify that the app stays on `/profile/account` and the `GlobalKey` error no longer occurs after unlinking a provider.
+- **Comprehensive Auth Testing:** Ensure no regressions in other authentication flows (linking, deletion, sign-in, sign-out, registration, password reset).
+- **Update Documentation:** Update `codebaseSummary.md` and `projectRoadmap.md` once testing confirms the fix.
 
 ## Previous Objectives (Completed)
+
+### Objective: Attempt to Fix Navigation/Context Errors After Auth Changes
+
+- **Context:** A `Multiple widgets used the same GlobalKey` error occurred after account linking and unlinking. A `Looking up a deactivated widget's ancestor is unsafe` error occurred after account deletion. An incorrect redirect occurred after unlinking.
+- **Action:**
+  - Refactored `app_router.dart` to replace `ShellRoute` with `StatefulShellRoute.indexedStack`. Updated `ScaffoldWithNavBar`. Corrected back button handling.
+  - Modified `_handleSuccessfulDeletion` in `account_settings_page.dart` to use the root navigator's context for the SnackBar.
+  - Simplified `LinkEmailPasswordDialog` (removed explicit invalidations/delays, used root context for SnackBar).
+  - Corrected `use_build_context_synchronously` warnings in linking/unlinking functions using appropriate `mounted` checks.
+  - Attempted various explicit navigation calls (`context.go`, `WidgetsBinding`) in `_unlinkProvider` to fix redirect, eventually removing them to match the working linking flow.
+- **Status:** Completed. Router refactored. Deletion SnackBar context fixed. Dialog simplified. Build context warnings fixed. **Linking `GlobalKey` error resolved.** **Unlinking `GlobalKey` error persisted.** **Unlinking redirect remained incorrect.**
 
 ### Objective: Fix Auth Flow Analysis Errors & BuildContext Warnings
 
@@ -39,7 +55,7 @@
 
 - **Context:** Address `ref` disposal error, `GlobalKey` error, and silent redirect issues during Google Sign-In and registration flows.
 - **Actions:** Refactored `GoogleSignInButton`, simplified `_signInWithGoogle`, added `ref.listen` in `AuthPage`, corrected `SnackBarHelper` usage, fixed `StyledButton` issues, adjusted router logic, added provider invalidation, moved `ref` access before `await` in `AuthPage`, isolated auth routes, fixed registration redirect.
-- **Status:** `ref` disposal error resolved. Registration redirect fixed. `GlobalKey` error persists.
+- **Status:** `ref` disposal error resolved. Registration redirect fixed. `GlobalKey` error persisted.
 
 ### Objective: Plan Implementation for Multiple Copies of Same Card Handling (Phase 2, Task 5)
 
