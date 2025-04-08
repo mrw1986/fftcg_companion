@@ -235,10 +235,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) => const ThemeSettingsPage(),
                   ),
                   GoRoute(
-                    path: 'account',
-                    builder: (context, state) => const AccountSettingsPage(),
-                  ),
-                  GoRoute(
                     path: 'logs',
                     builder: (context, state) => TalkerScreen(
                       talker: talker,
@@ -267,6 +263,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/reset-password', // Changed from /profile/reset-password
         builder: (context, state) => const ResetPasswordPage(),
+      ),
+      // NEW: Top-level route for Account Settings
+      GoRoute(
+        path: '/profile/account',
+        builder: (context, state) => const AccountSettingsPage(),
       ),
       // Redirect for old /profile/login path
       GoRoute(

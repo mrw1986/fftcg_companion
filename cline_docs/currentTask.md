@@ -1,5 +1,46 @@
 # Current Task
 
+## Current Objective: Fix Redirect After Linking Google from Account Settings (Attempt 7)
+
+### Context
+
+- Using `setState` alone (Attempt 5) fixed the UI update delay but not the redirect. Re-adding selective invalidation (`firebaseUserProvider` in the linking provider - Attempt 4) also caused a redirect.
+- The redirect seems linked to the timing of state updates and rebuilds after the linking operation completes.
+
+### Actions Taken
+
+1. **Removed Provider Invalidation (Again):** Ensured no explicit invalidation happens within `linkGoogleToEmailPasswordProvider`.
+2. **Invalidate + Delay + Rebuild:** Modified `_linkWithGoogle` in `account_settings_page.dart`:
+    - After successful `await` on the linking future:
+    - Manually call `ref.invalidate(firebaseUserProvider)`.
+    - Add a short `Future.delayed(const Duration(milliseconds: 100))`.
+    - Call `setState(() {})` to force a local rebuild.
+3. **Rationale:** Invalidate the user data provider, give a brief moment for state propagation/potential navigation events to settle, then force a local rebuild to hopefully pick up the correct, updated state without triggering the redirect.
+
+### Status
+
+- Completed. Using invalidate + delay + setState combination.
+
+### Next Steps
+
+- Request user testing to confirm if this combination finally resolves the redirect issue while maintaining the UI update.
+
+## Previous Objectives (Completed)
+
+### Objective: Fix Redirect After Linking Google from Account Settings (Attempt 2)
+
+- **Context:** Linking Google from Account Settings caused an unwanted redirect and `Duplicate GlobalKey` error due to the `StatefulShellRoute` rebuilding after the auth state change.
+- **Action:** Moved the `/profile/account` route definition in `app_router.dart` outside the `StatefulShellRoute` branches. Reverted the `isLinkingProvider` attempt.
+- **Status:** Completed. `GlobalKey` error resolved, but redirect issue persisted.
+
+### Objective: Fix System Back Gesture from Auth/Register Pages (Final)
+
+- **Context:** System back gesture didn't work correctly on `RegisterPage` after AppBar back button was fixed.
+- **Action:** Corrected `PopScope` usage in `AuthPage` and `RegisterPage` using `onPopInvokedWithResult`.
+- **Status:** Completed. System back gesture now navigates to `/profile` from `/auth` and `/register`.
+
+## Current Task
+
 ## Current Objective: Fix System Back Gesture from Auth/Register Pages (Final)
 
 ### Context
@@ -17,7 +58,7 @@
 
 - Completed. Both `AuthPage` and `RegisterPage` now correctly use `PopScope` with `onPopInvokedWithResult` to handle the system back gesture by navigating explicitly to `/profile`.
 
-### Next Steps
+### Final Testing Steps
 
 - Request final user testing to confirm that both the AppBar back button and the system back gesture correctly navigate back to the Profile page from the Sign In (`/auth`) and Register (`/register`) pages.
 

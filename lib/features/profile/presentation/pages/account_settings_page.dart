@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
+
 import 'package:fftcg_companion/core/routing/app_router.dart'; // Import for rootNavigatorKeyProvider
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_display_name.dart'
@@ -788,15 +789,28 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
     try {
       await ref.read(linkGoogleToEmailPasswordProvider.future);
-      // REMOVED explicit invalidation - rely on Firebase stream
+      // REMOVED explicit invalidation from provider.
     } catch (e) {
       error = e; // Capture error
     } finally {
       // Reset loading state AFTER await completes or fails
+      // Important: Do this BEFORE potential invalidation/setState below
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
+      }
+    }
+
+    // If successful, invalidate the user provider and force a rebuild after a short delay
+    if (error == null && mounted) {
+      ref.invalidate(firebaseUserProvider);
+      talker.debug(
+          'Invalidated firebaseUserProvider after successful Google link.');
+      await Future.delayed(const Duration(milliseconds: 50)); // Short delay
+      if (mounted) {
+        setState(() {}); // Force rebuild to pick up invalidated provider
+        talker.debug('Forced local rebuild after invalidation and delay.');
       }
     }
 
@@ -809,6 +823,13 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
             message: error is AuthException ? error.message : error.toString(),
             isError: true);
       } else {
+        // ** NEW: Add delay THEN force local rebuild on success BEFORE showing SnackBar **
+        await Future.delayed(const Duration(milliseconds: 100)); // Short delay
+        if (mounted) {
+          setState(() {});
+          talker.debug(
+              'Forced local rebuild of AccountSettingsPage after successful Google link and delay.');
+        }
         // Check State mounted AND rootContext mounted before showing success SnackBar
         if (mounted && rootContext.mounted) {
           // Removed redundant rootContext != null check
@@ -816,9 +837,14 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
               context: rootContext, // Use root context
               message: 'Successfully linked with Google',
               isError: false);
+          // ** NEW: Explicitly navigate back to ensure we stay here **
+          // Use the local context which should still be valid here
+          if (mounted) {
+            context.go('/profile/account');
+            talker.debug(
+                'Explicitly navigated to /profile/account after successful Google link.');
+          }
         }
-        // Navigation is handled by GoRouter's reaction to auth state changes
-        // REMOVED explicit context.go call
       }
     }
   }
@@ -1168,83 +1194,107 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     talker.debug(
         'showUnverifiedChip determined by: authState.emailNotVerified (${authState.emailNotVerified}) && !verificationDetected ($verificationDetected) = $showUnverifiedChip');
 
-    return Scaffold(
-      appBar: AppBarFactory.createAppBar(context, 'Account Settings'),
-      backgroundColor: colorScheme.surface,
-      body: _isLoading
-          ? const Center(child: LoadingIndicator())
-          : Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    colorScheme.primary.withValues(alpha: 0.05),
-                    colorScheme.surface,
+    return PopScope(
+      canPop: false, // Prevent default pop
+      // Use onPopInvokedWithResult instead of the deprecated onPopInvoked
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        // If the pop was prevented, handle it manually
+        if (!didPop) {
+          talker.debug(
+              'AccountSettingsPage: PopScope intercepted back gesture, navigating to /profile');
+          context.go('/profile');
+        }
+      },
+      child: Scaffold(
+        // Use AppBarFactory and provide a custom leading widget for back navigation
+        appBar: AppBarFactory.createAppBar(
+          context,
+          'Account Settings',
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              talker.debug(
+                  'AccountSettingsPage: AppBar back button pressed, navigating to /profile');
+              context.go('/profile');
+            },
+          ),
+        ),
+        backgroundColor: colorScheme.surface,
+        body: _isLoading
+            ? const Center(child: LoadingIndicator())
+            : Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      colorScheme.primary.withValues(alpha: 0.05),
+                      colorScheme.surface,
+                    ],
+                  ),
+                ),
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  children: [
+                    // --- Conditionally show Verification Banner ---
+                    // Use the updated showVerificationBanner logic
+                    if (showVerificationBanner) // Removed redundant null check
+                      _buildVerificationBanner(context, colorScheme,
+                          userForUI), // Removed unnecessary null assertion
+                    // --- END: Verification Banner ---
+
+                    // Profile Header with display name
+                    ProfileHeaderCard(
+                      user: userForUI, // Use userForUI
+                      displayNameController: _displayNameController,
+                      onUpdateProfile: _updateProfile,
+                      isLoading: _isLoading,
+                    ),
+
+                    // Account Information
+                    AccountInfoCard(
+                      user: userForUI, // Pass userForUI down
+                      // Use the revised logic for showing the unverified state chip
+                      isEmailNotVerified: showUnverifiedChip,
+                      // **NEW:** Pass pending email
+                      pendingEmail: pendingEmail,
+                      emailController: _emailController,
+                      showChangeEmail: _showChangeEmail,
+                      onToggleChangeEmail: () {
+                        setState(() {
+                          _showChangeEmail = !_showChangeEmail;
+                        });
+                      },
+                      onUpdateEmail: _updateEmail,
+                      onUnlinkProvider: _unlinkProvider,
+                      onLinkWithGoogle: _linkWithGoogle,
+                      onLinkWithEmailPassword: _linkWithEmailPassword,
+                      onChangePassword: () async {
+                        final shouldReauth = await showReauthRequiredDialog(
+                            context,
+                            isForDeletion: false,
+                            actionText: 'changing your password');
+                        if (shouldReauth) {
+                          setState(() {
+                            _showReauthDialog = true;
+                            _isAccountDeletion = false;
+                            _isPasswordChange = true;
+                          });
+                        }
+                      },
+                      isLoading: _isLoading,
+                    ),
+
+                    // Account Actions
+                    AccountActionsCard(
+                      user: userForUI, // Use userForUI
+                      onSignOut: _signOut,
+                      onDeleteAccount: _deleteAccount,
+                    ),
                   ],
                 ),
               ),
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                children: [
-                  // --- Conditionally show Verification Banner ---
-                  // Use the updated showVerificationBanner logic
-                  if (showVerificationBanner) // Removed redundant null check
-                    _buildVerificationBanner(context, colorScheme,
-                        userForUI), // Removed unnecessary null assertion
-                  // --- END: Verification Banner ---
-
-                  // Profile Header with display name
-                  ProfileHeaderCard(
-                    user: userForUI, // Use userForUI
-                    displayNameController: _displayNameController,
-                    onUpdateProfile: _updateProfile,
-                    isLoading: _isLoading,
-                  ),
-
-                  // Account Information
-                  AccountInfoCard(
-                    user: userForUI, // Pass userForUI down
-                    // Use the revised logic for showing the unverified state chip
-                    isEmailNotVerified: showUnverifiedChip,
-                    // **NEW:** Pass pending email
-                    pendingEmail: pendingEmail,
-                    emailController: _emailController,
-                    showChangeEmail: _showChangeEmail,
-                    onToggleChangeEmail: () {
-                      setState(() {
-                        _showChangeEmail = !_showChangeEmail;
-                      });
-                    },
-                    onUpdateEmail: _updateEmail,
-                    onUnlinkProvider: _unlinkProvider,
-                    onLinkWithGoogle: _linkWithGoogle,
-                    onLinkWithEmailPassword: _linkWithEmailPassword,
-                    onChangePassword: () async {
-                      final shouldReauth = await showReauthRequiredDialog(
-                          context,
-                          isForDeletion: false,
-                          actionText: 'changing your password');
-                      if (shouldReauth) {
-                        setState(() {
-                          _showReauthDialog = true;
-                          _isAccountDeletion = false;
-                          _isPasswordChange = true;
-                        });
-                      }
-                    },
-                    isLoading: _isLoading,
-                  ),
-
-                  // Account Actions
-                  AccountActionsCard(
-                    user: userForUI, // Use userForUI
-                    onSignOut: _signOut,
-                    onDeleteAccount: _deleteAccount,
-                  ),
-                ],
-              ),
-            ),
+      ),
     );
   }
 }

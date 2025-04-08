@@ -2,6 +2,55 @@
 
 ## Recent Changes
 
+### Fix Redirect After Linking Google from Account Settings (Current Session - Attempt 7)
+
+- **Context:** Adding a delay before `setState` (Attempt 6) still resulted in a redirect, although the UI did update correctly before the redirect. The timing of state propagation and router reaction remains problematic.
+- **Changes:**
+  - Removed the delay before `setState`.
+  - Re-added `ref.invalidate(firebaseUserProvider)` in `_linkWithGoogle` *after* the `await` but *before* the `setState`.
+  - Added a short `Future.delayed` *between* the invalidation and the `setState`.
+- **Rationale:** Invalidate the necessary provider, allow a brief moment for system processing/potential navigation triggers to settle, then force the local rebuild to hopefully catch the updated state without the redirect.
+- **Status:** Completed. Testing needed.
+
+### Fix Redirect After Linking Google from Account Settings (Current Session - Attempt 6)
+
+- **Context:** Using `setState` alone (Attempt 5) fixed the UI update delay but not the redirect.
+- **Changes:**
+  - Kept provider invalidation removed from `linkGoogleToEmailPasswordProvider`.
+  - Added a short `Future.delayed` before the `setState` call in `_linkWithGoogle` within `account_settings_page.dart`.
+- **Status:** Completed. Fixed UI update, but redirect persisted.
+
+### Fix UI Update After Linking Google from Account Settings (Current Session - Attempt 5)
+
+- **Context:** Removing provider invalidations (Attempt 3) fixed the redirect but caused the UI on the Account Settings page to not update immediately after linking Google. Attempting selective invalidation (`firebaseUserProvider` only - Attempt 4) still resulted in a redirect.
+- **Changes:**
+  - Removed provider invalidation from `linkGoogleToEmailPasswordProvider` again.
+  - Added an empty `setState(() {})` call in the `_linkWithGoogle` function within `account_settings_page.dart` after the linking operation succeeds, before showing the SnackBar.
+- **Status:** Completed. Fixed UI update, but redirect persisted.
+
+### Fix UI Update After Linking Google from Account Settings (Current Session - Attempt 4)
+
+- **Context:** Removing explicit invalidations (Attempt 3) fixed the redirect but caused the UI on the Account Settings page to not update immediately after linking Google.
+- **Changes:**
+  - Re-added `ref.invalidate(firebaseUserProvider)` to the `linkGoogleToEmailPasswordProvider` in `lib/core/providers/auth_provider.dart`.
+  - Intentionally did *not* re-add `ref.invalidate(authStateProvider)` to avoid triggering the router redirect.
+- **Status:** Completed. Testing needed to confirm UI updates correctly without redirecting.
+
+### Fix Redirect After Linking Google from Account Settings (Current Session - Attempt 3)
+
+- **Context:** Even after moving `/profile/account` outside the `StatefulShellRoute` (Attempt 2), linking Google still caused a redirect away from the Account Settings page.
+- **Changes:**
+  - Removed explicit `ref.invalidate(firebaseUserProvider)` and `ref.invalidate(authStateProvider)` calls from `linkGoogleToEmailPasswordProvider` in `lib/core/providers/auth_provider.dart`.
+- **Status:** Completed. Fixed redirect, but broke immediate UI update.
+
+### Fix Redirect After Linking Google from Account Settings (Current Session - Attempt 2)
+
+- **Context:** Linking Google from Account Settings caused an unwanted redirect and `Duplicate GlobalKey` error due to the `StatefulShellRoute` rebuilding after the auth state change.
+- **Changes:**
+  - Reverted the previous attempt using `isLinkingProvider`.
+  - Moved the `/profile/account` route definition in `app_router.dart` outside the `StatefulShellRoute` branches, making it a top-level route.
+- **Status:** Completed. `GlobalKey` error resolved, but redirect persisted.
+
 ### Fix Email Verification UI (Chip/Banner) (Current Session - Attempts 3, 4, 5)
 
 - **Context:** After linking Email/Password to Google, the "Unverified" chip appeared correctly (Attempt 3), but the top banner also appeared incorrectly (Attempt 4). After fixing the banner, the chip then failed to disappear after email verification (Attempt 5).

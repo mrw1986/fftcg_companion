@@ -478,10 +478,7 @@ final linkGoogleToEmailPasswordProvider = FutureProvider.autoDispose<void>(
   (ref) async {
     final authService = ref.watch(authServiceProvider);
     await authService.linkGoogleToEmailPassword();
-    // Invalidate both the source stream and the derived state
-    // to ensure the UI updates reliably after the user object is reloaded.
-    ref.invalidate(firebaseUserProvider); // Use the base stream provider
-    ref.invalidate(authStateProvider);
+    // REMOVED explicit invalidation. Relying on the natural stream update from authStateChanges.
   },
 );
 

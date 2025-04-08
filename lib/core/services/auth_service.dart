@@ -567,9 +567,10 @@ class AuthService {
       talker.info(
           'Successfully linked Google to Email/Password user: ${userCredential.user?.uid}');
 
-      // Reload the user to ensure we have the latest provider data
-      // Firestore update will be handled by the authStateChanges listener
+      // Reload the user IMMEDIATELY to ensure the user object has the latest provider data
       await userCredential.user?.reload();
+      talker.debug('User reloaded after linking Google to Email/Password.');
+      // Firestore update will be handled by the authStateChanges listener
       return userCredential;
     } catch (e) {
       if (e is FirebaseAuthException) {
