@@ -22,28 +22,24 @@ class _UpdatePasswordDialogState extends ConsumerState<UpdatePasswordDialog> {
   bool _showPassword = false;
   bool _isLoading = false;
   final FocusNode _passwordFocusNode = FocusNode();
-  bool _isPasswordFocused = false;
+  // Removed _isPasswordFocused state variable as it's no longer needed for conditional rendering
 
   @override
   void initState() {
     super.initState();
-    _passwordFocusNode.addListener(_onPasswordFocusChange);
+    // Removed listener as we no longer need to track focus for this
   }
 
   @override
   void dispose() {
-    _passwordFocusNode.removeListener(_onPasswordFocusChange);
+    // Removed listener removal
     _passwordFocusNode.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  void _onPasswordFocusChange() {
-    setState(() {
-      _isPasswordFocused = _passwordFocusNode.hasFocus;
-    });
-  }
+  // Removed _onPasswordFocusChange method
 
   void _togglePasswordVisibility() {
     setState(() {
@@ -147,38 +143,44 @@ class _UpdatePasswordDialogState extends ConsumerState<UpdatePasswordDialog> {
                   return null; // Password is valid
                 },
               ),
-              if (_isPasswordFocused) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Password Requirements:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text('• At least 8 characters long'),
-                      Text('• At least one uppercase letter (A-Z)'),
-                      Text('• At least one lowercase letter (a-z)'),
-                      Text('• At least one number (0-9)'),
-                      Text(
-                          '• At least one special character (!@#\$%^&*(),.?":{}|<>)'),
-                    ],
+              // Removed the conditional rendering based on focus
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                   ),
                 ),
-              ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Password Requirements:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text('• At least 8 characters long',
+                        style: TextStyle(
+                            color: colorScheme
+                                .onSurfaceVariant)), // Slightly muted text
+                    Text('• At least one uppercase letter (A-Z)',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                    Text('• At least one lowercase letter (a-z)',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                    Text('• At least one number (0-9)',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                    Text(
+                        '• At least one special character (!@#\$%^&*(),.?":{}|<>)',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _confirmPasswordController,
