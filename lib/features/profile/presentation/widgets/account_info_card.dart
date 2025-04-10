@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 // Removed Riverpod import
-import 'package:go_router/go_router.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_email_update.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/profile_auth_methods.dart';
@@ -190,32 +189,7 @@ class AccountInfoCard extends StatelessWidget {
               isEmailNotVerified: isEmailNotVerified,
             ),
 
-            // Reset password option for password users
-            if (!user!.isAnonymous && hasPassword) ...[
-              const SizedBox(height: 8),
-              ListTile(
-                title: const Text('Reset Password'),
-                subtitle: const Text('Send a password reset email'),
-                leading: Icon(
-                  Icons.lock_reset_outlined,
-                  color: colorScheme.tertiary,
-                ),
-                trailing: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                onTap: () {
-                  talker.debug(
-                      'Reset Password tapped, navigating to /profile/reset-password');
-                  context.push('/profile/reset-password');
-                },
-              ),
-            ],
-
+            // Reset password option removed - Authenticated users should use "Change Password"
             // Change password option for password users
             if (!user!.isAnonymous && hasPassword) ...[
               const SizedBox(height: 8),

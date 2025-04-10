@@ -93,7 +93,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       // 3. Authenticated or EmailNotVerified on Public Auth Route -> /profile/account
       if ((authStatus == AuthStatus.authenticated ||
               authStatus == AuthStatus.emailNotVerified) &&
-          isPublicRoute) {
+          isPublicRoute &&
+          location != '/reset-password') {
+        // Allow authenticated users on reset password page
         talker.debug(
             'Router Redirect: Authenticated/EmailNotVerified on public auth route -> /profile/account');
         return '/profile/account';
