@@ -1,11 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod
-import 'package:fftcg_companion/core/providers/auth_provider.dart'; // Import auth provider
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_email_update.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/profile_auth_methods.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/link_email_password_dialog.dart';
+import 'package:fftcg_companion/features/profile/presentation/providers/email_update_provider.dart';
+import 'package:fftcg_companion/features/profile/presentation/providers/email_update_completion_provider.dart';
 
 // Convert back to ConsumerWidget
 class AccountInfoCard extends ConsumerWidget {
@@ -75,12 +77,16 @@ class AccountInfoCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Add WidgetRef
-    // Get user directly from the provider
+    // Watch auth state and email update state
     final authState = ref.watch(authNotifierProvider);
     final user = authState.user;
 
-    // Use the user passed via constructor
+    // Force rebuild when providers change
+    ref.listen(emailUpdateCompletionProvider, (previous, next) {
+      // The rebuild will happen automatically due to state changes
+      talker.debug('AccountInfoCard: Email update completion state changed');
+    });
+
     if (user == null) return const SizedBox.shrink();
 
     final colorScheme = Theme.of(context).colorScheme;
@@ -88,7 +94,7 @@ class AccountInfoCard extends ConsumerWidget {
     final providers = user.providerData.map((e) => e.providerId).toList();
     final hasPassword = providers.contains('password');
     talker.debug(
-        'AccountInfoCard build: User providers: $providers, hasPassword: $hasPassword'); // Add logging
+        'AccountInfoCard build: User providers: $providers, hasPassword: $hasPassword, pendingEmail: $pendingEmail');
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -120,7 +126,60 @@ class AccountInfoCard extends ConsumerWidget {
                 ),
               ],
             ),
-            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Expanded(child: Divider(height: 24)),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () async {
+                    talker.debug('Manual refresh requested');
+                    try {
+                      // Get current user before reload
+                      final currentUser = FirebaseAuth.instance.currentUser;
+                      if (currentUser != null) {
+                        // Store current email for comparison
+                        final currentEmail = currentUser.email;
+
+                        // Force user reload
+                        await currentUser.reload();
+
+                        // Get fresh user instance after reload
+                        final reloadedUser = FirebaseAuth.instance.currentUser;
+                        if (reloadedUser != null) {
+                          talker.debug(
+                              'User reloaded successfully. Current email: ${reloadedUser.email}');
+
+                          // Check if email changed
+                          if (reloadedUser.email != currentEmail) {
+                            talker.info(
+                                'Email change detected after reload. Old: $currentEmail, New: ${reloadedUser.email}');
+                          }
+
+                          // Invalidate providers
+                          ref.invalidate(authNotifierProvider);
+                          ref.invalidate(emailUpdateNotifierProvider);
+                          ref.invalidate(emailUpdateCompletionProvider);
+                          talker.debug(
+                              'Providers invalidated after successful reload');
+                        } else {
+                          talker.warning(
+                              'User is null after reload - session may have expired');
+                        }
+                      } else {
+                        talker.warning('Cannot refresh - no current user');
+                      }
+                    } catch (e) {
+                      talker.error('Error during manual refresh', e);
+                      if (e.toString().contains('user-token-expired')) {
+                        talker.warning('User token expired during refresh');
+                      }
+                    }
+                  },
+                  tooltip: 'Refresh Auth State',
+                ),
+              ],
+            ),
 
             // NEW: Display Pending Email if present
             if (pendingEmail != null) ...[

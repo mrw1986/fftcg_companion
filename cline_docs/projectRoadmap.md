@@ -65,6 +65,7 @@
     - [x] Fixed navigation after registration to show Account Settings page
     - [x] **Fixed Firestore permission issues during data migration** (Resolved as part of general collection permission fix)
     - [x] **Fixed post-sign-in redirect issue** (Verified working)
+    - [x] **Fixed email update UI state after verification** (Added EmailUpdateCompletionProvider)
     - [ ] **Ongoing:** Resolve `GlobalKey` conflicts and `ref` disposal errors during auth flow. Address count verification edge cases.
     - [x] Implemented settings migration (theme, display preferences)
     - [ ] **Pending:** Expand data migration to include deck data (See Phase 3, Item 17)
@@ -114,7 +115,7 @@
 - [x] Provide secure account deletion (Rebuilt)
 - [x] Implement re-authentication (Rebuilt & Verified)
 - [x] Support anonymous accounts (Rebuilt)
-- [x] Implement proper email update flow with logout (Rebuilt)
+- [x] Implement proper email update flow with logout (Rebuilt & Enhanced with token refresh, error boundaries)
 - [x] Fix Forgot Password flow for anonymous users (Rebuilt)
 - [x] Implement proper account linking for anonymous users (Rebuilt)
 - [x] Fix account deletion flow with proper state reset (Rebuilt)
@@ -192,13 +193,26 @@
 
 ### Recently Completed
 
-1. **Investigate Reauthentication & Sign-in Redirect Issues (Current Session)**
+1. **Comprehensive Email Update Flow Fix (Current Session)**
+    - Fixed UI state synchronization after email verification:
+        - Added progressive token refresh strategy
+        - Implemented error boundaries for Riverpod state
+        - Added safe state management during transitions
+        - Enhanced action code settings for better UX
+        - Added comprehensive logging throughout
+    - Created detailed technical documentation:
+        - Added `emailUpdateFlowFix.md` with implementation details
+        - Updated `currentTask.md` with implementation plan
+        - Updated `codebaseSummary.md` with changes
+    - Status: Fix implemented, testing required.
+
+2. **Investigate Reauthentication & Sign-in Redirect Issues (Previous Session)**
     - Investigated blank reauthentication screen (not reproduced) and post-sign-in redirect failure.
     - Added and removed diagnostic logging in `AuthNotifier` and `ProfileReauthDialog`.
     - Confirmed router listener notification and redirect logic are working correctly.
     - Issues appear resolved or intermittent.
 
-2. **Auth Flow Stability & Linking Fixes (Previous Session)**
+3. **Auth Flow Stability & Linking Fixes (Previous Session)**
     - Resolved `GlobalKey` conflict and incorrect navigation after unlinking providers.
     - Fixed email pre-population regression in the link dialog.
     - Fixed UI update failure after linking Email/Password to Google.
@@ -206,18 +220,18 @@
     - Resolved various analysis errors and `use_build_context_synchronously` warnings.
     - Refactored `linkGoogleToAnonymous` merge conflict logic.
 
-3. **Analysis Errors & Provider Refactoring (Previous Session)**
+4. **Analysis Errors & Provider Refactoring (Previous Session)**
     - Addressed multiple analysis errors (`unused_import`, `invalid_use_of_protected_member`, `deprecated_member_use`, `use_super_parameters`, `unused_local_variable`).
     - Refactored `cardSearchQueryProvider`, `collectionSpecificFilterProvider`, and `collectionSearchQueryProvider` from `StateProvider` to `NotifierProvider` to correctly handle state persistence and side effects (fixing `listenSelf` deprecation).
     - Updated UI components to interact correctly with the refactored `NotifierProvider`s using their methods.
-4. **Collection Management Fixes & Enhancements (Objective 50)**
+5. **Collection Management Fixes & Enhancements (Objective 50)**
     - Fixed Firestore permission errors during add/update.
     - Implemented transactional `collectionCount` updates and verification.
     - Implemented delete-on-zero-quantity logic.
     - Added quantity text input UI.
     - Fixed grading label capitalization UI.
 
-5. **Fixed Google Authentication Display Name Issue (Objective 30)**
+6. **Fixed Google Authentication Display Name Issue (Objective 30)**
     - Fixed issue where Google display name wasn't storing in Firestore:
         - Added code to extract display name directly from Google provider data
         - Updated logic to prioritize Google provider display name
@@ -229,7 +243,7 @@
     - **Remaining Issue:**
         - Account Limits dialog appears after Google sign-in (separate concern - Fixed in Obj 31)
 
-6. **Data Migration and Firestore Rules Updates (Objective 27)**
+7. **Data Migration and Firestore Rules Updates (Objective 27)**
     - Updated Firestore rules to handle migrations:
         - Added special case for collection updates during migration
         - Added permission for initial user document creation
@@ -244,7 +258,7 @@
         - Need to verify and fix Firestore rules for all migration scenarios **(Partially addressed in Obj 50)**
         - Ensure proper user document creation timing
 
-7. **Fixed Email Update Flow and UI Updates (Objective 26)**
+8. **Fixed Email Update Flow and UI Updates (Objective 26)**
     - Fixed UI not updating after linking Google authentication:
         - Added explicit provider invalidation after successful Google linking
         - Ensured UI immediately reflects newly linked authentication methods
@@ -286,6 +300,7 @@
 - [x] **2. Fix Card Details Page Flicker/Lag:** Fix initial card display and swipe/button responsiveness issues.
 - [x] **3. Maintain Screen State:** Preserve filters/sort/search on navigation.
 - [x] **4. Finish Favorite/Wishlist Features:** Implement UI (filters, icons).
+- [x] **28. Fix Email Update Flow:** Implement robust token refresh, error boundaries, and state management for email updates.
 
 #### Phase 2: Collection Management & Key Enhancements (High Priority)
 

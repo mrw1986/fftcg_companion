@@ -21,7 +21,7 @@ import 'package:fftcg_companion/core/services/auth_service.dart';
 import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 // Import the new provider
 import 'package:fftcg_companion/features/profile/presentation/providers/email_update_provider.dart';
-// Removed import for email_update_checker.dart
+import 'package:fftcg_companion/features/profile/presentation/providers/email_update_completion_provider.dart';
 
 // NEW: Provider to store the original email during the update process
 final originalEmailForUpdateCheckProvider = StateProvider<String>((ref) => '');
@@ -227,8 +227,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
   }
 
   Future<void> _updateEmail() async {
-    final newEmail = _emailController.text.trim(); // Store new email
+    final newEmail = _emailController.text.trim();
     if (newEmail.isEmpty) {
+      if (!mounted) return;
       display_name.showThemedSnackBar(
           context: context,
           message: 'Please enter a valid email address',
@@ -236,56 +237,60 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
       return;
     }
 
-    // Show confirmation dialog (updated message)
+    // Show confirmation dialog
+    if (!mounted) return;
     final shouldProceed = await showEmailUpdateConfirmationDialog(context);
-
     if (!shouldProceed) return;
 
     // Get the original email BEFORE starting the update process
     final originalEmail = ref.read(firebaseUserProvider).value?.email;
+    if (originalEmail == null) {
+      if (!mounted) return;
+      display_name.showThemedSnackBar(
+          context: context,
+          message: 'Could not determine current email. Please try again.',
+          isError: true);
+      return;
+    }
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await ref.read(authServiceProvider).verifyBeforeUpdateEmail(
-            newEmail,
-          );
+      // Store original email for lifecycle check
+      ref.read(originalEmailForUpdateCheckProvider.notifier).state =
+          originalEmail;
+      talker.info('Stored original email for lifecycle check: $originalEmail');
 
-      // **NEW:** Update the pending email provider on success
+      // Send verification email
+      await ref.read(authServiceProvider).verifyBeforeUpdateEmail(newEmail);
+
+      // Update pending email state
       ref.read(emailUpdateNotifierProvider.notifier).setPendingEmail(newEmail);
-
-      // **NEW:** Store the original email for the lifecycle check
-      if (originalEmail != null) {
-        ref.read(originalEmailForUpdateCheckProvider.notifier).state =
-            originalEmail;
-        talker
-            .info('Stored original email for lifecycle check: $originalEmail');
-      } else {
-        talker.warning(
-            'Original email was null, cannot store for lifecycle check.');
-      }
-
-      // **REMOVED:** Start polling for the email change
-      // if (originalEmail != null) {
-      //   talker.info(
-      //       'Starting email update polling for original email: $originalEmail');
-      //   ref
-      //       .read(emailUpdateCheckerProvider.notifier)
-      //       .startPolling(originalEmail);
-      // } else {
-      //   talker.warning('Original email was null, cannot start polling.');
-      // }
+      talker.info('Verification email sent for email update.');
 
       setState(() {
         _isLoading = false;
-        _showChangeEmail = false; // Hide the input field after initiating
+        _showChangeEmail = false;
       });
 
-      // Show confirmation dialog (updated message)
+      // Show confirmation dialog with appropriate message
       if (mounted) {
-        await showEmailUpdateInitiatedDialog(context, newEmail);
+        final hasGoogleAuth = ref
+                .read(authNotifierProvider)
+                .user
+                ?.providerData
+                .any((userInfo) => userInfo.providerId == 'google.com') ??
+            false;
+
+        if (hasGoogleAuth) {
+          await showEmailUpdateInitiatedDialog(context, newEmail,
+              'You will remain logged in since you have Google authentication.');
+        } else {
+          await showEmailUpdateInitiatedDialog(context, newEmail,
+              'You will be logged out after verifying the email change.');
+        }
       }
     } on AuthException catch (e) {
       // Catch custom AuthException
@@ -1231,6 +1236,16 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
 
   @override
   Widget build(BuildContext context) {
+    // Watch the email update completion provider and force rebuild on changes
+    ref.listen(emailUpdateCompletionProvider, (previous, next) {
+      if (mounted) {
+        setState(() {
+          // Force rebuild to reflect email update changes
+          talker.debug('Forcing rebuild after email update completion');
+        });
+      }
+    });
+
     final authState = ref.watch(authNotifierProvider);
     // **REMOVED:** Watch the base stream provider directly
     // final currentUserAsyncValue = ref.watch(firebaseUserProvider);
@@ -1485,19 +1500,11 @@ Future<bool> showEmailUpdateConfirmationDialog(BuildContext context) async {
 
 // Renamed Dialog: Confirms email *sending*, not completion/logout
 Future<void> showEmailUpdateInitiatedDialog(
-    BuildContext context, String newEmail) async {
+    BuildContext context, String newEmail,
+    [String? customMessage]) async {
   final colorScheme = Theme.of(context).colorScheme;
-  final user = FirebaseAuth.instance.currentUser;
-
-  // Check if user has Google auth (a verified method)
-  final hasGoogleAuth = user?.providerData
-          .any((userInfo) => userInfo.providerId == 'google.com') ??
-      false;
-
-  // Determine the appropriate message
-  final message = hasGoogleAuth
-      ? 'A verification email has been sent to $newEmail. Please check your inbox and click the link to finalize the email change. You will remain logged in since you have other verified authentication methods.'
-      : 'A verification email has been sent to $newEmail. Please check your inbox and click the link to finalize the email change. You will be logged out after verifying since this is your only authentication method.';
+  final message = customMessage ??
+      'A verification email has been sent to $newEmail. Please check your inbox and click the link to finalize the email change.';
 
   return showDialog<void>(
     context: context,

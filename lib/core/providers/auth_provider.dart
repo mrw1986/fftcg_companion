@@ -155,6 +155,18 @@ class AuthNotifier extends Notifier<AuthState> implements Listenable {
     final previousStatus = state.status; // Store previous status for logging
     AuthState newState;
 
+    // Check for email update completion first
+    if (user != null) {
+      final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+      if (pendingEmail != null && user.email == pendingEmail) {
+        // Email has been verified and updated, clear the pending state
+        ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+        ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+        talker.info(
+            'Detected email verification completion in AuthNotifier, cleared pending email state.');
+      }
+    }
+
     if (user == null) {
       newState = const AuthState.unauthenticated();
     } else if (user.isAnonymous) {

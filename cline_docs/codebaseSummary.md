@@ -2,7 +2,39 @@
 
 ## Recent Changes
 
-### Fix Account Settings UI Update After Linking (Attempt 3 - Current Session)
+### Comprehensive Email Update Flow Fix (Current Session)
+
+- **Context:** After initiating an email change and verifying the new email via the link, the UI state (pending email and verification status) did not update correctly.
+- **Root Causes:**
+  1. Token Invalidation: Firebase invalidates the auth token after email verification, but the app wasn't handling this gracefully.
+  2. Riverpod State Error: Race condition during state transitions causing provider dependency errors.
+  3. Race Condition: Email update completion provider trying to check email update during sign-out.
+- **Changes:**
+  - **Token Refresh Handling (`auth_provider.dart`):**
+    - Added progressive token refresh strategy (try without force first)
+    - Added user reload before token refresh attempts
+    - Added comprehensive error handling for different error codes
+    - Added detailed logging throughout the flow
+  - **Error Boundary (`email_update_completion_provider.dart`):**
+    - Added safe state reading with error handling
+    - Added local value copies to prevent state access during transitions
+    - Added graceful error recovery mechanisms
+    - Added comprehensive logging for debugging
+  - **Action Code Settings (`auth_service.dart`):**
+    - Added proper action code settings for better UX
+    - Added token refresh helper method
+    - Improved error handling for email operations
+  - **Lifecycle Management (`account_settings_page.dart`):**
+    - Added app resume handling for pending email updates
+    - Added safe token refresh and user reload
+    - Added UI state synchronization with delays
+    - Added manual refresh capability
+- **Documentation:**
+  - Created `emailUpdateFlowFix.md` with detailed implementation documentation
+  - Updated `currentTask.md` with implementation plan and status
+- **Status:** Fix implemented. Testing required.
+
+### Fix Account Settings UI Update After Linking (Attempt 3 - Previous Session)
 
 - **Context:** The "Change Password" option still didn't appear immediately after linking, even with user reload and provider invalidation. The `User` object used in the build (`userForUI`) might not be reflecting the absolute latest state immediately after invalidation.
 - **Changes:**

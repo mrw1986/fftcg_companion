@@ -1,36 +1,176 @@
 # Current Task
 
-## Current Objective: Fix Account Settings UI Update After Linking
+## Current Objective: Fix Email Update UI State After Verification
 
 ### Context
 
-- **Issue:** The "Change Password" option in `AccountSettingsPage` does not appear immediately after a user creates an account with email/password or links email/password to an existing account (e.g., Google). This happens because the `User` object passed to the UI (`AccountInfoCard`) doesn't reflect the updated `providerData` immediately after the linking operation.
-- **Investigation:** Reviewed `AccountSettingsPage` and `AccountInfoCard`. Confirmed the UI relies on `user.providerData` to determine if the 'password' provider exists. The timing of the `User` object update after linking was identified as the likely cause. Logs confirmed user reload and provider invalidation were happening, but the UI still didn't update immediately.
-- **Previous Focus:** Extensive work on authentication flows, including refactoring `authNotifierProvider`, fixing redirects, and managing email verification/update states.
+- **Issue:** After initiating an email change and verifying the new email via the link, the UI state (pending email and verification status) did not update correctly.
+- **Investigation:** Reviewed the email update flow and found that while the Firebase Auth state updates correctly (as seen in the success dialog), the app's UI state wasn't synchronizing properly.
+- **Root Causes Identified:**
+  1. Token Invalidation: When a user verifies their new email, Firebase invalidates their current token, but the app wasn't handling this gracefully.
+  2. Riverpod State Error: Race condition during state transitions causing "Cannot use ref functions after the dependency of a provider changed" error.
+  3. Race Condition: Email update completion provider trying to check email update during sign-out when providers might be invalidated.
 
-### Actions Taken So Far
+### Implementation Plan
 
-- Reviewed `projectRoadmap.md`, `currentTask.md`, `techStack.md`, and `codebaseSummary.md`.
-- Read `lib/features/profile/presentation/pages/account_settings_page.dart`.
-- Read `lib/features/profile/presentation/widgets/account_info_card.dart`.
-- **Attempt 1 Fix:** Modified `_linkWithGoogle` and `_linkWithEmailPassword` in `lib/features/profile/presentation/pages/account_settings_page.dart` to include `FirebaseAuth.instance.currentUser?.reload()` followed by `ref.invalidate(authNotifierProvider)`. This did not fully resolve the issue.
-- **Attempt 2 Fix:** Modified `lib/features/profile/presentation/pages/account_settings_page.dart` to rely solely on `authState.user` for the user object and added a delayed `setState` after linking operations. Also removed an erroneous error handling block. This also did not fully resolve the issue.
-- **Attempt 3 Fix:** Converted `lib/features/profile/presentation/widgets/account_info_card.dart` back to a `ConsumerWidget` to directly watch `authNotifierProvider` and get the `User` object. Removed the `user` parameter from `AccountInfoCard`. Modified `lib/features/profile/presentation/pages/account_settings_page.dart` to remove the `user` parameter from the `AccountInfoCard` constructor call and removed the erroneous error handling block.
+#### 1. Token Refresh Handling Improvements
 
-### Next Steps
+In `auth_provider.dart`:
 
-- **Test the fix:** Verify that the "Change Password" option now appears immediately in the `AccountSettingsPage` after:
-  - Creating a new account using Email/Password.
-  - Linking Email/Password to an existing Google account.
-- Update `codebaseSummary.md` with the changes made.
-- Conclude the task.
+```dart
+try {
+  await user.getIdToken(false);
+} catch (e) {
+  talker.debug('Token expired, attempting force refresh...');
+  await user.getIdToken(true);
+}
+```
+
+- Add progressive token refresh (try without force first)
+- Add user reload before token refresh attempts
+- Handle different error codes appropriately
+- Add comprehensive error logging
+
+#### 2. Error Boundary for Riverpod State
+
+In `email_update_completion_provider.dart`:
+
+```dart
+EmailUpdateState? emailUpdateState;
+try {
+  emailUpdateState = ref.read(emailUpdateNotifierProvider);
+} catch (e) {
+  talker.error('Error reading provider state', e);
+}
+```
+
+- Add safe state reading with error handling
+- Create local copies of required values
+- Handle provider state errors gracefully
+- Add comprehensive error logging
+
+#### 3. Safe State Management
+
+In both providers:
+
+- Add state cleanup during sign-out
+- Handle token expiration gracefully
+- Add delayed UI updates when needed
+- Improve error handling and recovery
+
+#### 4. Action Code Settings Enhancement
+
+In `auth_service.dart`:
+
+```dart
+final actionCodeSettings = ActionCodeSettings(
+  url: 'https://yourapp.page.link/finishEmailUpdate?email=$newEmail',
+  handleCodeInApp: true,
+  androidPackageName: 'com.mrw1986.fftcg_companion',
+  androidInstallApp: true,
+  androidMinimumVersion: '12',
+  iOSBundleId: 'com.mrw1986.fftcg-companion',
+);
+```
+
+- Add proper action code settings
+- Improve error handling for email operations
+- Add token refresh helper method
+
+### Testing Plan
+
+1. **Basic Flow Testing:**
+   - Sign in with email/password
+   - Initiate email change
+   - Verify via link
+   - Confirm UI updates correctly without sign-out
+
+2. **Edge Cases:**
+   - Background app state during verification
+   - Linked Google account scenarios
+   - Multiple rapid email changes
+   - Deliberate token invalidation
+
+3. **Error Handling:**
+   - Network disconnection during verification
+   - Simultaneous operations (email + password change)
+   - Token expiration scenarios
+
+### Files to Modify
+
+1. `lib/core/providers/auth_provider.dart`
+   - Improve token refresh handling
+   - Update state management
+   - Add error handling
+
+2. `lib/features/profile/presentation/providers/email_update_completion_provider.dart`
+   - Add error boundaries
+   - Improve state management
+   - Add safe state reading
+
+3. `lib/core/services/auth_service.dart`
+   - Add action code settings
+   - Add token refresh helper
+   - Improve error handling
+
+4. `lib/features/profile/presentation/pages/account_settings_page.dart`
+   - Update lifecycle handling
+   - Add manual refresh
+   - Improve UI updates
 
 ### Status
 
-- **Completed:** Analysis of the UI update issue.
-- **Completed:** Implementation of the fix (AccountInfoCard as ConsumerWidget, direct provider watch) in `account_info_card.dart` and `account_settings_page.dart`.
-- **Pending:** Testing the fix.
-- **Pending:** Update `codebaseSummary.md`.
+- **Completed:** Analysis of the issue and identification of root causes
+- **Completed:** Development of comprehensive implementation plan
+- **Pending:** Implementation of the fixes
+- **Pending:** Testing of all scenarios
+- **Pending:** Documentation updates after implementation
+
+### Actions Taken
+
+1. Created new `EmailUpdateCompletionProvider` to monitor and handle email update completion:
+
+   ```dart
+   final emailUpdateCompletionProvider = Provider<void>((ref) {
+     final authState = ref.watch(authNotifierProvider);
+     final pendingEmail = ref.watch(emailUpdateNotifierProvider).pendingEmail;
+     
+     if (authState.user != null && pendingEmail != null) {
+       if (authState.user!.email == pendingEmail) {
+         ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+         ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+         talker.info('Email update completion detected: ${authState.user!.email}');
+       }
+     }
+   });
+   ```
+
+2. Enhanced `AuthNotifier._updateStateFromUser` to check for email update completion:
+
+   ```dart
+   if (user != null) {
+     final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+     if (pendingEmail != null && user.email == pendingEmail) {
+       ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+       ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+       talker.info('Detected email verification completion in AuthNotifier, cleared pending email state.');
+     }
+   }
+   ```
+
+3. Modified `AccountSettingsPage` to watch the completion provider:
+
+   ```dart
+   @override
+   Widget build(BuildContext context) {
+     // Watch the email update completion provider to keep it active
+     ref.watch(emailUpdateCompletionProvider);
+     
+     // Rest of build method...
+   }
+   ```
+
+4. Added comprehensive logging throughout the flow to track state changes and verification detection.
 
 ## Previous Objectives (Completed)
 
@@ -45,7 +185,7 @@
 - **Logging Verified:** Confirmed sufficient logging exists in `AccountSettingsPage`, `AuthService`, and `AuthNotifier` to diagnose the flow.
 - **Additional Issues Investigated:** User reported a blank reauthentication screen and getting stuck on the sign-in page after Google sign-in.
 
-#### Actions Taken (Reauthentication & Sign-in Redirect)
+#### Actions Taken During Reauthentication & Sign-in Redirect Investigation
 
 - Refactored `lib/core/providers/auth_provider.dart` to use `AsyncNotifier`.
 - Updated all dependent files to use `authNotifierProvider`.
@@ -77,7 +217,7 @@
   1. A blank screen appearing when reauthentication was required (e.g., before account deletion), with no options (Google/Email) shown.
   2. After signing in with Google, the UI remained stuck on the sign-in page despite logs indicating successful authentication.
 
-#### Actions Taken
+#### Actions Taken (Reauthentication & Sign-in Redirect)
 
 1. **Diagnose Reauth Screen:**
     - Added detailed logging to `_loadProviders` in `ProfileReauthDialog` to check `FirebaseAuth.instance.currentUser` and provider data access.
@@ -94,7 +234,3 @@
 #### Investigation Status
 
 - Investigation complete. Both reported issues appear resolved or were intermittent and could not be reproduced consistently. The underlying logic for provider loading in the reauth dialog and router redirection seems correct.
-
----
-
-Previous completed objectives remain below.
