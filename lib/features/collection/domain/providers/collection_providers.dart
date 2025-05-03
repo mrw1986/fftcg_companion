@@ -29,7 +29,7 @@ final userCollectionProvider =
 class UserCollectionNotifier extends AsyncNotifier<List<CollectionItem>> {
   @override
   Future<List<CollectionItem>> build() async {
-    final authState = ref.watch(authStateProvider);
+    final authState = ref.watch(authNotifierProvider);
 
     if (authState.isAuthenticated || authState.isAnonymous) {
       final repository = ref.read(collectionRepositoryProvider);
@@ -43,7 +43,7 @@ class UserCollectionNotifier extends AsyncNotifier<List<CollectionItem>> {
   Future<void> refreshCollection() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      final authState = ref.read(authStateProvider);
+      final authState = ref.read(authNotifierProvider);
 
       if (authState.isAuthenticated || authState.isAnonymous) {
         final repository = ref.read(collectionRepositoryProvider);
@@ -56,7 +56,7 @@ class UserCollectionNotifier extends AsyncNotifier<List<CollectionItem>> {
 
   /// Get a specific card from the collection
   Future<CollectionItem?> getCardFromCollection(String cardId) async {
-    final authState = ref.read(authStateProvider);
+    final authState = ref.read(authNotifierProvider);
 
     if (authState.isAuthenticated || authState.isAnonymous) {
       final repository = ref.read(collectionRepositoryProvider);
@@ -75,7 +75,7 @@ class UserCollectionNotifier extends AsyncNotifier<List<CollectionItem>> {
     Map<String, PurchaseInfo>? purchaseInfo,
     Map<String, GradingInfo>? gradingInfo,
   }) async {
-    final authState = ref.read(authStateProvider);
+    final authState = ref.read(authNotifierProvider);
 
     if (authState.isAuthenticated || authState.isAnonymous) {
       final repository = ref.read(collectionRepositoryProvider);
@@ -113,7 +113,7 @@ class UserCollectionNotifier extends AsyncNotifier<List<CollectionItem>> {
 /// Collection statistics provider
 final collectionStatsProvider =
     FutureProvider<Map<String, dynamic>>((ref) async {
-  final authState = ref.watch(authStateProvider);
+  final authState = ref.watch(authNotifierProvider);
 
   if (authState.isAuthenticated || authState.isAnonymous) {
     final repository = ref.read(collectionRepositoryProvider);

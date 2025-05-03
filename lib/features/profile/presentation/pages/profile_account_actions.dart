@@ -16,7 +16,7 @@ class ProfileAccountActions extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authStateProvider);
+    final authState = ref.watch(authNotifierProvider); // Use the new AsyncNotifierProvider
     final user = authState.user!;
 
     return Card(

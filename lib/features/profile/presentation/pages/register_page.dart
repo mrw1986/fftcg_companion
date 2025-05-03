@@ -82,7 +82,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
     try {
       final authService = ref.read(authServiceProvider);
-      final authState = ref.read(authStateProvider);
+      final authState = ref.read(authNotifierProvider);
       final email = _emailController.text.trim();
       final password = _passwordController.text;
       bool isLinking = authState.isAnonymous; // Check if linking or registering
@@ -106,7 +106,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       // The router redirect logic might still handle navigation in some cases,
       // but we'll add explicit navigation after the dialog for reliability.
       ref.invalidate(firebaseUserProvider);
-      ref.invalidate(authStateProvider);
+      ref.invalidate(authNotifierProvider);
       ref.invalidate(currentUserProvider);
 
       // Show verification email sent dialog
@@ -279,7 +279,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     try {
       talker.debug('Register page: Starting Google Sign-In');
       final authService = ref.read(authServiceProvider);
-      final authState = ref.read(authStateProvider);
+      final authState = ref.read(authNotifierProvider);
 
       // If user is anonymous, link the account
       if (authState.isAnonymous) {
@@ -294,7 +294,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
           // Invalidate providers and let router handle navigation
           ref.invalidate(firebaseUserProvider);
-          ref.invalidate(authStateProvider);
+          ref.invalidate(authNotifierProvider);
           ref.invalidate(currentUserProvider);
           // Explicit navigation might be needed here too if router redirect is unreliable
           if (mounted) {
@@ -383,7 +383,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   // Invalidate and navigate after successful merge/discard
                   if (mounted) {
                     ref.invalidate(firebaseUserProvider);
-                    ref.invalidate(authStateProvider);
+                    ref.invalidate(authNotifierProvider);
                     ref.invalidate(currentUserProvider);
                     if (currentContext.mounted) {
                       GoRouter.of(currentContext).go('/profile/account');
@@ -467,7 +467,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
           // Invalidate providers and let router handle navigation
           ref.invalidate(firebaseUserProvider);
-          ref.invalidate(authStateProvider);
+          ref.invalidate(authNotifierProvider);
           ref.invalidate(currentUserProvider);
 
           // Explicit navigation for reliability
@@ -528,7 +528,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     if (success) {
                       // Invalidate providers and let router handle navigation
                       ref.invalidate(firebaseUserProvider);
-                      ref.invalidate(authStateProvider);
+                      ref.invalidate(authNotifierProvider);
                       ref.invalidate(currentUserProvider);
                       // Explicit navigation after successful link
                       if (mounted) {
@@ -594,7 +594,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authStateProvider);
+    final authState = ref.watch(authNotifierProvider);
     final isAnonymous = authState.isAnonymous;
 
     // Wrap the Scaffold with PopScope

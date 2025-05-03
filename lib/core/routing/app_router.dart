@@ -43,79 +43,19 @@ final _shellNavigatorKeyProfile =
 // Provider for the GoRouter instance
 final routerProvider = Provider<GoRouter>((ref) {
   final rootNavigatorKey = ref.watch(rootNavigatorKeyProvider);
-  // Listen to auth state changes to trigger redirects
-  // No longer needed as redirect directly watches the provider
-  // final authStateListenable =
-  //     ValueNotifier<AuthState>(const AuthState.loading());
-  // ref.listen(authStateProvider, (_, next) {
-  //   authStateListenable.value = next;
-  // });
+  // Watch the new AuthNotifier instance directly for Listenable
+  final authNotifier = ref.watch(authNotifierProvider.notifier);
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     debugLogDiagnostics: true,
-    // REMOVED refreshListenable, using ref.watch in redirect instead
-    // Add redirect logic
-    redirect: (BuildContext context, GoRouterState state) {
-      // WATCH the NEW authStatusProvider to react ONLY to status changes
-      final authStatus = ref.watch(authStatusProvider);
-      final location = state.uri.toString(); // Use full path with query params
-
-      talker.debug(
-          'Router Redirect Check: Location="$location", AuthStatus=$authStatus');
-
-      // Define public routes accessible without full authentication
-      final publicRoutes = [
-        '/auth',
-        '/register',
-        '/reset-password',
-      ];
-
-      // Check if the current route is one of the public routes
-      final isPublicRoute =
-          publicRoutes.any((route) => location.startsWith(route));
-
-      // 1. Loading State
-      if (authStatus == AuthStatus.loading) {
-        talker.debug('Router Redirect: Auth loading, no redirect.');
-        return null;
-      }
-
-      // 2. Unauthenticated on Protected Route -> /auth
-      //    (Anonymous users are now ALLOWED on protected routes)
-      if (authStatus == AuthStatus.unauthenticated && !isPublicRoute) {
-        talker.debug(
-            'Router Redirect: Unauthenticated on protected route -> /auth');
-        return '/auth';
-      }
-
-      // 3. Authenticated or EmailNotVerified on Public Auth Route -> /profile/account
-      if ((authStatus == AuthStatus.authenticated ||
-              authStatus == AuthStatus.emailNotVerified) &&
-          isPublicRoute &&
-          location != '/reset-password') {
-        // Allow authenticated users on reset password page
-        talker.debug(
-            'Router Redirect: Authenticated/EmailNotVerified on public auth route -> /profile/account');
-        return '/profile/account';
-      }
-
-      // 4. Authenticated, EmailNotVerified, or Anonymous on a PROTECTED route
-      //    No redirect needed.
-      if ((authStatus == AuthStatus.authenticated ||
-              authStatus == AuthStatus.emailNotVerified ||
-              authStatus == AuthStatus.anonymous) && // Allow anonymous here
-          !isPublicRoute) {
-        talker.debug(
-            'Router Redirect: Authenticated/EmailNotVerified/Anonymous on protected route ($location), staying put.');
-        return null; // Explicitly stay
-      }
-
-      // 5. Default: Should theoretically not be reached if logic above is sound, but return null just in case.
-      talker.debug('Router Redirect: No redirect needed (default/fallback).');
-      return null;
-    },
+    // Use the notifier instance for refreshListenable
+    refreshListenable: authNotifier,
+    // Call the redirect method on the notifier instance
+    redirect: (BuildContext context, GoRouterState state) => authNotifier.redirect(
+        context,
+        state), // Use read to avoid dependency loop if needed? No, redirect needs context.
     // Add error handler
     errorBuilder: (context, state) => ErrorPage(error: state.error),
     routes: [
@@ -137,7 +77,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'cards/:id', // Nested route within Cards tab
                     builder: (context, state) {
-                      final card = state.extra as models.Card;
+                      // Ensure state.extra is correctly cast or handle null
+                      final card = state.extra as models.Card?;
+                      if (card == null) {
+                        // Handle missing card data, maybe redirect or show error
+                        return ErrorPage(error: Exception("Card data missing"));
+                      }
                       return CardDetailsPage(initialCard: card);
                     },
                   ),
@@ -247,6 +192,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                       ),
                     ),
                   ),
+                  // Removed /profile/account from here as it's now top-level
                 ],
               ),
             ],
@@ -255,18 +201,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // Top-level routes (outside the shell) for authentication
       GoRoute(
-        path: '/auth', // Changed from /profile/auth
+        path: '/auth',
         builder: (context, state) => const AuthPage(),
       ),
       GoRoute(
-        path: '/register', // Changed from /profile/register
+        path: '/register',
         builder: (context, state) => const RegisterPage(),
       ),
       GoRoute(
-        path: '/reset-password', // Changed from /profile/reset-password
+        path: '/reset-password',
         builder: (context, state) => const ResetPasswordPage(),
       ),
-      // NEW: Top-level route for Account Settings
+      // Account settings route remains top-level
       GoRoute(
         path: '/profile/account',
         builder: (context, state) => const AccountSettingsPage(),

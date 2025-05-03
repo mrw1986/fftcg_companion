@@ -14,7 +14,7 @@ final autoAuthProvider = Provider.autoDispose<void>((ref) {
   Timer? debounceTimer;
 
   // Listen to auth state changes
-  ref.listen<AuthState>(authStateProvider, (previous, next) async {
+  ref.listen<AuthState>(authNotifierProvider, (previous, next) async {
     // Cancel any pending timer
     debounceTimer?.cancel();
 

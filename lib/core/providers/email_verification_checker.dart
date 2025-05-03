@@ -46,7 +46,7 @@ final emailVerificationCheckerProvider = Provider.autoDispose<void>((ref) {
   }
 
   // Listen to auth state changes with explicit types
-  ref.listen<AuthState>(authStateProvider,
+  ref.listen<AuthState>(authNotifierProvider,
       (AuthState? previous, AuthState next) {
     // Start checking if the state is emailNotVerified OR
     // if the state is authenticated but the user's email isn't verified yet
@@ -82,7 +82,7 @@ final emailVerificationCheckerProvider = Provider.autoDispose<void>((ref) {
   });
 
   // Initial check in case the provider initializes when already in the target state
-  final initialAuthState = ref.read(authStateProvider);
+  final initialAuthState = ref.read(authNotifierProvider);
   // Added null check for initialAuthState and check for authenticated but unverified email
   if (initialAuthState.status == AuthStatus.emailNotVerified ||
       (initialAuthState.status == AuthStatus.authenticated &&

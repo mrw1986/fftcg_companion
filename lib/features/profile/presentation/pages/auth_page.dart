@@ -36,7 +36,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   }
 
   void _setupAuthListener() {
-    ref.listenManual<AuthState>(authStateProvider, (previous, next) {
+    ref.listenManual<AuthState>(authNotifierProvider, (previous, next) {
       // Ensure listener runs only when mounted
       if (!mounted) return;
 
@@ -56,12 +56,15 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         _showSuccessAndNavigate('Successfully signed in with Google!');
         _isSigningInWithGoogle = false; // Reset flag
       }
-      // Navigate after Email Sign-In initiated from this page (if needed, currently handled differently)
-      // else if (_isSigningInWithEmail && (wasUnauthenticated || wasAnonymous) && isAuthenticated) {
-      //   talker.debug('Auth Listener: Detected Email Sign-In completion, navigating...');
-      //   _showSuccessAndNavigate('Successfully signed in!');
-      //   _isSigningInWithEmail = false; // Reset flag
-      // }
+      // Navigate after Email Sign-In initiated from this page
+      else if (_isSigningInWithEmail &&
+          (wasUnauthenticated || wasAnonymous) &&
+          isAuthenticated) {
+        talker.debug(
+            'Auth Listener: Detected Email Sign-In completion, navigating...');
+        _showSuccessAndNavigate('Successfully signed in!');
+        _isSigningInWithEmail = false; // Reset flag
+      }
     });
   }
 
@@ -127,7 +130,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     final authService = ref.read(authServiceProvider); // Read service once
 
     try {
-      final authState = ref.read(authStateProvider); // Read state once
+      final authState = ref.read(authNotifierProvider); // Read state once
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
@@ -150,10 +153,12 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       // Reset skip flag ONLY on success, if mounted
       if (mounted) {
         ref.read(skipAutoAuthProvider.notifier).state = false;
-        // Invalidate providers to trigger listener
-        ref.invalidate(firebaseUserProvider);
-        ref.invalidate(authStateProvider);
-        ref.invalidate(currentUserProvider);
+        // REMOVED: Invalidate providers to trigger listener
+        // ref.invalidate(firebaseUserProvider);
+        // ref.invalidate(authNotifierProvider);
+        // ref.invalidate(currentUserProvider);
+        talker.debug(
+            'Auth page: Email sign-in success, relying on AuthNotifier listener.');
       }
 
       // --- REMOVED EXPLICIT NAVIGATION ---
@@ -255,12 +260,12 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         skipAutoAuthNotifier.state = false; // Use captured notifier
         talker.debug(
             'Auth page: Reset skipAutoAuthProvider=false after successful Google sign-in attempt.');
-        // Invalidate providers AFTER successful operation to trigger state change listener
-        ref.invalidate(firebaseUserProvider);
-        ref.invalidate(authStateProvider);
-        ref.invalidate(currentUserProvider);
+        // REMOVED: Invalidate providers AFTER successful operation to trigger state change listener
+        // ref.invalidate(firebaseUserProvider);
+        // ref.invalidate(authNotifierProvider);
+        // ref.invalidate(currentUserProvider);
         talker.debug(
-            'Auth page: Invalidated auth providers after Google sign-in.');
+            'Auth page: Google sign-in success, relying on AuthNotifier listener.');
       } else {
         talker.warning(
             'Auth page: Widget disposed after Google sign-in await, skipping post-success logic.');
@@ -331,10 +336,12 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                         // Reset skip flag on success inside dialog too
                         skipAutoAuthNotifier.state =
                             false; // Use captured notifier
-                        // Invalidate providers to trigger listener
-                        ref.invalidate(firebaseUserProvider);
-                        ref.invalidate(authStateProvider);
-                        ref.invalidate(currentUserProvider);
+                        // REMOVED: Invalidate providers to trigger listener
+                        // ref.invalidate(firebaseUserProvider);
+                        // ref.invalidate(authNotifierProvider);
+                        // ref.invalidate(currentUserProvider);
+                        talker.debug(
+                            'Auth page: Google creation success, relying on AuthNotifier listener.');
                       } else {
                         talker.warning(
                             'Auth page: Widget disposed after Google creation retry await, skipping post-success logic.');
@@ -394,7 +401,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   Widget build(BuildContext context) {
     // No listener here, moved to initState
     final authState =
-        ref.watch(authStateProvider); // Still watch for UI updates
+        ref.watch(authNotifierProvider); // Still watch for UI updates
     final isAnonymous = authState.isAnonymous;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;

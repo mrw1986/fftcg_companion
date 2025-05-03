@@ -779,10 +779,10 @@ class AuthService {
   }
 
   /// Re-authenticates the current user with Google.
-  /// Uses a sign-out/sign-in approach for simplicity and robustness against token issues.
+  /// **Strategy:** Performs Google Sign-In, then uses the obtained credential
+  /// to call Firebase's reauthenticateWithCredential, letting Firebase handle the validation.
   Future<UserCredential> reauthenticateWithGoogle() async {
-    talker.info(
-        'Attempting Google re-authentication (sign-out/sign-in approach)...');
+    talker.info('Attempting Google re-authentication (Firebase Validation)...');
     final currentUser = _auth.currentUser;
     if (currentUser == null) {
       talker.error('Re-authentication failed: No user signed in.');
@@ -791,13 +791,28 @@ class AuthService {
           message: 'No user is currently signed in.',
           category: AuthErrorCategory.authentication);
     }
-    final originalEmail =
-        currentUser.email; // Store original email for verification
+
+    // Get the email associated with the linked Google provider for error message display
+    String? linkedGoogleEmail;
+    try {
+      final googleProviderInfo = currentUser.providerData.firstWhere(
+        (userInfo) => userInfo.providerId == GoogleAuthProvider.PROVIDER_ID,
+      );
+      linkedGoogleEmail = googleProviderInfo.email;
+    } catch (_) {
+      // Ignore error if provider info not found, email just won't be in the error message
+    }
 
     try {
-      // Sign out from Google first to force a fresh login prompt
-      await _googleSignIn.signOut();
-      talker.debug('Signed out from Google for re-authentication.');
+      // **ADDED:** Force refresh token before starting re-auth flow
+      talker.debug('Forcing token refresh before Google re-auth...');
+      await currentUser.getIdToken(true);
+      talker.debug('Token refreshed.');
+
+      // **REMOVED:** Disconnect Google Sign In - let the SDK handle account selection
+      // talker.debug('Disconnecting GoogleSignIn before re-auth sign-in...');
+      // await _googleSignIn.disconnect();
+      // talker.debug('GoogleSignIn disconnected.');
 
       // Start Google sign-in flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
@@ -809,20 +824,7 @@ class AuthService {
             category: AuthErrorCategory.cancelled);
       }
       talker.debug(
-          'Google user obtained for re-authentication: ${googleUser.email}');
-
-      // Verify it's the same Google account
-      if (googleUser.email != originalEmail) {
-        talker.warning(
-            'Re-authentication failed: Different Google account used.');
-        // Sign the user out completely as they used the wrong account
-        await signOut(isInternalAuthFlow: true);
-        throw AuthException(
-            code: 'wrong-account',
-            message:
-                'Please use the same Google account you originally signed in with.',
-            category: AuthErrorCategory.authentication);
-      }
+          'Google user obtained for re-authentication: ${googleUser.email} (ID: ${googleUser.id})');
 
       // Obtain Google auth details
       final GoogleSignInAuthentication googleAuth =
@@ -833,7 +835,15 @@ class AuthService {
       );
       talker.debug('Google credential created for re-authentication.');
 
-      // Re-authenticate with Firebase
+      // **ADDED:** Log details before attempting re-authentication
+      talker.debug(
+          'Attempting reauthenticateWithCredential for Firebase User: ${currentUser.uid} (${currentUser.email})');
+      talker.debug(
+          'Firebase User Providers: ${currentUser.providerData.map((p) => '${p.providerId}(${p.uid})').join(', ')}');
+      talker.debug(
+          'Using Google Credential for Account: ${googleUser.email} (ID: ${googleUser.id})');
+
+      // Re-authenticate with Firebase - this will implicitly check if the credential matches the user
       final userCredential = await currentUser
           .reauthenticateWithCredential(credential)
           .timeout(_timeout);
@@ -842,12 +852,44 @@ class AuthService {
     } catch (e) {
       talker.error('Google re-authentication failed: $e');
 
-      // Only sign out for security-critical failures, not for cancellations
-      if (e is! AuthException || e.category != AuthErrorCategory.cancelled) {
-        await signOut(isInternalAuthFlow: true).catchError((signOutError) {
+      // **MODIFIED:** Check for specific error codes indicating wrong account
+      if (e is FirebaseAuthException) {
+        // **ADDED:** Log the specific Firebase error code
+        talker.warning(
+            'FirebaseAuthException caught during reauthenticateWithCredential. Code: ${e.code}, Message: ${e.message}');
+
+        if (e.code == 'user-mismatch' ||
+                e.code ==
+                    'invalid-credential' || // Can sometimes indicate wrong user
+                e.code ==
+                    'user-not-found' // Might occur if something is very wrong
+            ) {
+          talker.warning(
+              'Re-authentication failed, likely due to wrong Google account selection (Firebase Code: ${e.code}). Mapping to wrong-account.');
+          throw AuthException(
+              code: 'wrong-account',
+              message:
+                  'Please use the same Google account you originally signed in with${linkedGoogleEmail != null ? ' ($linkedGoogleEmail)' : ''}.',
+              category: AuthErrorCategory.authentication,
+              originalException: e);
+        }
+      }
+
+      // Only sign out the Google session for other security-critical failures, not for cancellations or wrong-account
+      if (e is! AuthException ||
+          (e.category != AuthErrorCategory.cancelled &&
+              e.code != 'wrong-account')) {
+        // Sign out the *Google* session if it's still active from the failed attempt
+        await _googleSignIn.signOut().catchError((googleSignOutError) {
           talker.error(
-              'Error signing out after failed re-authentication: $signOutError');
+              'Error signing out Google after failed re-auth: $googleSignOutError');
+          return null; // Fix: Added return null for catchError
         });
+        // Do NOT sign out the Firebase user here unless absolutely necessary
+        // await signOut(isInternalAuthFlow: true).catchError((signOutError) {
+        //   talker.error(
+        //       'Error signing out Firebase after failed re-authentication: $signOutError');
+        // });
       }
 
       throw _handleAuthException(e);
@@ -1097,6 +1139,9 @@ class AuthService {
       case 'not-authenticated': // Added custom code
       case 'not-google-user': // Added custom code
       case 'not-email-user': // Added custom code
+      case 'google-provider-not-found': // Added custom code
+      case 'google-provider-email-missing': // Added custom code
+      case 'google-provider-uid-missing': // Added custom code
         return AuthErrorCategory.authentication;
 
       // Network Issues
@@ -1166,11 +1211,20 @@ class AuthService {
       case 'user-token-expired':
         return 'Your session has expired. Please sign in again.';
       case 'wrong-account': // Custom code
-        return 'Please use the same account you originally signed in with.';
+        // Extract expected email from original message if possible
+        final expectedEmailMatch =
+            RegExp(r'\((.*?)\)').firstMatch(originalMessage ?? '');
+        final expectedEmail = expectedEmailMatch?.group(1);
+        return expectedEmail != null
+            ? 'Please use the same Google account you originally signed in with ($expectedEmail).'
+            : 'Please use the same Google account you originally signed in with.';
       case 'not-anonymous': // Custom code
       case 'not-authenticated': // Added custom code
       case 'not-google-user': // Added custom code
       case 'not-email-user': // Added custom code
+      case 'google-provider-not-found': // Added custom code
+      case 'google-provider-email-missing': // Added custom code
+      case 'google-provider-uid-missing': // Added custom code
         // These are internal logic errors, show a generic message to the user
         return 'An unexpected authentication error occurred. Please try again.';
 

@@ -8,7 +8,8 @@ class ProfileAccountInformation extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authStateProvider);
+    final authState =
+        ref.watch(authNotifierProvider); // Use the new AsyncNotifierProvider
     final user = authState.user!;
     Theme.of(context);
 
@@ -35,7 +36,8 @@ class ProfileAccountInformation extends ConsumerWidget {
                   Expanded(
                     child: Text(user.email ?? 'No email'),
                   ),
-                  if (authState.isEmailNotVerified)
+                  if (authState
+                      .isEmailNotVerifiedState) // Use the updated state property
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
@@ -53,7 +55,8 @@ class ProfileAccountInformation extends ConsumerWidget {
                 ],
               ),
             ),
-            if (!authState.isEmailNotVerified)
+            if (!authState
+                .isEmailNotVerifiedState) // Use the updated state property
               ListTile(
                 leading: const Icon(Icons.account_circle_outlined),
                 title: const Text('Account Type'),

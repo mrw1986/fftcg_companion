@@ -2,7 +2,43 @@
 
 ## Recent Changes
 
-### Fix Redirect After Linking Google from Account Settings (Current Session - Attempt 7)
+### Fix Account Settings UI Update After Linking (Attempt 3 - Current Session)
+
+- **Context:** The "Change Password" option still didn't appear immediately after linking, even with user reload and provider invalidation. The `User` object used in the build (`userForUI`) might not be reflecting the absolute latest state immediately after invalidation.
+- **Changes:**
+  - Modified `lib/features/profile/presentation/widgets/account_info_card.dart`: Converted to `ConsumerWidget` to directly watch `authNotifierProvider` and get the `User` object. Removed the `user` parameter.
+  - Modified `lib/features/profile/presentation/pages/account_settings_page.dart`: Removed the `user` parameter from the `AccountInfoCard` constructor call. Removed the erroneous error handling block that referenced `authState.error`.
+- **Status:** Fix implemented. Testing required.
+
+### Fix Account Settings UI Update After Linking (Attempt 2 - Previous Session)
+
+- **Context:** The "Change Password" option still didn't appear immediately after linking, even with user reload and provider invalidation. The `User` object used in the build (`userForUI`) might not be reflecting the absolute latest state immediately after invalidation.
+- **Changes:**
+  - Modified `lib/features/profile/presentation/pages/account_settings_page.dart`:
+    - Simplified user object retrieval in `build` method to rely solely on `authState.user` from the `authNotifierProvider`.
+    - Removed the error-prone fallback to `firebaseUserProvider.value`.
+    - Added a short `Future.delayed(const Duration(milliseconds: 50))` followed by `setState(() {})` after the `reload()` and `invalidate()` calls in `_linkWithGoogle` and `_linkWithEmailPassword`. This forces a delayed rebuild, potentially allowing the invalidated provider state to fully propagate.
+- **Status:** Fix implemented but did not resolve the issue based on user feedback and logs. Superseded by Attempt 3.
+
+### Fix Account Settings UI Update After Linking (Attempt 1 - Previous Session)
+
+- **Context:** The "Change Password" option in `AccountSettingsPage` did not appear immediately after linking an Email/Password provider because the `User` object's `providerData` wasn't updated in the UI promptly.
+- **Changes:**
+  - Modified `_linkWithGoogle` and `_linkWithEmailPassword` in `lib/features/profile/presentation/pages/account_settings_page.dart` to include `FirebaseAuth.instance.currentUser?.reload()` followed by `ref.invalidate(authNotifierProvider)`. This did not fully resolve the issue.
+- **Status:** Fix implemented but did not resolve the issue based on user feedback and logs. Superseded by Attempt 2.
+
+### Investigate Reauthentication & Sign-in Redirect Issues (Previous Session)
+
+- **Context:** User reported a blank reauthentication screen and getting stuck on the sign-in page after Google sign-in.
+- **Changes:**
+  - Added diagnostic logging to `ProfileReauthDialog` and `AuthNotifier`.
+  - Tested reauthentication and sign-in flows.
+  - Logs confirmed correct provider loading in `ProfileReauthDialog` (though the blank screen issue wasn't reproduced).
+  - Logs confirmed correct router listener notification and redirect execution in `AuthNotifier` after Google sign-in.
+  - Removed diagnostic logging.
+- **Status:** Investigation complete. Issues appear resolved or intermittent. Core logic confirmed to be working correctly.
+
+### Fix Redirect After Linking Google from Account Settings (Previous Session - Attempt 7)
 
 - **Context:** Adding a delay before `setState` (Attempt 6) still resulted in a redirect, although the UI did update correctly before the redirect. The timing of state propagation and router reaction remains problematic.
 - **Changes:**
@@ -12,7 +48,7 @@
 - **Rationale:** Invalidate the necessary provider, allow a brief moment for system processing/potential navigation triggers to settle, then force the local rebuild to hopefully catch the updated state without the redirect.
 - **Status:** Completed. Testing needed.
 
-### Fix Redirect After Linking Google from Account Settings (Current Session - Attempt 6)
+### Fix Redirect After Linking Google from Account Settings (Previous Session - Attempt 6)
 
 - **Context:** Using `setState` alone (Attempt 5) fixed the UI update delay but not the redirect.
 - **Changes:**
@@ -20,15 +56,15 @@
   - Added a short `Future.delayed` before the `setState` call in `_linkWithGoogle` within `account_settings_page.dart`.
 - **Status:** Completed. Fixed UI update, but redirect persisted.
 
-### Fix UI Update After Linking Google from Account Settings (Current Session - Attempt 5)
+### Fix UI Update After Linking Google from Account Settings (Previous Session - Attempt 5)
 
 - **Context:** Removing provider invalidations (Attempt 3) fixed the redirect but caused the UI on the Account Settings page to not update immediately after linking Google. Attempting selective invalidation (`firebaseUserProvider` only - Attempt 4) still resulted in a redirect.
 - **Changes:**
-  - Removed provider invalidation from `linkGoogleToEmailPasswordProvider` again.
-  - Added an empty `setState(() {})` call in the `_linkWithGoogle` function within `account_settings_page.dart` after the linking operation succeeds, before showing the SnackBar.
-- **Status:** Completed. Fixed UI update, but redirect persisted.
+  - Re-added `ref.invalidate(firebaseUserProvider)` to the `linkGoogleToEmailPasswordProvider` in `lib/core/providers/auth_provider.dart`.
+  - Intentionally did *not* re-add `ref.invalidate(authStateProvider)` to avoid triggering the router redirect.
+- **Status:** Completed. Testing needed to confirm UI updates correctly without redirecting.
 
-### Fix UI Update After Linking Google from Account Settings (Current Session - Attempt 4)
+### Fix Redirect After Linking Google from Account Settings (Previous Session - Attempt 4)
 
 - **Context:** Removing explicit invalidations (Attempt 3) fixed the redirect but caused the UI on the Account Settings page to not update immediately after linking Google.
 - **Changes:**
@@ -36,14 +72,14 @@
   - Intentionally did *not* re-add `ref.invalidate(authStateProvider)` to avoid triggering the router redirect.
 - **Status:** Completed. Testing needed to confirm UI updates correctly without redirecting.
 
-### Fix Redirect After Linking Google from Account Settings (Current Session - Attempt 3)
+### Fix Redirect After Linking Google from Account Settings (Previous Session - Attempt 3)
 
 - **Context:** Even after moving `/profile/account` outside the `StatefulShellRoute` (Attempt 2), linking Google still caused a redirect away from the Account Settings page.
 - **Changes:**
   - Removed explicit `ref.invalidate(firebaseUserProvider)` and `ref.invalidate(authStateProvider)` calls from `linkGoogleToEmailPasswordProvider` in `lib/core/providers/auth_provider.dart`.
 - **Status:** Completed. Fixed redirect, but broke immediate UI update.
 
-### Fix Redirect After Linking Google from Account Settings (Current Session - Attempt 2)
+### Fix Redirect After Linking Google from Account Settings (Previous Session - Attempt 2)
 
 - **Context:** Linking Google from Account Settings caused an unwanted redirect and `Duplicate GlobalKey` error due to the `StatefulShellRoute` rebuilding after the auth state change.
 - **Changes:**
@@ -51,7 +87,7 @@
   - Moved the `/profile/account` route definition in `app_router.dart` outside the `StatefulShellRoute` branches, making it a top-level route.
 - **Status:** Completed. `GlobalKey` error resolved, but redirect persisted.
 
-### Fix Email Verification UI (Chip/Banner) (Current Session - Attempts 3, 4, 5)
+### Fix Email Verification UI (Chip/Banner) (Previous Session - Attempts 3, 4, 5)
 
 - **Context:** After linking Email/Password to Google, the "Unverified" chip appeared correctly (Attempt 3), but the top banner also appeared incorrectly (Attempt 4). After fixing the banner, the chip then failed to disappear after email verification (Attempt 5).
 - **Changes:**
@@ -60,7 +96,7 @@
   - **Attempt 5:** Refined chip visibility logic in `AccountSettingsPage` to hide the chip immediately when `emailVerificationDetectedProvider` becomes true (`showUnverifiedChip = authState.emailNotVerified && !verificationDetected`). Fixed related debug log and lint error.
 - **Status:** Banner logic fixed. Chip logic fixed. **Testing needed** to confirm the chip now disappears correctly after verification.
 
-### Fix Email Verification Status Update After Linking (Current Session)
+### Fix Email Verification Status Update After Linking (Previous Session)
 
 - **Context:** After linking Email/Password to Google and verifying the email, the UI state didn't update to show the verified status because the `EmailVerificationChecker` wasn't running when the `AuthState` was `authenticated` (due to Google), even if the linked email was unverified.
 - **Changes:**
@@ -69,7 +105,7 @@
   - Updated the initial check logic in the provider to match this condition.
 - **Status:** Completed. Testing needed.
 
-### Display Pending Email Update (Current Session)
+### Display Pending Email Update (Previous Session)
 
 - **Context:** Improve user feedback after initiating an email change by showing the pending email address in Account Settings.
 - **Changes:**
@@ -80,8 +116,6 @@
 - **Status:** Completed.
 
 ### Removed Account Limits Dialog (Previous Session)
-
-### Removed Account Limits Dialog (Current Session)
 
 - **Context:** The `AccountLimitsDialog` (previously shown to anonymous/unverified users) is being removed in favor of a future onboarding experience. This involved removing the dialog widget, its invocation logic, and related parameters/logic in the authentication service.
 - **Changes:**
@@ -128,12 +162,12 @@
 
 - **Context:** Encountered persistent build errors and complexity related to the `freezed` code generation for models.
 - **Changes:** Replaced `freezed` with `dart_mappable`. Migrated models, updated serialization calls (`fromMap`/`toMap`), updated Hive adapters.
-- **Status:** Migration complete. Build runner successful. **Extensive testing required.**
+- **Status:** Migration complete. **Extensive testing required.**
 
 ### Collection Management Fixes & UI Enhancements (Objective 50) - Completed
 
 - **Context:** Resolved Firestore permission errors, inaccurate `collectionCount`, missing delete-on-zero-quantity logic, and addressed UI requests for quantity input and label capitalization.
-- **Changes:** Fixed `CollectionItem.toMap()` serialization. Refactored `UserRepository.updateCollectionCount` to use transactions and added verification. Modified `CollectionRepository.addOrUpdateCard` to delete on zero quantity. Added quantity `TextField` and fixed grading labels in UI.
+- **Changes:** Fixed `CollectionItem.toMap()` serialization. Refactored `UserRepository.updateCollectionCount` to use atomic transactions. Modified `CollectionRepository.addOrUpdateCard` to delete on zero quantity. Added quantity `TextField` and fixed grading labels in UI.
 - **Status:** Fixes and enhancements applied. Testing recommended.
 
 ### Fix Initialization Error During Set Count Preload (Objective 47) - Completed (Testing Needed)
@@ -214,13 +248,13 @@
 #### Riverpod Providers (lib/core/providers/ & lib/features/profile/presentation/providers/) - **Updated**
 
 - **`auth_provider.dart`:**
-  - `authStateProvider` calculates state.
-  - `firestoreUserSyncProvider` handles Firestore sync, resets `emailVerificationDetectedProvider`, triggers count verification, **and now clears `emailUpdateNotifierProvider` when email is updated or on sign-out/error.**
-  - `linkEmailPasswordToGoogleProvider`, `unlinkProviderProvider` handle specific auth operations.
+  - `authNotifierProvider` (NotifierProvider) manages core auth state (`AuthState`) and notifies router via `Listenable`.
+  - `firestoreUserSyncProvider` logic integrated into `AuthNotifier`'s `_triggerFirestoreSync`.
+  - `linkEmailPasswordToGoogleProvider`, `unlinkProviderProvider`, etc. (FutureProviders) handle specific auth operations and invalidate `authNotifierProvider`.
 - **`email_verification_checker.dart`:** Polls, updates Firestore, sets detection flag.
-- **`emailVerificationDetectedProvider`:** Simple `StateProvider<bool>`. Reset logic in `firestoreUserSyncProvider`.
+- **`emailVerificationDetectedProvider`:** Simple `StateProvider<bool>`. Reset logic in `AuthNotifier`.
 - **`auto_auth_provider.dart`:** Handles initial anonymous sign-in logic.
-- **`email_update_provider.dart`:** **NEW** `emailUpdateNotifierProvider` (NotifierProvider) manages the state of a pending email update (`pendingEmail`).
+- **`email_update_provider.dart`:** `emailUpdateNotifierProvider` (NotifierProvider) manages the state of a pending email update (`pendingEmail`).
 - Core auth state and action providers.
 
 #### Cards Feature Providers (lib/features/cards/presentation/providers/) - **Refactored**
@@ -241,11 +275,12 @@
   - **NEW:** `collectionSpecificFilterProvider` (**Refactored to NotifierProvider**). Manages collection-only filters (type, graded). Handles persistence via Hive.
   - Updated `filteredCollectionProvider` and `searchedCollectionProvider` to use `collectionFilterProvider`, `collectionSpecificFilterProvider`, and `collectionSearchQueryProvider`.
 
-#### Profile Page Components
+#### Profile Page Components - **Updated**
 
-- **`account_settings_page.dart`:** **Updated.** Manages account details, re-auth, linking/unlinking calls. Uses root context for SnackBars. Corrected `mounted` checks. Removed `skipAccountLimitsDialog` from `signOut` call. **Now sets/clears `emailUpdateNotifierProvider` state and passes `pendingEmail` to `AccountInfoCard`.**
-- **`account_info_card.dart`:** **Updated.** Added optional `pendingEmail` parameter. Displays pending email using a `ListTile` and `Chip`.
+- **`account_settings_page.dart`:** **Updated.** Manages account details, re-auth, linking/unlinking calls. Uses root context for SnackBars. Corrected `mounted` checks. Removed `skipAccountLimitsDialog` from `signOut` call. **Now sets/clears `emailUpdateNotifierProvider` state and passes `pendingEmail` to `AccountInfoCard`. Added user reload and provider invalidation after successful linking operations. Simplified user object retrieval in `build` method. Added delayed `setState` after linking. Removed erroneous error handling block.**
+- **`account_info_card.dart`:** **Updated.** Converted to `ConsumerWidget` to directly watch `authNotifierProvider`. Removed `user` parameter. Added optional `pendingEmail` parameter. Displays pending email using a `ListTile` and `Chip`.
 - **`account_limits_dialog.dart`:** **DELETED.**
+- **`profile_reauth_dialog.dart`:** **Updated.** Loads available providers (`password`, `google.com`) and conditionally displays UI elements. Diagnostic logging added and removed.
 
 #### Collection Page Components - **Updated**
 
@@ -275,15 +310,17 @@
 ## Data Flow (Refactored & Updated)
 
 - **Authentication Flow (Rebuilt & Refined)**
-  - **Linking:** Works correctly.
+  - **Linking:** **Updated.** Now includes user reload, provider invalidation, and a delayed `setState` to ensure immediate UI updates.
   - **Unlinking:** **Incorrect redirect and GlobalKey error persist.**
   - **Deletion:** Works correctly, including SnackBar context.
+  - **Reauthentication:** Logic exists, UI (`ProfileReauthDialog`) loads providers correctly. Blank screen issue not reproduced.
+  - **Sign-in Redirect:** Router listener notification and redirect logic confirmed working correctly after Google sign-in. Issue of getting stuck on `/auth` appears resolved/intermittent.
 - **Firestore User Document Creation/Update:** Triggers count verification.
 - **Collection Add/Update Flow:** Deletes on zero quantity.
 - **Email Verification Flow:** Hybrid approach implemented.
 - **Password Reset Flow:** Updated. No longer skips dialog timestamp reset (logic removed).
 - **Account Deletion Flow:** Simplified, uses helper for cleanup. No longer skips dialog timestamp reset (logic removed). **Now clears pending email state.**
-- **Email Update Flow:** **Updated.** Initiating an update now sets a pending email state (`emailUpdateNotifierProvider`). The UI (`AccountInfoCard`) displays this pending email. The state is cleared automatically by `firestoreUserSyncProvider` upon successful verification or sign-out/error.
+- **Email Update Flow:** **Updated.** Initiating an update now sets a pending email state (`emailUpdateNotifierProvider`). The UI (`AccountInfoCard`) displays this pending email. The state is cleared automatically by `AuthNotifier` upon successful verification or sign-out/error.
 - **Cards/Collection Filtering/Search/View:** (Flow Refactored)
   - Each feature uses its own providers.
   - State changes isolated to the respective feature.
@@ -296,26 +333,43 @@ graph TD
         C[Login/Register Page] --> D{Choose Method};
     end
 
-    subgraph Auth State Listener (firestoreUserSyncProvider)
-        ListenAuthState[Listen to firebaseUserProvider] --> UserEvent{User Data Changed?};
-        UserEvent -- Yes --> CheckResetFlag{Need to Reset Verification Flag?};
-        CheckResetFlag -- Yes --> ResetFlag[Reset emailVerificationDetectedProvider=false];
-        CheckResetFlag -- No --> CheckSyncNeeded{Need Firestore Sync?};
-        ResetFlag --> CheckSyncNeeded;
-        CheckSyncNeeded -- Yes --> CallCreateUser[Call UserRepository.createUserFromAuth(user)];
-        CallCreateUser --> FirestoreUpdate[Firestore Doc Updated];
-        FirestoreUpdate --> VerifyCount[Call UserRepository.verifyAndCorrectCollectionCount]; %% Added Verification Step
-        CheckSyncNeeded -- No --> NoOp[No Firestore Action];
-        UserEvent -- No --> NoOp;
+    subgraph Auth State Listener (AuthNotifier)
+        ListenAuthState[Listen to Firebase Auth Stream] --> UserEvent{User Data Changed?};
+        UserEvent -- Yes --> ReloadUser[Reload User Data];
+        ReloadUser -- Success --> DetermineState{Determine AuthState};
+        ReloadUser -- Failure --> LogError[Log Reload Error];
+        LogError --> DetermineState; %% Proceed with potentially stale data
+        DetermineState --> StateChanged{State Status Changed?};
+        StateChanged -- Yes --> UpdateInternalState[Update AuthNotifier State];
+        UpdateInternalState --> SyncAndNotify[Sync Firestore & Notify Router];
+        StateChanged -- No --> CheckUserChanged{User Object Changed?};
+        CheckUserChanged -- Yes --> SyncOnly[Sync Firestore Only];
+        CheckUserChanged -- No --> NoOp[No Action];
+        SyncAndNotify --> RouterRedirect[Router Redirect Logic];
+        SyncOnly --> NoOp;
+    end
+
+    subgraph Firestore Sync (_triggerFirestoreSync in AuthNotifier)
+        SyncAndNotify --> VerifyToken[Verify ID Token];
+        SyncOnly --> VerifyToken;
+        VerifyToken -- Valid --> CreateOrUpdateUser[Call UserRepository.createUserFromAuth];
+        CreateOrUpdateUser --> VerifyCount[Call UserRepository.verifyAndCorrectCollectionCount];
+        VerifyCount --> CheckPendingEmail{User Email Matches Pending?};
+        CheckPendingEmail -- Yes --> ClearPendingEmail[Clear Pending Email State];
+        CheckPendingEmail -- No --> SyncComplete[Sync Complete];
+        ClearPendingEmail --> SyncComplete;
+        VerifyToken -- Invalid --> ForceSignOut[Force Sign Out];
+        ForceSignOut --> AuthState;
     end
 
     subgraph Anonymous Flow
         B -- No --> AnonSignIn[Sign In Anonymously];
         AnonSignIn --> AuthState;
         Anon[Anonymous User] -- Link --> LinkChoice{Link Email/Pass or Google?};
-        LinkChoice -- Email/Pass --> LinkEmailPass[AuthService.linkEmailAndPasswordToAnonymous];
-        LinkEmailPass --> UpdateFirestoreAnon[Immediate Firestore Update in AuthService];
-        UpdateFirestoreAnon --> AuthState;
+        LinkChoice -- Email/Pass --> LinkEmailPass[UI Calls _linkWithEmailPassword]; %% Changed Trigger
+        LinkEmailPass --> LinkEmailPassProvider[Provider: linkEmailAndPasswordToAnonymous]; %% Changed Provider
+        LinkEmailPassProvider --> ReloadInvalidateSetState1[Reload User, Invalidate AuthNotifier, Delayed SetState]; %% NEW
+        ReloadInvalidateSetState1 --> AuthState; %% NEW
         LinkChoice -- Google --> LinkGoogle[AuthService.linkGoogleToAnonymous];
         LinkGoogle -- Exists --> MergePrompt{Merge Data?};
         MergePrompt -- Yes --> MigrateData[Migrate Data];
@@ -355,6 +409,10 @@ graph TD
         D -- Google --> LoginGoogle[Login/Register with Google];
         LoginGoogle --> AuthState;
         GoogleUser[Google User] -- Actions --> OtherActions2[Other Account Actions];
+        GoogleUser -- Link Email/Pass --> LinkEmailPassToGoogle[UI Calls _linkWithEmailPassword];
+        LinkEmailPassToGoogle --> LinkProviderCall[Provider: linkEmailPasswordToGoogle];
+        LinkProviderCall --> ReloadInvalidateSetState2[Reload User, Invalidate AuthNotifier, Delayed SetState]; %% NEW
+        ReloadInvalidateSetState2 --> AuthState; %% NEW
     end
 
     subgraph Password Reset Flow
@@ -386,12 +444,16 @@ graph TD
         ShowSnackbar --> FinalSignOut[Helper: Sign Out User]; %% Removed skip flag
         FinalSignOut --> NavigateAway[Helper: Navigate Away (with mounted check)];
         NavigateAway --> AuthState;
+        ActionChoice -- Link Google --> LinkGoogleFromSettings[UI Calls _linkWithGoogle];
+        LinkGoogleFromSettings --> LinkGoogleProviderCall[Provider: linkGoogleToEmailPassword];
+        LinkGoogleProviderCall --> ReloadInvalidateSetState3[Reload User, Invalidate AuthNotifier, Delayed SetState]; %% NEW
+        ReloadInvalidateSetState3 --> AuthState; %% NEW
     end
 
     subgraph State & UI
         AuthState[Auth State Change] --> ListenAuthState;
         AuthState --> UpdateUIMain[Update UI via AuthState];
-        AuthState --> RouterRedirect[Router Redirect Logic];
+        AuthState --> RouterRedirect;
     end
 
     style NavigateToAccount1 fill:#c9ffc9,stroke:#333,stroke-width:1px
@@ -414,8 +476,20 @@ graph TD
     style SignOutFirebase2 fill:#e1f5fe,stroke:#0277bd,stroke-width:1px
     style ListenAuthState fill:#d1c4e9,stroke:#512da8,stroke-width:2px
     style UserEvent fill:#d1c4e9,stroke:#512da8,stroke-width:1px
-    style CallCreateUser fill:#d1c4e9,stroke:#512da8,stroke-width:1px
-    style FirestoreUpdate fill:#b39ddb,stroke:#512da8,stroke-width:1px
+    style ReloadUser fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
+    style DetermineState fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
+    style StateChanged fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
+    style UpdateInternalState fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
+    style SyncAndNotify fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
+    style CheckUserChanged fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
+    style SyncOnly fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
+    style VerifyToken fill:#b39ddb,stroke:#512da8,stroke-width:1px
+    style CreateOrUpdateUser fill:#b39ddb,stroke:#512da8,stroke-width:1px
+    style VerifyCount fill:#b39ddb,stroke:#512da8,stroke-width:1px
+    style CheckPendingEmail fill:#b39ddb,stroke:#512da8,stroke-width:1px
+    style ClearPendingEmail fill:#b39ddb,stroke:#512da8,stroke-width:1px
+    style SyncComplete fill:#b39ddb,stroke:#512da8,stroke-width:1px
+    style ForceSignOut fill:#ffcdd2,stroke:#c62828,stroke-width:1px
     style NoOp fill:#eee,stroke:#999,stroke-width:1px
     style UpdateFirestoreAnon fill:#ffcc80,stroke:#ef6c00,stroke-width:2px
     style UpdateUIMain fill:#e1f5fe,stroke:#0277bd,stroke-width:1px
@@ -425,7 +499,10 @@ graph TD
     style ShowSnackbar fill:#c8e6c9,stroke:#388e3c,stroke-width:1px
     style FinalSignOut fill:#c8e6c9,stroke:#388e3c,stroke-width:1px
     style NavigateAway fill:#c8e6c9,stroke:#388e3c,stroke-width:1px
-    style CheckResetFlag fill:#d1c4e9,stroke:#512da8,stroke-width:1px
-    style ResetFlag fill:#ffecb3,stroke:#ffa000,stroke-width:1px
-    style CheckSyncNeeded fill:#d1c4e9,stroke:#512da8,stroke-width:1px
-    style VerifyCount fill:#b39ddb,stroke:#512da8,stroke-width:2px %% Added Verification Step Style
+    style ReloadInvalidateSetState1 fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px %% NEW
+    style ReloadInvalidateSetState2 fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px %% NEW
+    style ReloadInvalidateSetState3 fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px %% NEW
+
+</final_file_content>
+
+IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting (e.g., if you used single quotes but the formatter converted them to double quotes). Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.

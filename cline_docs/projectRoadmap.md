@@ -42,7 +42,7 @@
     - [x] Google Sign-In
     - [x] Email verification
     - [x] Account deletion
-    - [x] Re-authentication flow
+    - [x] Re-authentication flow (**Verified working**)
     - [x] Provider management (linking/unlinking)
     - [x] Anonymous accounts
     - [x] Email update with proper logout flow
@@ -64,6 +64,7 @@
     - [x] Fixed Google authentication display name not storing in Firestore
     - [x] Fixed navigation after registration to show Account Settings page
     - [x] **Fixed Firestore permission issues during data migration** (Resolved as part of general collection permission fix)
+    - [x] **Fixed post-sign-in redirect issue** (Verified working)
     - [ ] **Ongoing:** Resolve `GlobalKey` conflicts and `ref` disposal errors during auth flow. Address count verification edge cases.
     - [x] Implemented settings migration (theme, display preferences)
     - [ ] **Pending:** Expand data migration to include deck data (See Phase 3, Item 17)
@@ -111,7 +112,7 @@
 - [x] Handle email verification (Rebuilt)
 - [x] Manage user accounts (Rebuilt)
 - [x] Provide secure account deletion (Rebuilt)
-- [x] Implement re-authentication (Rebuilt)
+- [x] Implement re-authentication (Rebuilt & Verified)
 - [x] Support anonymous accounts (Rebuilt)
 - [x] Implement proper email update flow with logout (Rebuilt)
 - [x] Fix Forgot Password flow for anonymous users (Rebuilt)
@@ -123,12 +124,19 @@
 - [x] Fixed authentication method order consistency in UI
 - [x] Fixed Google authentication display name not storing in Firestore
 - [x] **Fixed Firestore permission issues during data migration (Resolved)**
+- [x] **Fixed post-sign-in redirect issue (Verified)**
 - [ ] **Resolve `GlobalKey` / `ref` disposal errors during auth flow (Ongoing)**
 - [ ] **Implement comprehensive data migration for all user data (Pending - See Phase 3, Item 17)**
 
 ### Recently Completed Tasks
 
-1. **Auth Flow Stability & Linking Fixes (Current Session)**
+1. **Investigate Reauthentication & Sign-in Redirect Issues (Current Session)**
+    - Investigated blank reauthentication screen (not reproduced) and post-sign-in redirect failure.
+    - Added and removed diagnostic logging in `AuthNotifier` and `ProfileReauthDialog`.
+    - Confirmed router listener notification and redirect logic are working correctly.
+    - Issues appear resolved or intermittent.
+
+2. **Auth Flow Stability & Linking Fixes (Previous Session)**
     - Resolved `GlobalKey` conflict and incorrect navigation after unlinking providers by introducing `authStatusProvider` and refining router logic.
     - Fixed email pre-population regression in the link dialog.
     - Ensured UI updates correctly after linking Email/Password to Google by adding provider invalidation.
@@ -136,18 +144,18 @@
     - Resolved various analysis errors and `use_build_context_synchronously` warnings.
     - Refactored `linkGoogleToAnonymous` merge conflict logic.
 
-2. **Analysis Errors & Provider Refactoring (Previous Session)**
+3. **Analysis Errors & Provider Refactoring (Previous Session)**
     - Addressed multiple analysis errors (`unused_import`, `invalid_use_of_protected_member`, `deprecated_member_use`, `use_super_parameters`, `unused_local_variable`).
     - Refactored `cardSearchQueryProvider`, `collectionSpecificFilterProvider`, and `collectionSearchQueryProvider` from `StateProvider` to `NotifierProvider` to correctly handle state persistence and side effects (fixing `listenSelf` deprecation).
     - Updated UI components to interact correctly with the refactored `NotifierProvider`s using their methods.
-3. **Collection Management Fixes & Enhancements (Objective 50)**
+4. **Collection Management Fixes & Enhancements (Objective 50)**
     - Fixed Firestore `PERMISSION_DENIED` errors when adding/updating collection items by correcting `CollectionItem.toMap()` serialization (`cardId` type, `null` map handling).
     - Implemented robust `collectionCount` tracking in `UserRepository` using Firestore transactions and added a verification/correction mechanism triggered on auth sync.
     - Implemented automatic deletion of collection items when both regular and foil quantities are updated to zero (`CollectionRepository`).
     - Added `TextField` for direct quantity input on the collection edit page.
     - Fixed capitalization of "Regular"/"Foil" labels in the grading section of the collection item detail page.
 
-4. **Fixed Account Limits Dialog Issue After Google Sign-In (Objective 31)**
+5. **Fixed Account Limits Dialog Issue After Google Sign-In (Objective 31)**
     - Prevented the Account Limits dialog from appearing after cancelling Google sign-in or linking:
         - Modified the auto-sign-in logic in `auto_auth_provider.dart` to pass `isInternalAuthFlow=true` when creating temporary anonymous users.
         - This ensures the dialog timestamp isn't reset during internal auth flows like Google sign-in.
@@ -184,7 +192,13 @@
 
 ### Recently Completed
 
-1. **Auth Flow Stability & Linking Fixes (Current Session)**
+1. **Investigate Reauthentication & Sign-in Redirect Issues (Current Session)**
+    - Investigated blank reauthentication screen (not reproduced) and post-sign-in redirect failure.
+    - Added and removed diagnostic logging in `AuthNotifier` and `ProfileReauthDialog`.
+    - Confirmed router listener notification and redirect logic are working correctly.
+    - Issues appear resolved or intermittent.
+
+2. **Auth Flow Stability & Linking Fixes (Previous Session)**
     - Resolved `GlobalKey` conflict and incorrect navigation after unlinking providers.
     - Fixed email pre-population regression in the link dialog.
     - Fixed UI update failure after linking Email/Password to Google.
@@ -192,18 +206,18 @@
     - Resolved various analysis errors and `use_build_context_synchronously` warnings.
     - Refactored `linkGoogleToAnonymous` merge conflict logic.
 
-2. **Analysis Errors & Provider Refactoring (Previous Session)**
+3. **Analysis Errors & Provider Refactoring (Previous Session)**
     - Addressed multiple analysis errors (`unused_import`, `invalid_use_of_protected_member`, `deprecated_member_use`, `use_super_parameters`, `unused_local_variable`).
     - Refactored `cardSearchQueryProvider`, `collectionSpecificFilterProvider`, and `collectionSearchQueryProvider` from `StateProvider` to `NotifierProvider` to correctly handle state persistence and side effects (fixing `listenSelf` deprecation).
     - Updated UI components to interact correctly with the refactored `NotifierProvider`s using their methods.
-3. **Collection Management Fixes & Enhancements (Objective 50)**
+4. **Collection Management Fixes & Enhancements (Objective 50)**
     - Fixed Firestore permission errors during add/update.
     - Implemented transactional `collectionCount` updates and verification.
     - Implemented delete-on-zero-quantity logic.
     - Added quantity text input UI.
     - Fixed grading label capitalization UI.
 
-4. **Fixed Google Authentication Display Name Issue (Objective 30)**
+5. **Fixed Google Authentication Display Name Issue (Objective 30)**
     - Fixed issue where Google display name wasn't storing in Firestore:
         - Added code to extract display name directly from Google provider data
         - Updated logic to prioritize Google provider display name
@@ -215,7 +229,7 @@
     - **Remaining Issue:**
         - Account Limits dialog appears after Google sign-in (separate concern - Fixed in Obj 31)
 
-5. **Data Migration and Firestore Rules Updates (Objective 27)**
+6. **Data Migration and Firestore Rules Updates (Objective 27)**
     - Updated Firestore rules to handle migrations:
         - Added special case for collection updates during migration
         - Added permission for initial user document creation
@@ -230,7 +244,7 @@
         - Need to verify and fix Firestore rules for all migration scenarios **(Partially addressed in Obj 50)**
         - Ensure proper user document creation timing
 
-6. **Fixed Email Update Flow and UI Updates (Objective 26)**
+7. **Fixed Email Update Flow and UI Updates (Objective 26)**
     - Fixed UI not updating after linking Google authentication:
         - Added explicit provider invalidation after successful Google linking
         - Ensured UI immediately reflects newly linked authentication methods

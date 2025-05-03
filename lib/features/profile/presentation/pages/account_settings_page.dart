@@ -21,6 +21,10 @@ import 'package:fftcg_companion/core/services/auth_service.dart';
 import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 // Import the new provider
 import 'package:fftcg_companion/features/profile/presentation/providers/email_update_provider.dart';
+// Removed import for email_update_checker.dart
+
+// NEW: Provider to store the original email during the update process
+final originalEmailForUpdateCheckProvider = StateProvider<String>((ref) => '');
 
 class AccountSettingsPage extends ConsumerStatefulWidget {
   const AccountSettingsPage({super.key});
@@ -30,7 +34,9 @@ class AccountSettingsPage extends ConsumerStatefulWidget {
       _AccountSettingsPageState();
 }
 
-class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
+// NEW: Add WidgetsBindingObserver mixin
+class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
+    with WidgetsBindingObserver {
   final _displayNameController = TextEditingController();
   final _emailController = TextEditingController();
   bool _isLoading = false;
@@ -48,6 +54,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
   @override
   void initState() {
     super.initState();
+    // NEW: Add observer
+    WidgetsBinding.instance.addObserver(this);
     // Initial read might get null if provider is still loading
     // We'll primarily rely on the build method for initialization now.
   }
@@ -99,11 +107,85 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
   @override
   void dispose() {
+    // NEW: Remove observer
+    WidgetsBinding.instance.removeObserver(this);
     _displayNameController.dispose();
     _emailController.dispose();
     _reauthEmailController.dispose();
     _reauthPasswordController.dispose();
     super.dispose();
+  }
+
+  // NEW: Implement didChangeAppLifecycleState
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) async {
+    super.didChangeAppLifecycleState(state);
+    talker.debug('App lifecycle state changed: $state');
+
+    if (state == AppLifecycleState.resumed) {
+      talker.debug('App resumed, checking for pending email update...');
+      // Check if an email update is pending
+      final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+      final originalEmail = ref.read(originalEmailForUpdateCheckProvider);
+
+      talker.debug(
+          'Lifecycle Check: PendingEmail=$pendingEmail, OriginalEmail=$originalEmail');
+
+      if (pendingEmail != null &&
+          pendingEmail.isNotEmpty &&
+          originalEmail.isNotEmpty) {
+        talker.debug(
+            'Lifecycle Check: Pending update detected. Original: $originalEmail, Pending: $pendingEmail');
+        final user = FirebaseAuth.instance.currentUser;
+
+        if (user != null) {
+          try {
+            talker.debug('Lifecycle Check: Reloading user...');
+            await user.reload();
+            final reloadedUser = FirebaseAuth.instance.currentUser;
+            final currentEmail = reloadedUser?.email;
+            talker.debug(
+                'Lifecycle Check: User reloaded. Current Email: $currentEmail');
+
+            if (currentEmail != null &&
+                currentEmail.isNotEmpty &&
+                currentEmail != originalEmail) {
+              talker.info(
+                  'Lifecycle Check: Email change detected! Original: $originalEmail, Current: $currentEmail. Invalidating auth provider.');
+              // Invalidate the main auth provider to trigger state update
+              ref.invalidate(authNotifierProvider);
+              // Reset the original email provider to prevent re-checking
+              ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+              talker.debug(
+                  'Lifecycle Check: Reset originalEmailForUpdateCheckProvider.');
+            } else {
+              talker.debug(
+                  'Lifecycle Check: Email has not changed or is null/empty.');
+            }
+          } catch (e, s) {
+            talker.error('Lifecycle Check: Error reloading user', e, s);
+            // Handle specific errors like token expiration if necessary
+            if (e is FirebaseAuthException &&
+                (e.code == 'user-token-expired' ||
+                    e.code == 'user-disabled' ||
+                    e.code == 'user-not-found')) {
+              talker.warning(
+                  'Lifecycle Check: User token expired or user invalid during reload. Invalidating auth provider.');
+              ref.invalidate(authNotifierProvider);
+              // Reset the original email provider as the check failed
+              ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+            }
+            // Optionally show a generic error to the user?
+            // SnackBarHelper.showErrorSnackBar(context: context, message: 'Failed to check for email update. Please try signing out and back in.');
+          }
+        } else {
+          talker.debug('Lifecycle Check: No current user found.');
+        }
+      } else {
+        talker.debug(
+            'Lifecycle Check: No pending email update or original email not stored.');
+      }
+    }
   }
 
   Future<void> _updateProfile() async {
@@ -159,6 +241,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
     if (!shouldProceed) return;
 
+    // Get the original email BEFORE starting the update process
+    final originalEmail = ref.read(firebaseUserProvider).value?.email;
+
     setState(() {
       _isLoading = true;
     });
@@ -170,6 +255,28 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
       // **NEW:** Update the pending email provider on success
       ref.read(emailUpdateNotifierProvider.notifier).setPendingEmail(newEmail);
+
+      // **NEW:** Store the original email for the lifecycle check
+      if (originalEmail != null) {
+        ref.read(originalEmailForUpdateCheckProvider.notifier).state =
+            originalEmail;
+        talker
+            .info('Stored original email for lifecycle check: $originalEmail');
+      } else {
+        talker.warning(
+            'Original email was null, cannot store for lifecycle check.');
+      }
+
+      // **REMOVED:** Start polling for the email change
+      // if (originalEmail != null) {
+      //   talker.info(
+      //       'Starting email update polling for original email: $originalEmail');
+      //   ref
+      //       .read(emailUpdateCheckerProvider.notifier)
+      //       .startPolling(originalEmail);
+      // } else {
+      //   talker.warning('Original email was null, cannot start polling.');
+      // }
 
       setState(() {
         _isLoading = false;
@@ -259,6 +366,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     try {
       // **NEW:** Clear pending email state before signing out
       ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+      // **NEW:** Clear original email state before signing out
+      ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
       await ref.read(authServiceProvider).signOut();
       // UI will update via provider watch
 
@@ -297,6 +406,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
     // **NEW:** Clear pending email state before signing out
     ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+    // **NEW:** Clear original email state before signing out
+    ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
 
     // Add mounted check before showing snackbar and navigating
     if (mounted && rootContext != null) {
@@ -663,6 +774,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
         });
         try {
           final newEmail = _emailController.text.trim(); // Store new email
+          // Get the original email BEFORE starting the update process
+          final originalEmail = ref.read(firebaseUserProvider).value?.email;
+
           await ref.read(authServiceProvider).verifyBeforeUpdateEmail(
                 newEmail,
               );
@@ -670,6 +784,18 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
           ref
               .read(emailUpdateNotifierProvider.notifier)
               .setPendingEmail(newEmail);
+          // **NEW:** Store the original email for the lifecycle check
+          if (originalEmail != null) {
+            ref.read(originalEmailForUpdateCheckProvider.notifier).state =
+                originalEmail;
+            talker.info(
+                'Stored original email for lifecycle check (after re-auth): $originalEmail');
+          } else {
+            talker.warning(
+                'Original email was null, cannot store for lifecycle check (after re-auth).');
+          }
+          // **REMOVED:** Polling start
+
           setState(() {
             _isLoading = false;
             _showChangeEmail = false;
@@ -725,50 +851,48 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       _isLoading = true;
     });
 
+    Object? error; // Variable to capture potential errors
+
     try {
-      // Call unlink and wait for the provider to complete (which includes invalidation)
+      // Call unlink and wait for the provider to complete
       await ref.read(unlinkProviderProvider(providerId).future);
       talker.debug('unlinkProviderProvider future completed for $providerId.');
 
-      // *** ADD A SMALL DELAY ***
-      // Hypothesis: Give potential background Google tasks or state propagation extra time to settle after unlink.
-      await Future.delayed(const Duration(milliseconds: 300));
-      talker.debug('Small delay completed after unlinking $providerId');
-
-      // Reset loading state AFTER await and delay
+      // After success, explicitly navigate to stay on the account settings page
+      if (mounted) {
+        // Removed Navigator.of(context).pushReplacement(...)
+      }
+    } catch (e) {
+      error = e; // Capture the error
+      talker.error('Error during unlink provider $providerId: $e');
+    } finally {
+      // Reset loading state AFTER await completes or fails
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
       }
+    }
 
-      // Show success message using root context
-      if (mounted && rootContext != null && rootContext.mounted) {
+    // Show SnackBar using root context AFTER state is reset and potential rebuild
+    if (mounted && rootContext != null && rootContext.mounted) {
+      if (error != null) {
+        display_name.showThemedSnackBar(
+            context: rootContext, // Use root context
+            message: error is AuthException ? error.message : error.toString(),
+            isError: true);
+      } else {
+        // Show success message
         display_name.showThemedSnackBar(
             context: rootContext, // Use root context
             message:
                 'Successfully unlinked ${_getProviderDisplayName(providerId)}',
             isError: false);
-      }
-
-      // No explicit navigation needed, rely on router watching authStatusProvider
-    } catch (e) {
-      // Reset loading state on error
-      if (mounted) {
-        // Added mounted check before setState
-        setState(() {
-          _isLoading = false;
-        });
-      }
-
-      // Show error message using root context
-      if (mounted && rootContext != null && rootContext.mounted) {
-        display_name.showThemedSnackBar(
-            context: rootContext, // Use root context
-            message: e is AuthException // Catch custom AuthException
-                ? e.message // Use message from AuthException
-                : e.toString(),
-            isError: true);
+        // Force rebuild after success to update UI
+        if (mounted) {
+          setState(() {});
+          talker.debug('Forced rebuild via setState after successful unlink.');
+        }
       }
     }
   }
@@ -790,6 +914,17 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     try {
       await ref.read(linkGoogleToEmailPasswordProvider.future);
       // REMOVED explicit invalidation from provider.
+      // **NEW:** Reload user data and invalidate provider
+      talker.debug('Google link successful, reloading user data...');
+      await FirebaseAuth.instance.currentUser?.reload();
+      talker.debug('User data reloaded, invalidating authNotifierProvider.');
+      ref.invalidate(authNotifierProvider);
+      // **NEW:** Add delay and force rebuild
+      await Future.delayed(const Duration(milliseconds: 50)); // Small delay
+      if (mounted) {
+        setState(() {});
+        talker.debug('Forced rebuild via delayed setState after Google link.');
+      }
     } catch (e) {
       error = e; // Capture error
     } finally {
@@ -802,17 +937,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       }
     }
 
-    // If successful, invalidate the user provider and force a rebuild after a short delay
-    if (error == null && mounted) {
-      ref.invalidate(firebaseUserProvider);
-      talker.debug(
-          'Invalidated firebaseUserProvider after successful Google link.');
-      await Future.delayed(const Duration(milliseconds: 50)); // Short delay
-      if (mounted) {
-        setState(() {}); // Force rebuild to pick up invalidated provider
-        talker.debug('Forced local rebuild after invalidation and delay.');
-      }
-    }
+    // Removed Navigator.of(context).pushReplacement(...)
 
     // Show SnackBar using root context AFTER state is reset
     // Check State mounted AND rootContext mounted
@@ -823,27 +948,19 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
             message: error is AuthException ? error.message : error.toString(),
             isError: true);
       } else {
-        // ** NEW: Add delay THEN force local rebuild on success BEFORE showing SnackBar **
-        await Future.delayed(const Duration(milliseconds: 100)); // Short delay
-        if (mounted) {
-          setState(() {});
-          talker.debug(
-              'Forced local rebuild of AccountSettingsPage after successful Google link and delay.');
-        }
         // Check State mounted AND rootContext mounted before showing success SnackBar
         if (mounted && rootContext.mounted) {
-          // Removed redundant rootContext != null check
           display_name.showThemedSnackBar(
               context: rootContext, // Use root context
               message: 'Successfully linked with Google',
               isError: false);
-          // ** NEW: Explicitly navigate back to ensure we stay here **
-          // Use the local context which should still be valid here
-          if (mounted) {
-            context.go('/profile/account');
-            talker.debug(
-                'Explicitly navigated to /profile/account after successful Google link.');
-          }
+          // Force rebuild after success to update UI
+          // This might be redundant now due to invalidation, but keep for safety
+          // if (mounted) {
+          //   setState(() {});
+          //   talker.debug(
+          //       'Forced rebuild via setState after successful Google link.');
+          // }
         }
       }
     }
@@ -865,7 +982,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     Object? error;
 
     try {
-      final user = ref.read(authStateProvider).user;
+      final user = ref.read(authNotifierProvider).user;
       final hasGoogleProvider = user?.providerData.any(
             (element) => element.providerId == 'google.com',
           ) ??
@@ -887,16 +1004,32 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
             'Successfully linked Email/Password'; // Adjust if needed
       }
       // Auth state invalidation is handled by the providers themselves
+
+      // **NEW:** Reload user data and invalidate provider
+      talker.debug('Email/Password link successful, reloading user data...');
+      await FirebaseAuth.instance.currentUser?.reload();
+      talker.debug('User data reloaded, invalidating authNotifierProvider.');
+      ref.invalidate(authNotifierProvider);
+      // **NEW:** Add delay and force rebuild
+      await Future.delayed(const Duration(milliseconds: 50)); // Small delay
+      if (mounted) {
+        setState(() {});
+        talker.debug(
+            'Forced rebuild via delayed setState after Email/Password link.');
+      }
     } catch (e) {
       error = e; // Capture error
     } finally {
       // Reset loading state AFTER await completes or fails
+      // Important: Do this BEFORE potential invalidation/setState below
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
       }
     }
+
+    // Removed Navigator.of(context).pushReplacement(...)
 
     // Show SnackBar using root context AFTER state is reset
     // Check State mounted AND rootContext mounted
@@ -909,14 +1042,18 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       } else if (successMessage != null) {
         // Check State mounted AND rootContext mounted before showing success SnackBar
         if (mounted && rootContext.mounted) {
-          // Removed redundant rootContext != null check
           display_name.showThemedSnackBar(
               context: rootContext, // Use root context
               message: successMessage,
               isError: false);
+          // Force rebuild after success to update UI
+          // This might be redundant now due to invalidation, but keep for safety
+          // if (mounted) {
+          //   setState(() {});
+          //   talker.debug(
+          //       'Forced rebuild via setState after successful Email/Password link.');
+          // }
         }
-        // Navigation is handled by GoRouter's reaction to auth state changes
-        // REMOVED explicit context.go call
       }
     }
   }
@@ -1094,9 +1231,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authStateProvider);
-    // Watch the base stream provider to get AsyncValue
-    final currentUserAsyncValue = ref.watch(firebaseUserProvider);
+    final authState = ref.watch(authNotifierProvider);
+    // **REMOVED:** Watch the base stream provider directly
+    // final currentUserAsyncValue = ref.watch(firebaseUserProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -1107,8 +1244,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
     final pendingEmail = emailUpdateState.pendingEmail;
 
     // Determine the user object to use for the UI
-    // Prioritize the direct user stream value if available, fallback to authState
-    final userForUI = currentUserAsyncValue.value ?? authState.user;
+    // **CHANGED:** Rely solely on the user object from AuthNotifier's state
+    final userForUI = authState.user;
 
     // Initialize controllers *inside* build when user data is available
     if (userForUI != null && !_controllersInitialized) {
@@ -1123,30 +1260,15 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
       talker.debug('User signed out, controllers cleared.');
     }
 
-    // Handle loading state based on the AsyncValue
-    if (currentUserAsyncValue.isLoading) {
+    // Handle loading state based on the AuthNotifier state
+    if (authState.status == AuthStatus.loading) {
       return Scaffold(
         appBar: AppBarFactory.createAppBar(context, 'Account Settings'),
         body: const Center(child: LoadingIndicator()),
       );
     }
 
-    // Handle error state based on the AsyncValue
-    if (currentUserAsyncValue.hasError) {
-      return Scaffold(
-        appBar: AppBarFactory.createAppBar(context, 'Account Settings'),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Error loading user data: ${currentUserAsyncValue.error}',
-              style: TextStyle(color: colorScheme.error),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    }
+    // **REMOVED:** Error handling block that used authState.error
 
     // Handle data state (user can be null here if signed out)
     // Show re-authentication dialog if needed
@@ -1238,7 +1360,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
                   children: [
                     // --- Conditionally show Verification Banner ---
                     // Use the updated showVerificationBanner logic
-                    if (showVerificationBanner) // Removed redundant null check
+                    if (showVerificationBanner) // Added null check for safety
                       _buildVerificationBanner(context, colorScheme,
                           userForUI), // Removed unnecessary null assertion
                     // --- END: Verification Banner ---
@@ -1253,7 +1375,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage> {
 
                     // Account Information
                     AccountInfoCard(
-                      user: userForUI, // Pass userForUI down
+                      // **REMOVED:** user parameter
                       // Use the revised logic for showing the unverified state chip
                       isEmailNotVerified: showUnverifiedChip,
                       // **NEW:** Pass pending email

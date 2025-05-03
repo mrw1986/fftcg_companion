@@ -30,7 +30,7 @@ class LoadingWrapper extends ConsumerWidget {
       // Log initialization completion
       next.whenData((_) {
         talker.debug('Initialization completed, checking auth state');
-        final authState = ref.read(authStateProvider);
+        final authState = ref.read(authNotifierProvider);
         talker.debug('Auth state after initialization:');
         talker.debug('Status: ${authState.status}');
         talker.debug('Is anonymous: ${authState.isAnonymous}');
@@ -41,7 +41,7 @@ class LoadingWrapper extends ConsumerWidget {
     });
 
     // Watch auth state to show dialog when it changes
-    ref.listen<AuthState>(authStateProvider, (previous, next) async {
+    ref.listen<AuthState>(authNotifierProvider, (previous, next) async {
       // Only proceed if initialization is complete
       final initState = ref.read(initializationProvider);
       if (!initState.hasValue) {
@@ -89,7 +89,7 @@ class LoadingWrapper extends ConsumerWidget {
             // Removed logic to show AccountLimitsDialog on initial load
             WidgetsBinding.instance.addPostFrameCallback((_) async {
               talker.debug('Initial load post-frame callback');
-              final authState = ref.read(authStateProvider);
+              final authState = ref.read(authNotifierProvider);
               talker.debug('Initial auth state:');
               talker.debug('Status: ${authState.status}');
               talker.debug('Is anonymous: ${authState.isAnonymous}');

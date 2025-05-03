@@ -12,7 +12,7 @@ class CardPreferencesNotifier extends AsyncNotifier<UserCardPreferences> {
   @override
   Future<UserCardPreferences> build() async {
     // Listen to auth changes to update preferences when user changes
-    ref.listen(authStateProvider, (previous, next) {
+    ref.listen(authNotifierProvider, (previous, next) {
       if (previous != next) {
         ref.invalidateSelf();
       }

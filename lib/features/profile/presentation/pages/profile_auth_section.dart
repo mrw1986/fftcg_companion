@@ -47,9 +47,9 @@ class ProfileAuthSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authStateProvider);
+    final authState = ref.watch(authNotifierProvider);
 
-    if (authState.isAuthenticated || authState.isEmailNotVerified) {
+    if (authState.isAuthenticated || authState.isEmailNotVerifiedState) {
       final user = authState.user!;
       final theme = Theme.of(context);
       final colorScheme = theme.colorScheme;
@@ -57,7 +57,7 @@ class ProfileAuthSection extends ConsumerWidget {
       return Column(
         children: [
           // Show email verification warning if needed
-          if (authState.isEmailNotVerified)
+          if (authState.isEmailNotVerifiedState)
             Container(
               margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.all(16),
@@ -213,7 +213,7 @@ class ProfileAuthSection extends ConsumerWidget {
                         Expanded(
                           child: Text(user.email ?? 'No email'),
                         ),
-                        if (authState.isEmailNotVerified)
+                        if (authState.isEmailNotVerifiedState)
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
@@ -230,7 +230,7 @@ class ProfileAuthSection extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  if (!authState.isEmailNotVerified)
+                  if (!authState.isEmailNotVerifiedState)
                     ListTile(
                       leading: const Icon(Icons.account_circle_outlined),
                       title: const Text('Account Type'),

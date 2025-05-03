@@ -95,7 +95,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authStateProvider);
+    final authState = ref.watch(authNotifierProvider);
     ref.watch(splashScreenPreferencesProvider); // Used for reactivity
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;

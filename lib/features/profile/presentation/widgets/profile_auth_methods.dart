@@ -54,7 +54,7 @@ class ProfileAuthMethods extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Watch both providers to ensure rebuild on user stream changes or derived state changes
-    final authState = ref.watch(authStateProvider);
+    final authState = ref.watch(authNotifierProvider);
     ref.watch(
         currentUserProvider); // Watch the user stream directly for reactivity
 

@@ -64,9 +64,12 @@ class _ProfileReauthDialogState extends ConsumerState<ProfileReauthDialog> {
       // If there's an error, default to showing all options
       _providers = ['password', 'google.com'];
     } finally {
-      setState(() {
-        _isLoadingProviders = false;
-      });
+      // Ensure setState runs even if the widget is disposed during the async gap
+      if (mounted) {
+        setState(() {
+          _isLoadingProviders = false;
+        });
+      }
     }
   }
 

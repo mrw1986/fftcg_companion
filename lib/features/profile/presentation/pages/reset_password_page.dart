@@ -25,7 +25,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
   void initState() {
     super.initState();
     // Pre-fill email if user is logged in
-    final user = ref.read(authStateProvider).user;
+    final user = ref.read(authNotifierProvider).user;
     if (user != null && user.email != null && user.email!.isNotEmpty) {
       _emailController.text = user.email!;
     }
@@ -49,7 +49,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
 
     try {
       // Check if user is authenticated before attempting to sign out
-      final authState = ref.read(authStateProvider);
+      final authState = ref.read(authNotifierProvider);
       final isUserAuthenticated =
           authState.isAuthenticated && !authState.isAnonymous;
 

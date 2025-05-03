@@ -76,7 +76,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     _setLoading(true);
 
     try {
-      final authState = ref.read(authStateProvider);
+      final authState = ref.read(authNotifierProvider);
       final authService = ref.read(authServiceProvider);
       final email = _emailController.text.trim();
       final password = _passwordController.text;
@@ -187,7 +187,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     try {
       talker.debug('Login page: Starting Google Sign-In');
-      final authState = ref.read(authStateProvider);
+      final authState = ref.read(authNotifierProvider);
       final authService = ref.read(authServiceProvider);
 
       // If user is anonymous, link the account instead of creating a new one
@@ -273,7 +273,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   // Invalidate and navigate after successful merge/discard
                   if (mounted) {
                     ref.invalidate(firebaseUserProvider);
-                    ref.invalidate(authStateProvider);
+                    ref.invalidate(authNotifierProvider);
                     ref.invalidate(currentUserProvider);
                     _navigateToProfile(); // Navigate after merge
                   }
@@ -311,7 +311,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         talker.debug('Login page: Calling authService.signInWithGoogle()');
         await authService.signInWithGoogle();
         talker.debug('Login page: Google Sign-In successful');
-        // _navigateToProfile(); // Rely on router redirect via authStateProvider
+        // _navigateToProfile(); // Rely on router redirect via authNotifierProvider
       }
     } on RequiresManualLinkException catch (e, st) {
       // --- NEW: Handle specific manual link exception ---
@@ -365,7 +365,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBarFactory.createAppBar(context,
-          ref.watch(authStateProvider).isAnonymous ? 'Account' : 'Login'),
+          ref.watch(authNotifierProvider).isAnonymous ? 'Account' : 'Login'),
       body: _isLoading
           ? const Center(child: LoadingIndicator())
           : Center(
@@ -394,7 +394,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 16), // Reduced spacing
-                    if (ref.watch(authStateProvider).isAnonymous)
+                    if (ref.watch(authNotifierProvider).isAnonymous)
                       Container(
                         padding: const EdgeInsets.all(16),
                         margin:
@@ -521,7 +521,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           Center(
                             child: StyledButton(
                               onPressed: _signInWithEmailAndPassword,
-                              text: ref.watch(authStateProvider).isAnonymous
+                              text: ref.watch(authNotifierProvider).isAnonymous
                                   ? 'Sign In / Link Account'
                                   : 'Login',
                             ),
@@ -531,7 +531,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     ),
 
                     // Move Google sign-in button here - below the Sign In / Link Account button
-                    if (ref.watch(authStateProvider).isAnonymous)
+                    if (ref.watch(authNotifierProvider).isAnonymous)
                       Padding(
                         padding: const EdgeInsets.only(top: 16.0),
                         child: GoogleSignInButton(
@@ -560,9 +560,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             foregroundColor:
                                 Theme.of(context).colorScheme.primary,
                           ),
-                          child: Text(ref.watch(authStateProvider).isAnonymous
-                              ? 'Create a new account'
-                              : 'Don\'t have an account? Register'),
+                          child: Text(
+                              ref.watch(authNotifierProvider).isAnonymous
+                                  ? 'Create a new account'
+                                  : 'Don\'t have an account? Register'),
                         ),
                       ],
                     ),
@@ -583,7 +584,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ],
                     ),
                     // Only show the Google button here for non-anonymous users
-                    if (!ref.watch(authStateProvider).isAnonymous) ...[
+                    if (!ref.watch(authNotifierProvider).isAnonymous) ...[
                       const SizedBox(height: 16),
                       const Divider(thickness: 1),
                       const SizedBox(height: 16),

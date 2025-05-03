@@ -78,7 +78,8 @@ class _LinkEmailPasswordDialogState
     });
 
     try {
-      final user = ref.read(authStateProvider).user;
+      final user =
+          ref.read(authNotifierProvider).user; // Access user from AuthState
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 

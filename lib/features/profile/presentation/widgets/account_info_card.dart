@@ -1,16 +1,15 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-// Removed Riverpod import
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod
+import 'package:fftcg_companion/core/providers/auth_provider.dart'; // Import auth provider
 import 'package:fftcg_companion/core/utils/logger.dart';
 import 'package:fftcg_companion/features/profile/presentation/pages/profile_email_update.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/profile_auth_methods.dart';
 import 'package:fftcg_companion/features/profile/presentation/widgets/link_email_password_dialog.dart';
-// Removed auth_provider import
-// Removed incorrect UnverifiedChip import
 
-// Reverted to StatelessWidget
-class AccountInfoCard extends StatelessWidget {
-  final User? user; // Use user prop passed from parent
+// Convert back to ConsumerWidget
+class AccountInfoCard extends ConsumerWidget {
+  // Remove user parameter
   final bool isEmailNotVerified;
   final String? pendingEmail; // NEW: Add pending email parameter
   final TextEditingController emailController;
@@ -25,7 +24,7 @@ class AccountInfoCard extends StatelessWidget {
 
   const AccountInfoCard({
     super.key,
-    required this.user, // Expect user from parent
+    // Remove user parameter requirement
     required this.isEmailNotVerified,
     this.pendingEmail, // NEW: Make pendingEmail optional
     required this.emailController,
@@ -40,14 +39,14 @@ class AccountInfoCard extends StatelessWidget {
   });
 
   // Updated dialog showing logic to check providerData for email
-  void _showLinkEmailPasswordDialog(BuildContext context) {
+  void _showLinkEmailPasswordDialog(BuildContext context, User? user) {
     String? initialEmailValue = user?.email; // Try primary email first
 
     // If primary email is null/empty, try finding the Google provider email
     if ((initialEmailValue == null || initialEmailValue.isEmpty) &&
         user != null) {
       try {
-        final googleProvider = user!.providerData.firstWhere(
+        final googleProvider = user.providerData.firstWhere(
           (userInfo) => userInfo.providerId == 'google.com',
         );
         initialEmailValue = googleProvider.email;
@@ -75,15 +74,21 @@ class AccountInfoCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    // Removed WidgetRef
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Add WidgetRef
+    // Get user directly from the provider
+    final authState = ref.watch(authNotifierProvider);
+    final user = authState.user;
+
     // Use the user passed via constructor
     if (user == null) return const SizedBox.shrink();
 
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final providers = user!.providerData.map((e) => e.providerId).toList();
+    final providers = user.providerData.map((e) => e.providerId).toList();
     final hasPassword = providers.contains('password');
+    talker.debug(
+        'AccountInfoCard build: User providers: $providers, hasPassword: $hasPassword'); // Add logging
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -177,13 +182,13 @@ class AccountInfoCard extends StatelessWidget {
 
             // Use ProfileAuthMethods for authentication methods
             ProfileAuthMethods(
-              user: user, // Pass the user from props
+              user: user, // Pass the user from provider state
               onUnlinkProvider: onUnlinkProvider,
               onLinkWithGoogle: onLinkWithGoogle,
               onLinkWithEmailPassword: onLinkWithEmailPassword,
-              // Pass the class method as the callback
+              // Pass the class method as the callback, passing the user
               onShowLinkEmailPasswordDialog: () =>
-                  _showLinkEmailPasswordDialog(context), // No ref needed
+                  _showLinkEmailPasswordDialog(context, user), // Pass user
               showChangeEmail: showChangeEmail,
               onToggleChangeEmail: onToggleChangeEmail,
               isEmailNotVerified: isEmailNotVerified,
@@ -191,7 +196,7 @@ class AccountInfoCard extends StatelessWidget {
 
             // Reset password option removed - Authenticated users should use "Change Password"
             // Change password option for password users
-            if (!user!.isAnonymous && hasPassword) ...[
+            if (!user.isAnonymous && hasPassword) ...[
               const SizedBox(height: 8),
               ListTile(
                 title: const Text('Change Password'),

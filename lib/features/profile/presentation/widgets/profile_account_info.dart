@@ -29,8 +29,10 @@ class ProfileAccountInfo extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (user == null) return const SizedBox.shrink();
 
-    final authState = ref.watch(authStateProvider);
-    final isEmailVerified = !authState.isEmailNotVerified;
+    final authState =
+        ref.watch(authNotifierProvider); // Use the new AsyncNotifierProvider
+    final isEmailVerified =
+        !authState.isEmailNotVerifiedState; // Use the updated state property
     final providers = user!.providerData.map((e) => e.providerId).toList();
     final hasPassword = providers.contains('password');
 

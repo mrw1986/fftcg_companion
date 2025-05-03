@@ -1,348 +1,35 @@
+import 'dart:async'; // Required for StreamSubscription
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // Required for Listenable/VoidCallback
+import 'package:go_router/go_router.dart'; // Required for GoRouterState in redirect
 import 'package:fftcg_companion/core/services/auth_service.dart';
-import 'package:fftcg_companion/features/profile/data/repositories/user_repository.dart'; // Import UserRepository
+import 'package:fftcg_companion/features/profile/data/repositories/user_repository.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
-// Import for deep equality check
-// Import the email update provider
 import 'package:fftcg_companion/features/profile/presentation/providers/email_update_provider.dart';
+// Removed import for email_update_checker.dart
+// Import the provider for original email check
+import 'package:fftcg_companion/features/profile/presentation/pages/account_settings_page.dart';
+// Removed incorrect imports for LoginPage and HomePage
+// Import goRouterProvider for routeExists check (Removed - _routeExists logic removed)
+// import 'package:fftcg_companion/core/routing/app_router.dart';
 
-/// Provider for the AuthService
-final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService();
-});
+/// Authentication status enum (Keep as is)
+enum AuthStatus {
+  unauthenticated,
+  anonymous,
+  emailNotVerified, // Represents state where ONLY unverified email/pass exists
+  authenticated,
+  loading, // Changed from initial/authenticating for simplicity
+  error,
+}
 
-/// Provider for the current user stream from Firebase Auth
-final firebaseUserProvider = StreamProvider<User?>((ref) {
-  final authService = ref.watch(authServiceProvider);
-  talker.debug('Setting up Firebase Auth user stream');
-  return authService.authStateChanges;
-});
-
-/// Provider that ensures the Firestore user document is synced with the auth state.
-/// This provider listens to the Firebase user stream and triggers Firestore updates.
-/// It also resets the emailVerificationDetectedProvider flag when appropriate.
-/// **NEW:** It also clears the pending email state when the user's email is updated.
-final firestoreUserSyncProvider = Provider<void>((ref) {
-  // Use the raw Firebase user stream provider here
-  ref.listen<AsyncValue<User?>>(firebaseUserProvider, (previous, next) async {
-    final previousUser = previous?.valueOrNull; // Safely get previous user
-    final nextUser = next.valueOrNull; // Safely get next user
-
-    // --- Logic to reset emailVerificationDetectedProvider ---
-    bool shouldResetVerificationFlag = false;
-    if (previousUser != null && nextUser == null) {
-      // User signed out
-      shouldResetVerificationFlag = true;
-      talker.debug(
-          'firestoreUserSyncProvider: User signed out, scheduling verification flag reset.');
-    } else if (nextUser != null && nextUser.emailVerified) {
-      // User exists and is verified (covers initial load and verification changes)
-      shouldResetVerificationFlag = true;
-      talker.debug(
-          'firestoreUserSyncProvider: User is verified, scheduling verification flag reset.');
-    } else if (nextUser != null && nextUser.isAnonymous) {
-      // User is anonymous
-      shouldResetVerificationFlag = true;
-      talker.debug(
-          'firestoreUserSyncProvider: User is anonymous, scheduling verification flag reset.');
-    } else if (next is AsyncError) {
-      // Error occurred
-      shouldResetVerificationFlag = true;
-      talker.debug(
-          'firestoreUserSyncProvider: Auth stream error, scheduling verification flag reset.');
-    }
-
-    if (shouldResetVerificationFlag) {
-      // Check current state before setting to avoid unnecessary rebuilds
-      if (ref.read(emailVerificationDetectedProvider)) {
-        talker.debug(
-            'firestoreUserSyncProvider: Resetting emailVerificationDetectedProvider to false.');
-        // Use read().notifier.state as we are in a callback
-        ref.read(emailVerificationDetectedProvider.notifier).state = false;
-      }
-    }
-    // --- End of reset logic ---
-
-    // --- Logic to sync Firestore document ---
-    if (nextUser != null) {
-      // *** NEW: Verify token validity before proceeding ***
-      try {
-        talker.debug(
-            'firestoreUserSyncProvider: Verifying token validity for ${nextUser.uid}');
-        await nextUser.getIdToken(true); // Force refresh
-        talker.debug(
-            'firestoreUserSyncProvider: Token is valid for ${nextUser.uid}');
-
-        // --- Existing Firestore Sync Logic (Moved inside try block) ---
-        // Determine if a sync is needed based on relevant user data changes
-        bool shouldSync = previousUser ==
-                null || // Always sync if it's the first non-null user
-            previousUser.uid !=
-                nextUser.uid || // Should not happen, but safe check
-            previousUser.email != nextUser.email ||
-            previousUser.displayName != nextUser.displayName ||
-            previousUser.photoURL != nextUser.photoURL ||
-            previousUser.emailVerified != nextUser.emailVerified;
-
-        // *** ADDED LOGGING ***
-        if (previousUser != null &&
-            previousUser.emailVerified != nextUser.emailVerified) {
-          talker.debug(
-              'FirestoreUserSync: emailVerified changed from ${previousUser.emailVerified} to ${nextUser.emailVerified}');
-        }
-        // *** END LOGGING ***
-
-        if (shouldSync) {
-          // *** ADDED LOGGING ***
-          talker.debug(
-              'FirestoreUserSync: shouldSync is TRUE. User: ${nextUser.uid}, Email: ${nextUser.email}, Verified: ${nextUser.emailVerified}, PrevVerified: ${previousUser?.emailVerified}');
-          // *** END LOGGING ***
-          try {
-            final userRepository =
-                ref.read(userRepositoryProvider); // Read the new provider
-            await userRepository.createUserFromAuth(nextUser);
-            talker.debug(
-                'FirestoreUserSync: Successfully synced user ${nextUser.uid} to Firestore.');
-            // Verify and correct collection count after ensuring user doc exists
-            await userRepository.verifyAndCorrectCollectionCount(nextUser.uid);
-          } catch (e, s) {
-            talker.error(
-                'FirestoreUserSync: Error syncing user ${nextUser.uid} to Firestore',
-                e,
-                s);
-            // Decide if error needs propagation or just logging
-          }
-        } else {
-          talker.debug(
-              'FirestoreUserSync: User stream emitted, but no relevant data changed for UID: ${nextUser.uid}. Skipping Firestore sync.');
-        }
-        // --- End of Existing Firestore Sync Logic ---
-
-        // --- Existing Pending Email Clear Logic (Moved inside try block) ---
-        final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
-        if (pendingEmail != null && nextUser.email == pendingEmail) {
-          talker.debug(
-              'FirestoreUserSync: Detected user email (${nextUser.email}) matches pending email ($pendingEmail). Clearing pending state.');
-          // Use read().notifier as we are in a callback
-          ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
-        }
-        // --- End of Existing Pending Email Clear Logic ---
-      } on FirebaseAuthException catch (e) {
-        talker.warning(
-            'firestoreUserSyncProvider: Token refresh failed for ${nextUser.uid}',
-            e);
-        // Check for specific error codes indicating the user is invalid
-        if (e.code == 'user-not-found' ||
-            e.code == 'user-disabled' ||
-            e.code == 'invalid-user-token') {
-          talker.warning(
-              'firestoreUserSyncProvider: User ${nextUser.uid} is invalid on backend. Forcing sign out.');
-          try {
-            // Use read to get AuthService instance within the listener
-            final authService = ref.read(authServiceProvider);
-            // Sign out locally, marking it as internal to prevent dialog loops etc.
-            await authService.signOut(isInternalAuthFlow: true);
-          } catch (signOutError) {
-            talker.error(
-                'firestoreUserSyncProvider: Error during forced sign out after invalid token',
-                signOutError);
-          }
-        }
-        // Do not proceed with Firestore sync or other logic if token is invalid
-        return; // Exit the listener callback for this user emission
-      } catch (e, s) {
-        talker.error(
-            'firestoreUserSyncProvider: Unexpected error during token refresh for ${nextUser.uid}',
-            e,
-            s);
-        // Optional: Decide if other errors should also trigger sign-out or just be logged.
-        // For now, we only force sign-out on specific FirebaseAuthExceptions.
-        // Allow sync logic to proceed/fail for other errors (e.g., network issues).
-      }
-      // *** End of NEW token verification logic ***
-
-      // --- **NEW:** Logic to clear pending email state ---
-      final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
-      if (pendingEmail != null && nextUser.email == pendingEmail) {
-        talker.debug(
-            'FirestoreUserSync: Detected user email (${nextUser.email}) matches pending email ($pendingEmail). Clearing pending state.');
-        // Use read().notifier as we are in a callback
-        ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
-      }
-      // --- End of clear pending email logic ---
-    } else if (previousUser != null && nextUser == null) {
-      talker.debug('FirestoreUserSync: Detected user signed out.');
-      // Firestore cleanup is handled by Firebase Extension or specific delete logic
-      // **NEW:** Also clear pending email on sign out
-      final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
-      if (pendingEmail != null) {
-        talker.debug(
-            'FirestoreUserSync: Clearing pending email state due to sign out.');
-        ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
-      }
-    } else if (next is AsyncError) {
-      talker.error('FirestoreUserSync: Error in user stream', next.error,
-          next.stackTrace);
-      // **NEW:** Also clear pending email on auth error
-      final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
-      if (pendingEmail != null) {
-        talker.debug(
-            'FirestoreUserSync: Clearing pending email state due to auth error.');
-        ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
-      }
-    }
-    // --- End of Firestore sync logic ---
-  });
-});
-
-/// Provider for UserRepository (needed by firestoreUserSyncProvider)
-final userRepositoryProvider = Provider<UserRepository>((ref) {
-  // Assuming UserRepository has a default constructor
-  return UserRepository();
-});
-
-/// Provider for the current user (derived from the Firebase stream)
-final currentUserProvider = Provider<User?>((ref) {
-  // Watch the raw Firebase user stream
-  return ref.watch(firebaseUserProvider).when(
-        data: (user) => user,
-        loading: () => null, // Or return previous user if needed during loading
-        error: (e, s) {
-          talker.error('Error fetching current user', e, s);
-          return null; // No user available on error
-        },
-      );
-});
-
-/// Force refresh auth provider to trigger auth state refresh
-final forceRefreshAuthProvider = StateProvider<bool>((ref) => false);
-
-/// Provider that watches and resets the forceRefreshAuthProvider
-/// This allows us to avoid modifying the provider during initialization
-final forceRefreshHandlerProvider = Provider<void>((ref) {
-  // Watch the force refresh provider
-  final shouldRefresh = ref.watch(forceRefreshAuthProvider);
-
-  // If the flag is true, schedule a reset after this frame completes
-  if (shouldRefresh) {
-    // Use Future.microtask to reset the flag after the current execution frame
-    Future.microtask(() {
-      try {
-        ref.read(forceRefreshAuthProvider.notifier).state = false;
-        talker.debug('Force auth refresh flag reset');
-      } catch (e) {
-        // Log error if the provider is no longer available
-        talker.error('Error resetting force refresh flag: $e');
-      }
-    });
-  }
-});
-
-// Removed the problematic authStateListenerProvider
-
-/// Provider for the authentication state (derived from the Firebase stream)
-final authStateProvider = Provider<AuthState>((ref) {
-  // Ensure the sync provider is active by watching it. This also handles the verification flag reset now.
-  ref.watch(firestoreUserSyncProvider);
-
-  // Watch the force refresh flag but DON'T modify it here
-  // Simply watch it to rebuild when it changes
-  ref.watch(forceRefreshAuthProvider);
-
-  // Watch the forceRefreshHandlerProvider to ensure it's activated
-  ref.watch(forceRefreshHandlerProvider);
-
-  // Watch the raw Firebase user stream
-  final userAsync = ref.watch(firebaseUserProvider);
-
-  return userAsync.when(
-    data: (user) {
-      talker.debug('Auth state updated:');
-      talker.debug('User: ${user?.email}');
-      talker.debug('Is anonymous: ${user?.isAnonymous}');
-      talker.debug('Is email verified: ${user?.emailVerified}');
-      if (user == null) {
-        talker.debug('Auth state: unauthenticated');
-        // Resetting is handled by firestoreUserSyncProvider listener
-        return const AuthState.unauthenticated();
-      }
-
-      // First check if the user is anonymous
-      if (user.isAnonymous) {
-        // Even if there are providers, if isAnonymous is true, treat as anonymous
-        talker.debug('Auth state: anonymous');
-        // Resetting is handled by firestoreUserSyncProvider listener
-        return AuthState.anonymous(user);
-      } else {
-        // User is not anonymous, check providers
-        // Check for providers
-        bool hasPasswordProvider = user.providerData
-            .any((userInfo) => userInfo.providerId == 'password');
-        bool hasGoogleProvider = user.providerData
-            .any((userInfo) => userInfo.providerId == 'google.com');
-
-        // *** ADDED LOGGING ***
-        talker.debug(
-            'authStateProvider: Checking user state. hasPassword: $hasPasswordProvider, hasGoogle: $hasGoogleProvider, emailVerified: ${user.emailVerified}');
-        // *** END LOGGING ***
-
-        // If user has an email/password provider and the email is not verified, return emailNotVerified state
-        // This takes precedence over other providers being linked.
-        if (hasPasswordProvider && !user.emailVerified) {
-          talker.debug('authStateProvider: Returning emailNotVerified');
-          return AuthState.emailNotVerified(user);
-        }
-        // Otherwise (user has no email/password OR it's verified), return authenticated state
-
-        // User either has no email/password or it's verified
-        talker.debug('authStateProvider: Returning authenticated (verified)');
-        // Resetting is handled by firestoreUserSyncProvider listener
-        return AuthState.authenticated(user);
-      }
-    },
-    loading: () {
-      talker.debug('Auth state: loading');
-      return const AuthState.loading();
-    },
-    error: (error, stackTrace) {
-      talker.error('Auth state error', error, stackTrace);
-      // Resetting is handled by firestoreUserSyncProvider listener
-      return AuthState.error(error.toString());
-    },
-  );
-});
-
-/// NEW: Provider that exposes only the AuthStatus enum from AuthState.
-/// This is useful for reacting only to changes in the overall authentication
-/// status (e.g., authenticated, unauthenticated) without triggering rebuilds
-/// for internal User object changes (like providerData updates).
-final authStatusProvider = Provider<AuthStatus>((ref) {
-  // Watch the full authStateProvider
-  final authState = ref.watch(authStateProvider);
-  // Select and return only the status enum
-  talker.debug(
-      'authStatusProvider returning status: ${authState.status}'); // Changed detail to debug
-  return authState.status;
-  // Note: Using .select might be slightly more efficient if AuthState was complex,
-  // but simply returning the status achieves the goal here.
-  // return ref.watch(authStateProvider.select((state) => state.status));
-}, name: 'authStatusProvider'); // Added name for clarity
-
-/// NEW: StateProvider to signal immediate verification detection by the checker.
-/// This helps bridge the gap until the main authStateProvider updates via the stream.
-final emailVerificationDetectedProvider = StateProvider<bool>((ref) => false);
-
-/// Authentication state class
+/// Authentication state class (Keep as is)
 class AuthState {
   final AuthStatus status;
   final User? user;
   final String? errorMessage;
-  // This flag now primarily indicates if the user object itself reports
-  // emailVerified as false, useful for UI hints, but the main state logic
-  // is handled in the authStateProvider above.
-  final bool emailNotVerified;
+  final bool emailNotVerified; // Keep for UI hints if needed
 
   const AuthState({
     required this.status,
@@ -362,18 +49,14 @@ class AuthState {
         emailNotVerified = false,
         errorMessage = null;
 
-  // Removed const keyword as initializers are not constant
   AuthState.authenticated(this.user)
       : status = AuthStatus.authenticated,
-        // Authenticated state should always have emailNotVerified as false.
-        // The distinction is handled by the AuthStatus enum itself.
-        emailNotVerified = false,
+        emailNotVerified = false, // Handled by status enum
         errorMessage = null;
 
   AuthState.emailNotVerified(this.user)
       : status = AuthStatus.emailNotVerified,
-        // Always true for unverified state since we know it has unverified email
-        emailNotVerified = true,
+        emailNotVerified = true, // Explicitly true for this state
         errorMessage = null;
 
   const AuthState.loading()
@@ -387,32 +70,377 @@ class AuthState {
         user = null,
         emailNotVerified = false;
 
+  // Add getters for convenience if needed
   bool get isAuthenticated => status == AuthStatus.authenticated;
-  // Use this getter to check the specific state if needed
   bool get isEmailNotVerifiedState => status == AuthStatus.emailNotVerified;
-  // Keep the original getter name for compatibility, but its meaning is now
-  // tied to the user object's status, not the overall AuthState status.
-  bool get isEmailNotVerified => emailNotVerified;
   bool get isAnonymous => status == AuthStatus.anonymous;
   bool get isUnauthenticated => status == AuthStatus.unauthenticated;
   bool get isLoading => status == AuthStatus.loading;
   bool get hasError => status == AuthStatus.error;
 }
 
-/// Authentication status enum
-enum AuthStatus {
-  unauthenticated,
-  anonymous,
-  emailNotVerified, // Represents state where ONLY unverified email/pass exists
-  authenticated,
-  loading,
-  error,
+// --- NEW AuthNotifier ---
+final authNotifierProvider =
+    NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+
+class AuthNotifier extends Notifier<AuthState> implements Listenable {
+  VoidCallback? _routerListener;
+  StreamSubscription<User?>? _authSubscription;
+  // Removed _userSubscription
+
+  @override
+  AuthState build() {
+    // Initial state
+    state = const AuthState.loading();
+
+    // Listen to Firebase Auth state changes
+    _listenToAuthChanges();
+
+    // Perform initial check
+    _checkInitialAuthStatus();
+
+    // Setup cleanup for subscriptions
+    ref.onDispose(() {
+      talker.debug("Disposing AuthNotifier: Cancelling subscriptions.");
+      _authSubscription?.cancel();
+      // _userSubscription?.cancel(); // Removed
+      _routerListener = null; // Clear listener on dispose
+    });
+
+    // Return initial state
+    return state;
+  }
+
+  void _listenToAuthChanges() {
+    final authService = ref.read(authServiceProvider);
+    _authSubscription?.cancel(); // Cancel previous subscription if any
+    _authSubscription = authService.authStateChanges.listen(
+      (user) async {
+        talker.debug(
+            'AuthNotifier: Firebase auth state changed. User: ${user?.uid}');
+        await _updateStateFromUser(user); // Update state based on user
+        // Removed call to _listenToUserChanges
+      },
+      onError: (error, stackTrace) {
+        talker.error('AuthNotifier: Error in auth stream', error, stackTrace);
+        state = AuthState.error(error.toString());
+        _routerListener?.call(); // Notify router on error
+      },
+    );
+  }
+
+  // Removed _listenToUserChanges method as main stream often covers necessary updates
+
+  Future<void> _checkInitialAuthStatus() async {
+    talker.debug('AuthNotifier: Checking initial auth status...');
+    // Use the stream's current value if available, otherwise get current user directly
+    final initialUser = ref.read(firebaseUserProvider).valueOrNull ??
+        FirebaseAuth.instance.currentUser;
+    // Ensure reload happens if getting current user directly
+    if (initialUser != null &&
+        ref.read(firebaseUserProvider).valueOrNull == null) {
+      try {
+        await initialUser.reload();
+        talker.debug("Initial user reloaded.");
+      } catch (e) {
+        talker.warning("Failed to reload initial user: $e");
+        // Decide how to handle reload failure - maybe sign out?
+      }
+    }
+    await _updateStateFromUser(
+        FirebaseAuth.instance.currentUser); // Use potentially reloaded user
+  }
+
+  Future<void> _updateStateFromUser(User? user) async {
+    final previousStatus = state.status; // Store previous status for logging
+    AuthState newState;
+
+    if (user == null) {
+      newState = const AuthState.unauthenticated();
+    } else if (user.isAnonymous) {
+      newState = AuthState.anonymous(user);
+    } else {
+      // It might still be beneficial to reload here occasionally,
+      // especially if emailVerified status is critical and might lag in the stream.
+      // Reload the user to ensure we have the latest data, especially emailVerified status
+      // and potentially the updated email after verifyBeforeUpdateEmail flow.
+      try {
+        talker.debug(
+            'AuthNotifier: Reloading user ${user.uid} before updating state...');
+        await user.reload();
+        talker.debug('AuthNotifier: User ${user.uid} reloaded successfully.');
+        // Update the user variable reference to the potentially reloaded instance
+        user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          // If reload somehow resulted in null user (edge case, e.g., disabled), handle as unauthenticated
+          talker.warning(
+              'AuthNotifier: User became null after reload. Setting state to unauthenticated.');
+          newState = const AuthState.unauthenticated();
+          // Skip further checks for this user, the outer logic will handle state update
+          state = newState;
+          _syncFirestoreAndFlags(null); // Trigger sign-out cleanup
+          _routerListener?.call();
+          return; // Exit the function early
+        }
+      } catch (e, s) {
+        talker.error(
+            'AuthNotifier: Failed to reload user ${user!.uid}',
+            e, // Re-add null assertion
+            s); // Add null check
+        // Decide how to handle reload failure. Maybe keep existing state or go to error?
+        // For now, let's proceed with the potentially stale user data but log the error.
+        // Alternatively, could set state = AuthState.error("Failed to refresh user data");
+      }
+
+      bool hasPasswordProvider = user.providerData // Keep null check removed
+          .any((userInfo) => userInfo.providerId == 'password');
+
+      if (hasPasswordProvider && !user.emailVerified) {
+        // Null check removed as it's guaranteed non-null here
+        newState = AuthState.emailNotVerified(user);
+      } else {
+        newState = AuthState.authenticated(user);
+      }
+    }
+
+    // Only update state and notify if the status actually changed
+    if (newState.status != state.status) {
+      talker.debug(
+          'AuthNotifier: Updating state from $previousStatus to ${newState.status} for user: ${user?.uid}');
+      state = newState;
+      _syncFirestoreAndFlags(user); // Perform sync actions after state update
+      _routerListener?.call(); // Notify router AFTER state is updated
+    } else {
+      talker.debug(
+          'AuthNotifier: State status ${state.status} unchanged for user: ${user?.uid}. Not notifying router.');
+      // Still sync Firestore if user object itself might have changed details
+      if (state.user?.uid == user?.uid) {
+        // Ensure it's the same user
+        _syncFirestoreAndFlags(user);
+      }
+    }
+  }
+
+  // Helper to consolidate Firestore sync and flag resets
+  void _syncFirestoreAndFlags(User? user) {
+    // --- Firestore Sync ---
+    if (user != null) {
+      // Trigger Firestore sync asynchronously (don't await here)
+      _triggerFirestoreSync(user);
+    } else {
+      // Handle sign-out cleanup if needed (e.g., clear pending email)
+      _handleSignOutCleanup();
+    }
+
+    // --- Reset Flags ---
+    _resetVerificationFlagIfNeeded(user);
+  }
+
+  Future<void> _triggerFirestoreSync(User user) async {
+    try {
+      // Verify token validity before syncing
+      talker.debug(
+          'AuthNotifier (Sync): Verifying token validity for ${user.uid}');
+      await user.getIdToken(true); // Force refresh
+      talker.debug('AuthNotifier (Sync): Token is valid for ${user.uid}');
+
+      final userRepository = ref.read(userRepositoryProvider);
+      // Check if user document needs creation/update (simplified check)
+      // A more robust check might involve comparing timestamps or specific fields
+      talker.debug(
+          'AuthNotifier (Sync): Triggering createUserFromAuth for ${user.uid}');
+      await userRepository.createUserFromAuth(user);
+      talker.debug(
+          'AuthNotifier (Sync): Successfully synced user ${user.uid} to Firestore.');
+      await userRepository.verifyAndCorrectCollectionCount(user.uid);
+
+      // Clear pending email if applicable
+      final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+      if (pendingEmail != null && user.email == pendingEmail) {
+        talker.debug(
+            'AuthNotifier (Sync): Detected user email matches pending email. Clearing pending state.');
+        ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+        // **NEW:** Also clear the original email stored for the lifecycle check
+        ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+        talker.debug(
+            'AuthNotifier (Sync): Cleared originalEmailForUpdateCheckProvider.');
+      }
+    } on FirebaseAuthException catch (e) {
+      talker.warning(
+          'AuthNotifier (Sync): Token refresh failed for ${user.uid}', e);
+      if (e.code == 'user-not-found' ||
+          e.code == 'user-disabled' ||
+          e.code == 'invalid-user-token') {
+        talker.warning(
+            'AuthNotifier (Sync): User ${user.uid} is invalid on backend. Forcing sign out.');
+        try {
+          await ref.read(authServiceProvider).signOut(isInternalAuthFlow: true);
+        } catch (signOutError) {
+          talker.error('AuthNotifier (Sync): Error during forced sign out',
+              signOutError);
+        }
+      }
+    } catch (e, s) {
+      talker.error(
+          'AuthNotifier (Sync): Error syncing user ${user.uid} to Firestore',
+          e,
+          s);
+    }
+  }
+
+  void _handleSignOutCleanup() {
+    talker.debug('AuthNotifier (Sync): Handling sign out cleanup.');
+    final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+    if (pendingEmail != null) {
+      talker.debug(
+          'AuthNotifier (Sync): Clearing pending email state due to sign out.');
+      ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+    }
+    // **NEW:** Clear the original email stored for the lifecycle check on sign out
+    ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+    talker.debug(
+        'AuthNotifier (Sync): Cleared originalEmailForUpdateCheckProvider on sign out.');
+
+    // **REMOVED:** Stop the email update checker polling if it's running
+    // if (ref.read(emailUpdateCheckerProvider).isPolling) {
+    //   ref.read(emailUpdateCheckerProvider.notifier).stopPolling();
+    // }
+  }
+
+  void _resetVerificationFlagIfNeeded(User? user) {
+    bool shouldReset = user == null || user.emailVerified || user.isAnonymous;
+    if (shouldReset && ref.read(emailVerificationDetectedProvider)) {
+      talker.debug(
+          'AuthNotifier: Resetting emailVerificationDetectedProvider to false.');
+      ref.read(emailVerificationDetectedProvider.notifier).state = false;
+    }
+  }
+
+  // --- Listenable Implementation ---
+  @override
+  void addListener(VoidCallback listener) {
+    _routerListener = listener;
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    _routerListener = null;
+  }
+
+  // --- Redirect Logic (Moved from GoRouter) ---
+  String? redirect(BuildContext context, GoRouterState goRouterState) {
+    // Use the current state of this notifier
+    final currentAuthState = state; // Read the current state directly
+    final authStatus = currentAuthState.status;
+    final currentMatchedLocation = goRouterState.matchedLocation;
+    final targetUri = goRouterState.uri.toString();
+
+    talker.debug(
+        'AuthNotifier Redirect Check: MatchedLocation="$currentMatchedLocation", TargetUri="$targetUri", AuthStatus=$authStatus');
+
+    // --- Prevent Redirects FROM Account Settings ---
+    if (currentMatchedLocation == '/profile/account') {
+      if (authStatus == AuthStatus.unauthenticated) {
+        talker.debug(
+            'AuthNotifier Redirect: Unauthenticated on /profile/account -> /auth');
+        return '/auth'; // Use actual route path
+      } else {
+        talker.debug(
+            'AuthNotifier Redirect: Already on /profile/account and status is $authStatus, staying put.');
+        return null;
+      }
+    }
+    // --- END: Prevent Redirects FROM Account Settings ---
+
+    final publicRoutes = ['/auth', '/register', '/reset-password'];
+    final isPublicRoute =
+        publicRoutes.any((route) => targetUri.startsWith(route));
+
+    // 1. Loading State - Allow navigation while loading/initializing
+    if (authStatus == AuthStatus.loading) {
+      talker.debug('AuthNotifier Redirect: Auth loading, no redirect.');
+      return null;
+    }
+
+    // 2. Unauthenticated on Protected Route -> /auth
+    if (authStatus == AuthStatus.unauthenticated && !isPublicRoute) {
+      talker.debug(
+          'AuthNotifier Redirect: Unauthenticated on protected route ($targetUri) -> /auth');
+      return '/auth'; // Use actual route path
+    }
+
+    // 3. Authenticated or EmailNotVerified on Public Auth Route -> / (Home)
+    //    (Except for reset password page)
+    if ((authStatus == AuthStatus.authenticated ||
+            authStatus == AuthStatus.emailNotVerified) &&
+        isPublicRoute &&
+        targetUri != '/reset-password') {
+      talker.debug(
+          'AuthNotifier Redirect: Authenticated/EmailNotVerified on public auth route ($targetUri) -> /');
+      return '/'; // Use actual home route path
+    }
+
+    // 4. Authenticated, EmailNotVerified, or Anonymous on a PROTECTED route -> Stay
+    if ((authStatus == AuthStatus.authenticated ||
+            authStatus == AuthStatus.emailNotVerified ||
+            authStatus == AuthStatus.anonymous) &&
+        !isPublicRoute) {
+      talker.debug(
+          'AuthNotifier Redirect: Status $authStatus on protected route ($targetUri), staying put.');
+      return null; // Explicitly stay
+    }
+
+    // 5. Default: No redirect needed
+    talker.debug(
+        'AuthNotifier Redirect: No redirect needed (default/fallback). Target: $targetUri');
+    return null;
+  }
+
+  // Removed dispose method, cleanup handled in ref.onDispose within build()
 }
+
+// --- Other Providers ---
+
+/// Provider for the AuthService (Unchanged)
+final authServiceProvider = Provider<AuthService>((ref) {
+  return AuthService();
+});
+
+/// Provider for the current user stream from Firebase Auth (Unchanged)
+final firebaseUserProvider = StreamProvider<User?>((ref) {
+  final authService = ref.watch(authServiceProvider);
+  talker.debug('Setting up Firebase Auth user stream');
+  return authService.authStateChanges;
+});
+
+/// Provider for UserRepository (Unchanged)
+final userRepositoryProvider = Provider<UserRepository>((ref) {
+  return UserRepository();
+});
+
+/// Provider for the current user (derived from AuthNotifier state)
+final currentUserProvider = Provider<User?>((ref) {
+  // Watch the new AuthNotifier
+  return ref.watch(authNotifierProvider).user;
+});
+
+// authStatusProvider can be derived from authNotifierProvider
+final authStatusProvider = Provider<AuthStatus>((ref) {
+  final authState = ref.watch(authNotifierProvider);
+  talker.debug('authStatusProvider returning status: ${authState.status}');
+  return authState.status;
+}, name: 'authStatusProvider');
+
+/// StateProvider to signal immediate verification detection by the checker (Keep as is)
+final emailVerificationDetectedProvider = StateProvider<bool>((ref) => false);
+
+// --- Future Providers for Auth Actions (Invalidate new notifier) ---
 
 /// Provider for handling user account deletion
 final deleteUserProvider = FutureProvider.autoDispose<void>((ref) async {
   final authService = ref.watch(authServiceProvider);
   await authService.deleteUser();
+  ref.invalidate(authNotifierProvider); // Invalidate the main notifier
 });
 
 /// Provider for re-authenticating a user with email and password
@@ -420,10 +448,12 @@ final reauthWithEmailProvider =
     FutureProvider.autoDispose.family<UserCredential, EmailPasswordCredentials>(
   (ref, credentials) async {
     final authService = ref.watch(authServiceProvider);
-    return await authService.reauthenticateWithEmailAndPassword(
+    final cred = await authService.reauthenticateWithEmailAndPassword(
       credentials.email,
       credentials.password,
     );
+    ref.invalidate(authNotifierProvider); // Invalidate the main notifier
+    return cred;
   },
 );
 
@@ -431,21 +461,18 @@ final reauthWithEmailProvider =
 final reauthWithGoogleProvider = FutureProvider.autoDispose<UserCredential>(
   (ref) async {
     final authService = ref.watch(authServiceProvider);
-    return await authService.reauthenticateWithGoogle();
+    final cred = await authService.reauthenticateWithGoogle();
+    ref.invalidate(authNotifierProvider); // Invalidate the main notifier
+    return cred;
   },
 );
 
 /// Provider for unlinking an authentication provider
-// Changed return type to void as the primary goal is the side effect
 final unlinkProviderProvider = FutureProvider.autoDispose.family<void, String>(
   (ref, providerId) async {
     final authService = ref.watch(authServiceProvider);
-    // Call the service method but don't need to return the User? object
     await authService.unlinkProvider(providerId);
-    // Invalidate both the source stream and the derived state
-    // to ensure the UI updates reliably after the user object is reloaded.
-    ref.invalidate(firebaseUserProvider); // Use the base stream provider
-    ref.invalidate(authStateProvider);
+    ref.invalidate(authNotifierProvider); // Invalidate the main notifier
   },
 );
 
@@ -455,20 +482,17 @@ final linkEmailPasswordToGoogleProvider =
   (ref, credentials) async {
     final authService = ref.watch(authServiceProvider);
     try {
-      // Corrected method name
       final userCredential = await authService.linkEmailPasswordToGoogle(
         credentials.email,
         credentials.password,
       );
-      // Invalidate providers on success to force UI refresh
-      ref.invalidate(firebaseUserProvider);
-      ref.invalidate(authStateProvider);
+      ref.invalidate(authNotifierProvider); // Invalidate the main notifier
       talker.debug(
-          'Successfully linked Email/Password to Google, invalidated providers.');
+          'Successfully linked Email/Password to Google, invalidated main notifier.');
       return userCredential;
     } catch (e) {
       talker.error('Error linking Email/Password to Google: $e');
-      rethrow; // Rethrow the error to be caught by the caller
+      rethrow;
     }
   },
 );
@@ -478,7 +502,7 @@ final linkGoogleToEmailPasswordProvider = FutureProvider.autoDispose<void>(
   (ref) async {
     final authService = ref.watch(authServiceProvider);
     await authService.linkGoogleToEmailPassword();
-    // REMOVED explicit invalidation. Relying on the natural stream update from authStateChanges.
+    ref.invalidate(authNotifierProvider); // Invalidate the main notifier
   },
 );
 
@@ -487,9 +511,10 @@ final updatePasswordProvider =
     FutureProvider.autoDispose.family<void, String>((ref, newPassword) async {
   final authService = ref.watch(authServiceProvider);
   await authService.updatePassword(newPassword);
+  ref.invalidate(authNotifierProvider); // Invalidate the main notifier
 });
 
-/// Helper class for email/password credentials
+/// Helper class for email/password credentials (Unchanged)
 class EmailPasswordCredentials {
   final String email;
   final String password;
@@ -497,54 +522,35 @@ class EmailPasswordCredentials {
   EmailPasswordCredentials({required this.email, required this.password});
 }
 
-/// Helper function to show a themed SnackBar
+/// Helper function to show a themed SnackBar (Unchanged)
 void showThemedSnackBar({
   required BuildContext context,
   required String message,
   bool isError = false,
   Duration duration = const Duration(seconds: 10),
 }) {
-  // Check if the context is still mounted before showing the SnackBar
   if (!context.mounted) return;
-
-  // Get the ScaffoldMessenger safely
   final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-  // Clear any existing SnackBars to prevent overlap
   scaffoldMessenger.clearSnackBars();
-
-  // Show the new SnackBar
   scaffoldMessenger.showSnackBar(
     SnackBar(
       content: Text(
         message,
         style: TextStyle(
           color: isError
-              ? Theme.of(context)
-                  .colorScheme
-                  .onErrorContainer // Use onErrorContainer for errors
-              : Theme.of(context)
-                  .colorScheme
-                  .onPrimaryContainer, // Use onPrimaryContainer for success
+              ? Theme.of(context).colorScheme.onErrorContainer
+              : Theme.of(context).colorScheme.onPrimaryContainer,
         ),
       ),
       backgroundColor: isError
-          ? Theme.of(context)
-              .colorScheme
-              .errorContainer // Use errorContainer for errors
-          : Theme.of(context)
-              .colorScheme
-              .primaryContainer, // Use primaryContainer for success
+          ? Theme.of(context).colorScheme.errorContainer
+          : Theme.of(context).colorScheme.primaryContainer,
       duration: duration,
       action: SnackBarAction(
         label: 'OK',
         textColor: isError
-            ? Theme.of(context)
-                .colorScheme
-                .onErrorContainer // Use onErrorContainer for errors
-            : Theme.of(context)
-                .colorScheme
-                .onPrimaryContainer, // Use onPrimaryContainer for success
+            ? Theme.of(context).colorScheme.onErrorContainer
+            : Theme.of(context).colorScheme.onPrimaryContainer,
         onPressed: () => scaffoldMessenger.hideCurrentSnackBar(),
       ),
     ),
