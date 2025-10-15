@@ -6,12 +6,14 @@ class CardSearchBar extends ConsumerStatefulWidget {
   final TextEditingController controller;
   final bool isSearching;
   final VoidCallback onSearchToggle;
+  final void Function(Animation<double>)? onAnimationReady;
 
   const CardSearchBar({
     super.key,
     required this.controller,
     required this.isSearching,
     required this.onSearchToggle,
+    this.onAnimationReady,
   });
 
   @override
@@ -23,8 +25,8 @@ class _CardSearchBarState extends ConsumerState<CardSearchBar>
   late AnimationController _animationController;
   late Animation<double> _widthAnimation;
   late Animation<double> _opacityAnimation;
-  late Animation<double> _titleOpacityAnimation;
   late Animation<Offset> _slideAnimation;
+  late Animation<double> _iconsCoverAnimation;
   bool _hasText = false;
 
   @override
@@ -49,13 +51,6 @@ class _CardSearchBarState extends ConsumerState<CardSearchBar>
       ),
     );
 
-    _titleOpacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
-      ),
-    );
-
     _slideAnimation = Tween<Offset>(
       begin: const Offset(1.0, 0.0),
       end: Offset.zero,
@@ -66,8 +61,21 @@ class _CardSearchBarState extends ConsumerState<CardSearchBar>
       ),
     );
 
+    // Animation for covering the action icons progressively
+    _iconsCoverAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeOutCubic),
+      ),
+    );
+
     // Listen for text changes to show/hide the clear button
     widget.controller.addListener(_updateTextStatus);
+
+    // Expose the animation to parent widget
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onAnimationReady?.call(_iconsCoverAnimation);
+    });
   }
 
   void _updateTextStatus() {
@@ -105,49 +113,22 @@ class _CardSearchBarState extends ConsumerState<CardSearchBar>
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.centerLeft,
-      children: [
-        // Title that fades out when search is active
-        AnimatedBuilder(
-          animation: _titleOpacityAnimation,
-          builder: (context, child) {
-            return Opacity(
-              opacity: _titleOpacityAnimation.value,
+    return AnimatedBuilder(
+      animation: Listenable.merge([_widthAnimation, _opacityAnimation]),
+      builder: (context, child) {
+        return SlideTransition(
+          position: _slideAnimation,
+          child: Opacity(
+            opacity: _opacityAnimation.value,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.only(left: 16.0),
               child: child,
-            );
-          },
-          child: const Text('Card Database'),
-        ),
-
-        // Search field that expands from right to left
-        AnimatedBuilder(
-          animation: _widthAnimation,
-          builder: (context, child) {
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final size = MediaQuery.sizeOf(context);
-                final isSmallScreen = size.width <= size.shortestSide;
-                final maxWidth =
-                    isSmallScreen ? constraints.maxWidth : size.width * 0.6;
-
-                return SlideTransition(
-                  position: _slideAnimation,
-                  child: Container(
-                    width: maxWidth * _widthAnimation.value,
-                    alignment: Alignment.centerLeft,
-                    child: Opacity(
-                      opacity: _opacityAnimation.value,
-                      child: child,
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-          child: _buildSearchField(ref),
-        ),
-      ],
+            ),
+          ),
+        );
+      },
+      child: _buildSearchField(ref),
     );
   }
 

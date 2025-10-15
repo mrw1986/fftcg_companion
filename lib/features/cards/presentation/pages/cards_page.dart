@@ -27,6 +27,7 @@ class _CardsPageState extends ConsumerState<CardsPage>
     with SingleTickerProviderStateMixin {
   bool _isSearching = false;
   late AnimationController _fabAnimationController;
+  Animation<double>? _searchCoverAnimation;
 
   @override
   void initState() {
@@ -172,14 +173,32 @@ class _CardsPageState extends ConsumerState<CardsPage>
           controller: searchController,
           isSearching: _isSearching,
           onSearchToggle: _toggleSearch,
+          onAnimationReady: (animation) {
+            setState(() {
+              _searchCoverAnimation = animation;
+            });
+          },
         ),
+        titleSpacing: _isSearching ? 0 : null,
         actions: [
-          CardAppBarActions(
-            isSearching: _isSearching,
-            onSearchToggle: _toggleSearch,
-            onFilterTap: _showFilterDialog,
-            onSortTap: _showSortBottomSheet,
-          ),
+          if (_isSearching)
+            // Only show close button when searching
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                ref.read(cardSearchQueryProvider.notifier).setQuery('');
+                _toggleSearch();
+              },
+            )
+          else
+            // Show all actions when not searching
+            CardAppBarActions(
+              isSearching: _isSearching,
+              onSearchToggle: _toggleSearch,
+              onFilterTap: _showFilterDialog,
+              onSortTap: _showSortBottomSheet,
+              searchCoverAnimation: _searchCoverAnimation,
+            ),
         ],
       ),
       body: RefreshIndicator(
