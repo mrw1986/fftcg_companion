@@ -72,10 +72,14 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
       return data.keys().hasAll(['userId', 'name', 'cards']) &&
              data.userId == request.auth.uid &&
              data.name is string &&
+             data.name.size() > 0 && // Ensure name is not empty
              data.name.size() <= 100 &&
              data.cards is list &&
              data.cards.size() >= 50 &&
-             data.cards.size() <= 100;
+             data.cards.size() <= 100 &&
+             // Validate description if present
+             (!data.keys().hasAny(['description']) ||
+              (data.description is string && data.description.size() <= 500));
     }
 
     function isValidDeckUpdate() {
@@ -99,10 +103,12 @@ exists(/databases/$(database)/documents/admins/$(request.auth.uid));
       return data.keys().hasAll(['userId', 'cardId', 'lastModified']) &&
              data.userId == request.auth.uid &&
              data.cardId is string &&
+             data.cardId.size() > 0 && // Ensure cardId is not empty
+             data.cardId.size() <= 50 && // Reasonable length limit
              data.lastModified is timestamp &&
              (data.regularQty is number || data.foilQty is number) &&
-             (data.regularQty == null || (data.regularQty is number && data.regularQty >= 0)) && // Removed upper bound
-             (data.foilQty == null || (data.foilQty is number && data.foilQty >= 0)) && // Removed upper bound
+             (data.regularQty == null || (data.regularQty is number && data.regularQty >= 0 && data.regularQty <= 999)) && // Added upper bound for sanity
+             (data.foilQty == null || (data.foilQty is number && data.foilQty >= 0 && data.foilQty <= 999)) && // Added upper bound for sanity
              (!data.keys().hasAny(['condition']) || data.condition is map) &&
              (!data.keys().hasAny(['purchaseInfo']) || data.purchaseInfo is map);
     }

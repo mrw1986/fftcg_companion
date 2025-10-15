@@ -250,10 +250,48 @@ class AuthNotifier extends Notifier<AuthState> implements Listenable {
 
   Future<void> _triggerFirestoreSync(User user) async {
     try {
-      // Verify token validity before syncing
+      // Verify token validity before syncing with progressive refresh strategy
       talker.debug(
           'AuthNotifier (Sync): Verifying token validity for ${user.uid}');
-      await user.getIdToken(true); // Force refresh
+
+      // First, try to reload the user to ensure we have the latest data
+      try {
+        talker.debug(
+            'AuthNotifier (Sync): Reloading user before token verification');
+        await user.reload();
+        // Get fresh user reference after reload
+        final freshUser = FirebaseAuth.instance.currentUser;
+        if (freshUser == null) {
+          talker.warning(
+              'AuthNotifier (Sync): User became null after reload, aborting sync');
+          return;
+        }
+        // Update user reference to the fresh one
+        user = freshUser;
+        talker.debug('AuthNotifier (Sync): User reloaded successfully');
+      } catch (reloadError) {
+        talker.warning(
+            'AuthNotifier (Sync): Failed to reload user before token verification',
+            reloadError);
+        // Continue with potentially stale user object
+      }
+
+      // Progressive token refresh - try without force first
+      try {
+        talker.debug(
+            'AuthNotifier (Sync): Attempting token refresh without force');
+        await user.getIdToken(false);
+        talker.debug(
+            'AuthNotifier (Sync): Token refresh succeeded without force');
+      } catch (e) {
+        talker.debug(
+            'AuthNotifier (Sync): Token refresh without force failed, trying with force',
+            e);
+        // If regular refresh fails, try with force
+        await user.getIdToken(true);
+        talker.debug('AuthNotifier (Sync): Token refresh with force succeeded');
+      }
+
       talker.debug('AuthNotifier (Sync): Token is valid for ${user.uid}');
 
       final userRepository = ref.read(userRepositoryProvider);
@@ -266,30 +304,67 @@ class AuthNotifier extends Notifier<AuthState> implements Listenable {
           'AuthNotifier (Sync): Successfully synced user ${user.uid} to Firestore.');
       await userRepository.verifyAndCorrectCollectionCount(user.uid);
 
-      // Clear pending email if applicable
-      final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+      // Clear pending email if applicable - with safer state access
+      String? pendingEmail;
+      try {
+        pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+      } catch (providerError) {
+        talker.error('AuthNotifier (Sync): Error reading pending email state',
+            providerError);
+        // Continue with null pendingEmail
+      }
+
       if (pendingEmail != null && user.email == pendingEmail) {
         talker.debug(
             'AuthNotifier (Sync): Detected user email matches pending email. Clearing pending state.');
-        ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
-        // **NEW:** Also clear the original email stored for the lifecycle check
-        ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
-        talker.debug(
-            'AuthNotifier (Sync): Cleared originalEmailForUpdateCheckProvider.');
+        try {
+          ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+          // Also clear the original email stored for the lifecycle check
+          ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+          talker.debug(
+              'AuthNotifier (Sync): Cleared originalEmailForUpdateCheckProvider.');
+        } catch (stateError) {
+          talker.error('AuthNotifier (Sync): Error clearing email update state',
+              stateError);
+          // Continue despite state clearing error
+        }
       }
     } on FirebaseAuthException catch (e) {
       talker.warning(
           'AuthNotifier (Sync): Token refresh failed for ${user.uid}', e);
-      if (e.code == 'user-not-found' ||
-          e.code == 'user-disabled' ||
-          e.code == 'invalid-user-token') {
+
+      // Handle different error codes appropriately
+      if (e.code == 'user-not-found' || e.code == 'user-disabled') {
         talker.warning(
-            'AuthNotifier (Sync): User ${user.uid} is invalid on backend. Forcing sign out.');
+            'AuthNotifier (Sync): User ${user.uid} is invalid on backend (${e.code}). Forcing sign out.');
         try {
           await ref.read(authServiceProvider).signOut(isInternalAuthFlow: true);
         } catch (signOutError) {
           talker.error('AuthNotifier (Sync): Error during forced sign out',
               signOutError);
+        }
+      } else if (e.code == 'invalid-user-token' ||
+          e.code == 'user-token-expired') {
+        talker.warning(
+            'AuthNotifier (Sync): User token is invalid or expired (${e.code}). Attempting reload before sign out.');
+        try {
+          // One last attempt to reload the user
+          await user.reload();
+          // Try the sync again after reload (will be caught if it fails again)
+          await _triggerFirestoreSync(FirebaseAuth.instance.currentUser!);
+        } catch (reloadError) {
+          talker.error(
+              'AuthNotifier (Sync): Final reload attempt failed, forcing sign out',
+              reloadError);
+          try {
+            await ref
+                .read(authServiceProvider)
+                .signOut(isInternalAuthFlow: true);
+          } catch (signOutError) {
+            talker.error(
+                'AuthNotifier (Sync): Error during forced sign out after reload failure',
+                signOutError);
+          }
         }
       }
     } catch (e, s) {
@@ -297,6 +372,10 @@ class AuthNotifier extends Notifier<AuthState> implements Listenable {
           'AuthNotifier (Sync): Error syncing user ${user.uid} to Firestore',
           e,
           s);
+
+      // For network or other errors, log but don't take action
+      talker.warning(
+          'AuthNotifier (Sync): Non-auth error occurred, sync may be incomplete');
     }
   }
 

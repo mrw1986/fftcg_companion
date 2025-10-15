@@ -2,7 +2,24 @@
 
 ## Recent Changes
 
-### Comprehensive Email Update Flow Fix (Current Session)
+### Email Update Verification Checker Implementation (Current Session)
+
+- **Context:** During email update verification, the app needed a robust mechanism to detect when verification is complete and update the UI accordingly.
+- **Changes:**
+  - Created new `EmailUpdateVerificationChecker` (`lib/core/providers/email_update_verification_checker.dart`) that actively checks for email verification status.
+  - The checker runs a timer that polls Firebase Auth, refreshes tokens, and reloads the user data to detect when an email update is verified.
+  - Enhanced UI in `account_info_card.dart` to use the verification status from the checker to display appropriate verification status indicators.
+  - Modified `account_settings_page.dart` to start the checker when an email update is initiated.
+  - Implemented proper token refresh handling that recognizes token invalidation as a sign of email verification completion.
+  - Added error handling for network issues and token expiration scenarios.
+- **Benefits:**
+  - More reliable detection of email verification completion.
+  - Better user feedback through visual status indicators.
+  - Graceful handling of token invalidation after verification.
+  - Improved error recovery during verification process.
+- **Status:** Implemented. Testing recommended.
+
+### Comprehensive Email Update Flow Fix (Previous Session)
 
 - **Context:** After initiating an email change and verifying the new email via the link, the UI state (pending email and verification status) did not update correctly.
 - **Root Causes:**
@@ -284,6 +301,7 @@
   - `firestoreUserSyncProvider` logic integrated into `AuthNotifier`'s `_triggerFirestoreSync`.
   - `linkEmailPasswordToGoogleProvider`, `unlinkProviderProvider`, etc. (FutureProviders) handle specific auth operations and invalidate `authNotifierProvider`.
 - **`email_verification_checker.dart`:** Polls, updates Firestore, sets detection flag.
+- **`email_update_verification_checker.dart`:** Polls and detects when email update verification has completed.
 - **`emailVerificationDetectedProvider`:** Simple `StateProvider<bool>`. Reset logic in `AuthNotifier`.
 - **`auto_auth_provider.dart`:** Handles initial anonymous sign-in logic.
 - **`email_update_provider.dart`:** `emailUpdateNotifierProvider` (NotifierProvider) manages the state of a pending email update (`pendingEmail`).
@@ -309,8 +327,8 @@
 
 #### Profile Page Components - **Updated**
 
-- **`account_settings_page.dart`:** **Updated.** Manages account details, re-auth, linking/unlinking calls. Uses root context for SnackBars. Corrected `mounted` checks. Removed `skipAccountLimitsDialog` from `signOut` call. **Now sets/clears `emailUpdateNotifierProvider` state and passes `pendingEmail` to `AccountInfoCard`. Added user reload and provider invalidation after successful linking operations. Simplified user object retrieval in `build` method. Added delayed `setState` after linking. Removed erroneous error handling block.**
-- **`account_info_card.dart`:** **Updated.** Converted to `ConsumerWidget` to directly watch `authNotifierProvider`. Removed `user` parameter. Added optional `pendingEmail` parameter. Displays pending email using a `ListTile` and `Chip`.
+- **`account_settings_page.dart`:** **Updated.** Manages account details, re-auth, linking/unlinking calls. Uses root context for SnackBars. Corrected `mounted` checks. Removed `skipAccountLimitsDialog` from `signOut` call. **Now sets/clears `emailUpdateNotifierProvider` state and passes `pendingEmail` to `AccountInfoCard`. Added user reload and provider invalidation after successful linking operations. Simplified user object retrieval in `build` method. Added delayed `setState` after linking. Removed erroneous error handling block. Now starts the email update verification checker when an email update is initiated.**
+- **`account_info_card.dart`:** **Updated.** Converted to `ConsumerWidget` to directly watch `authNotifierProvider`. Removed `user` parameter. Added optional `pendingEmail` parameter. Displays pending email using a `ListTile` and `Chip`. **Now also watches the email update verification checker and updates UI to show verification status.**
 - **`account_limits_dialog.dart`:** **DELETED.**
 - **`profile_reauth_dialog.dart`:** **Updated.** Loads available providers (`password`, `google.com`) and conditionally displays UI elements. Diagnostic logging added and removed.
 
@@ -350,9 +368,10 @@
 - **Firestore User Document Creation/Update:** Triggers count verification.
 - **Collection Add/Update Flow:** Deletes on zero quantity.
 - **Email Verification Flow:** Hybrid approach implemented.
+- **Email Update Verification Flow:** **New EmailUpdateVerificationChecker actively monitors verification status.**
 - **Password Reset Flow:** Updated. No longer skips dialog timestamp reset (logic removed).
 - **Account Deletion Flow:** Simplified, uses helper for cleanup. No longer skips dialog timestamp reset (logic removed). **Now clears pending email state.**
-- **Email Update Flow:** **Updated.** Initiating an update now sets a pending email state (`emailUpdateNotifierProvider`). The UI (`AccountInfoCard`) displays this pending email. The state is cleared automatically by `AuthNotifier` upon successful verification or sign-out/error.
+- **Email Update Flow:** **Updated.** Initiating an update now sets a pending email state (`emailUpdateNotifierProvider`). The UI (`AccountInfoCard`) displays this pending email. The state is cleared automatically by `AuthNotifier` upon successful verification or sign-out/error. **The EmailUpdateVerificationChecker actively polls for completion.**
 - **Cards/Collection Filtering/Search/View:** (Flow Refactored)
   - Each feature uses its own providers.
   - State changes isolated to the respective feature.
@@ -384,157 +403,4 @@ graph TD
     subgraph Firestore Sync (_triggerFirestoreSync in AuthNotifier)
         SyncAndNotify --> VerifyToken[Verify ID Token];
         SyncOnly --> VerifyToken;
-        VerifyToken -- Valid --> CreateOrUpdateUser[Call UserRepository.createUserFromAuth];
-        CreateOrUpdateUser --> VerifyCount[Call UserRepository.verifyAndCorrectCollectionCount];
-        VerifyCount --> CheckPendingEmail{User Email Matches Pending?};
-        CheckPendingEmail -- Yes --> ClearPendingEmail[Clear Pending Email State];
-        CheckPendingEmail -- No --> SyncComplete[Sync Complete];
-        ClearPendingEmail --> SyncComplete;
-        VerifyToken -- Invalid --> ForceSignOut[Force Sign Out];
-        ForceSignOut --> AuthState;
-    end
-
-    subgraph Anonymous Flow
-        B -- No --> AnonSignIn[Sign In Anonymously];
-        AnonSignIn --> AuthState;
-        Anon[Anonymous User] -- Link --> LinkChoice{Link Email/Pass or Google?};
-        LinkChoice -- Email/Pass --> LinkEmailPass[UI Calls _linkWithEmailPassword]; %% Changed Trigger
-        LinkEmailPass --> LinkEmailPassProvider[Provider: linkEmailAndPasswordToAnonymous]; %% Changed Provider
-        LinkEmailPassProvider --> ReloadInvalidateSetState1[Reload User, Invalidate AuthNotifier, Delayed SetState]; %% NEW
-        ReloadInvalidateSetState1 --> AuthState; %% NEW
-        LinkChoice -- Google --> LinkGoogle[AuthService.linkGoogleToAnonymous];
-        LinkGoogle -- Exists --> MergePrompt{Merge Data?};
-        MergePrompt -- Yes --> MigrateData[Migrate Data];
-        MergePrompt -- No --> DiscardData[Keep Google Data];
-        MigrateData --> SignOutSignIn[Sign Out & Sign In w/ Google];
-        DiscardData --> SignOutSignIn;
-        LinkGoogle -- Success --> SignOutSignIn;
-        SignOutSignIn --> AuthState;
-    end
-
-    subgraph Email/Password Flow
-        D -- Email/Pass --> EmailChoice{Register or Login?};
-        EmailChoice -- Register --> RegisterEmail[Register + Send Verification];
-        EmailChoice -- Login --> LoginEmail[Login Email/Pass];
-        RegisterEmail --> ShowVerifyDialog[Show Verification Dialog];
-        ShowVerifyDialog -- OK Clicked --> StartChecker[Start Email Verification Checker];
-        StartChecker --> AuthState;
-        LoginEmail --> AuthState;
-        EmailUser[Email/Pass User] -- Actions --> OtherActions[Other Account Actions];
-        EmailUser -- Unverified --> StartChecker2[Start Email Verification Checker];
-    end
-
-    subgraph Email Verification Check Flow (Fixed - Attempt 2 - Testing Needed - Obj 42, 44, 46)
-        StartChecker --> LoopCheck{Checker: Periodically Reload User};
-        StartChecker2 --> LoopCheck;
-        LoopCheck -- Verified? --> IsVerified{emailVerified == true?};
-        IsVerified -- No --> LoopCheck;
-        IsVerified -- Yes --> UpdateFirestoreChecker[Checker: Update Firestore Immediately];
-        UpdateFirestoreChecker --> SetDetectionFlag[Checker: Set emailVerificationDetectedProvider=true];
-        SetDetectionFlag --> CancelTimer[Checker: Cancel Timer];
-        SetDetectionFlag --> UpdateUIImmediate[UI Hides Banner & Chip Immediately];
-        CancelTimer --> StreamEmit{Firebase Stream Emits Updated User};
-        StreamEmit --> AuthState;
-    end
-
-    subgraph Google Flow
-        D -- Google --> LoginGoogle[Login/Register with Google];
-        LoginGoogle --> AuthState;
-        GoogleUser[Google User] -- Actions --> OtherActions2[Other Account Actions];
-        GoogleUser -- Link Email/Pass --> LinkEmailPassToGoogle[UI Calls _linkWithEmailPassword];
-        LinkEmailPassToGoogle --> LinkProviderCall[Provider: linkEmailPasswordToGoogle];
-        LinkProviderCall --> ReloadInvalidateSetState2[Reload User, Invalidate AuthNotifier, Delayed SetState]; %% NEW
-        ReloadInvalidateSetState2 --> AuthState; %% NEW
-    end
-
-    subgraph Password Reset Flow
-        ResetPage[Reset Password Page] -- Authenticated User --> SendResetEmail[UI Calls AuthService.sendPasswordResetEmail];
-        SendResetEmail --> SignOutAfterReset[UI Calls AuthService.signOut]; %% Removed skip flag
-        SignOutAfterReset --> SignOutFirebase[AuthService: Signs out Firebase/Google]; %% Removed skip timestamp step
-        SignOutFirebase --> AuthState;
-        ResetPage -- Unauthenticated User --> SendResetEmail2[UI Calls AuthService.sendPasswordResetEmail];
-        SendResetEmail2 --> ShowSuccessMessage[UI Shows Success Message];
-    end
-
-    subgraph Common Actions
-        B -- Yes --> SignedInUser;
-        SignedInUser --> ActionChoice{Choose Action};
-        ActionChoice -- Sign Out --> SignOutNormal[UI Calls AuthService.signOut];
-        SignOutNormal --> SignOutFirebase2[AuthService: Signs out Firebase/Google]; %% Removed timestamp reset step
-        SignOutFirebase2 --> AuthState;
-        ActionChoice -- Delete Account --> AttemptDelete[UI Calls AuthService.deleteUser];
-        AttemptDelete --> DeleteAuth{AuthService: Delete Auth User}; %% Removed Firestore Step
-        DeleteAuth -- Success --> HandleSuccess[UI Calls _handleSuccessfulDeletion Helper];
-        DeleteAuth -- Failure --> HandleAuthError{Auth Error?};
-        HandleAuthError -- user-not-found --> LogWarning[Log Warning (Ignore Error)];
-        LogWarning --> HandleSuccess; %% Treat as success
-        HandleAuthError -- requires-recent-login --> HandleReauth[UI Handles Re-auth Prompt];
-        HandleAuthError -- Other --> HandleOtherAuthError[UI Handles Error];
-        HandleReauth -- User Re-authenticates --> AttemptDelete; %% Retry the same simplified delete
-        HandleReauth -- User Cancels --> SignedInUser;
-        HandleSuccess --> ShowSnackbar[Helper: Show Success Snackbar];
-        ShowSnackbar --> FinalSignOut[Helper: Sign Out User]; %% Removed skip flag
-        FinalSignOut --> NavigateAway[Helper: Navigate Away (with mounted check)];
-        NavigateAway --> AuthState;
-        ActionChoice -- Link Google --> LinkGoogleFromSettings[UI Calls _linkWithGoogle];
-        LinkGoogleFromSettings --> LinkGoogleProviderCall[Provider: linkGoogleToEmailPassword];
-        LinkGoogleProviderCall --> ReloadInvalidateSetState3[Reload User, Invalidate AuthNotifier, Delayed SetState]; %% NEW
-        ReloadInvalidateSetState3 --> AuthState; %% NEW
-    end
-
-    subgraph State & UI
-        AuthState[Auth State Change] --> ListenAuthState;
-        AuthState --> UpdateUIMain[Update UI via AuthState];
-        AuthState --> RouterRedirect;
-    end
-
-    style NavigateToAccount1 fill:#c9ffc9,stroke:#333,stroke-width:1px
-    style NavigateToAccount2 fill:#c9ffc9,stroke:#333,stroke-width:1px
-    style NavigateToAccount3 fill:#c9ffc9,stroke:#333,stroke-width:1px
-    style NavigateToAccount4 fill:#c9ffc9,stroke:#333,stroke-width:1px
-    style ShowVerifyDialog fill:#ffffcc,stroke:#333,stroke-width:1px
-    style DeleteAuth fill:#ffcccc,stroke:#333,stroke-width:2px
-    style HandleReauth fill:#fdc,stroke:#333,stroke-width:2px
-    style LoopCheck fill:#e0f7fa,stroke:#00796b,stroke-width:1px
-    style IsVerified fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
-    style UpdateFirestoreChecker fill:#ffcc80,stroke:#ef6c00,stroke-width:2px
-    style SetDetectionFlag fill:#ffecb3,stroke:#ffa000,stroke-width:1px
-    style CancelTimer fill:#ffecb3,stroke:#ffa000,stroke-width:1px
-    style UpdateUIImmediate fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
-    style StreamEmit fill:#dcedc8,stroke:#689f38,stroke-width:1px
-    style SignOutAfterReset fill:#cce5ff,stroke:#005cb2,stroke-width:1px %% Updated node name
-    style SignOutFirebase fill:#cce5ff,stroke:#005cb2,stroke-width:1px
-    style SignOutNormal fill:#e1f5fe,stroke:#0277bd,stroke-width:1px
-    style SignOutFirebase2 fill:#e1f5fe,stroke:#0277bd,stroke-width:1px
-    style ListenAuthState fill:#d1c4e9,stroke:#512da8,stroke-width:2px
-    style UserEvent fill:#d1c4e9,stroke:#512da8,stroke-width:1px
-    style ReloadUser fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
-    style DetermineState fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
-    style StateChanged fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
-    style UpdateInternalState fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
-    style SyncAndNotify fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
-    style CheckUserChanged fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
-    style SyncOnly fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px
-    style VerifyToken fill:#b39ddb,stroke:#512da8,stroke-width:1px
-    style CreateOrUpdateUser fill:#b39ddb,stroke:#512da8,stroke-width:1px
-    style VerifyCount fill:#b39ddb,stroke:#512da8,stroke-width:1px
-    style CheckPendingEmail fill:#b39ddb,stroke:#512da8,stroke-width:1px
-    style ClearPendingEmail fill:#b39ddb,stroke:#512da8,stroke-width:1px
-    style SyncComplete fill:#b39ddb,stroke:#512da8,stroke-width:1px
-    style ForceSignOut fill:#ffcdd2,stroke:#c62828,stroke-width:1px
-    style NoOp fill:#eee,stroke:#999,stroke-width:1px
-    style UpdateFirestoreAnon fill:#ffcc80,stroke:#ef6c00,stroke-width:2px
-    style UpdateUIMain fill:#e1f5fe,stroke:#0277bd,stroke-width:1px
-    style HandleAuthError fill:#ffebcc,stroke:#ff8f00,stroke-width:2px
-    style LogWarning fill:#fff9c4,stroke:#fbc02d,stroke-width:1px
-    style HandleSuccess fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
-    style ShowSnackbar fill:#c8e6c9,stroke:#388e3c,stroke-width:1px
-    style FinalSignOut fill:#c8e6c9,stroke:#388e3c,stroke-width:1px
-    style NavigateAway fill:#c8e6c9,stroke:#388e3c,stroke-width:1px
-    style ReloadInvalidateSetState1 fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px %% NEW
-    style ReloadInvalidateSetState2 fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px %% NEW
-    style ReloadInvalidateSetState3 fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px %% NEW
-
-</final_file_content>
-
-IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting (e.g., if you used single quotes but the formatter converted them to double quotes). Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.
+        VerifyToken

@@ -8,6 +8,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:fftcg_companion/app/app.dart';
 import 'package:fftcg_companion/app/theme/theme_provider.dart';
 import 'package:fftcg_companion/firebase_options.dart';
@@ -20,6 +21,9 @@ final _container = ProviderContainer();
 Future<void> initializeApp() async {
   // Initialize Talker first
   initializeTalker();
+
+  // Load environment variables
+  await dotenv.load(fileName: '.env');
 
   try {
     // Initialize Hive first
@@ -42,11 +46,14 @@ Future<void> initializeApp() async {
     );
     talker.debug('Firebase initialized successfully');
     // Initialize Firebase App Check
-    // TODO: Add your reCAPTCHA v3 site key for web
-    // final kWebRecaptchaSiteKey = 'YOUR_RECAPTCHA_V3_SITE_KEY';
     await FirebaseAppCheck.instance.activate(
-      // You can also use a `ReCaptchaEnterpriseProvider` provider instance as an argument for `webProvider`
-      // webProvider: ReCaptchaV3Provider(kWebRecaptchaSiteKey),
+      // Web provider using reCAPTCHA v3 for web platform security
+      webProvider: ReCaptchaV3Provider(
+        const String.fromEnvironment(
+          'FIREBASE_RECAPTCHA_V3_SITE_KEY',
+          defaultValue: 'YOUR_RECAPTCHA_V3_SITE_KEY', // Replace with actual key
+        ),
+      ),
       // Default provider for Android is Play Integrity.
       androidProvider: AndroidProvider.playIntegrity,
       // Default provider for Apple platforms is App Attest.

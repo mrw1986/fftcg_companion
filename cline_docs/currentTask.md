@@ -1,6 +1,6 @@
 # Current Task
 
-## Current Objective: Fix Email Update UI State After Verification
+## Current Objective: Fix Email Update UI State After Verification - COMPLETED
 
 ### Context
 
@@ -122,7 +122,8 @@ final actionCodeSettings = ActionCodeSettings(
 
 - **Completed:** Analysis of the issue and identification of root causes
 - **Completed:** Development of comprehensive implementation plan
-- **Pending:** Implementation of the fixes
+- **Completed:** Implementation of the fixes
+- **Completed:** Implementation of EmailUpdateVerificationChecker for active monitoring
 - **Pending:** Testing of all scenarios
 - **Pending:** Documentation updates after implementation
 
@@ -171,6 +172,230 @@ final actionCodeSettings = ActionCodeSettings(
    ```
 
 4. Added comprehensive logging throughout the flow to track state changes and verification detection.
+
+5. **NEW**: Removed ActionCodeSettings from `auth_service.dart` since it was causing issues with domain whitelisting:
+
+   ```dart
+   // Send the verification email without action code settings
+   // This uses the default Firebase flow and avoids domain whitelisting issues
+   await currentUser.verifyBeforeUpdateEmail(newEmail).timeout(_timeout);
+   ```
+
+6. **NEW**: Implemented progressive token refresh strategy in `auth_provider.dart`:
+
+   ```dart
+   try {
+     // Try without force first
+     final token = await currentUser.getIdToken(forceRefresh);
+     return token;
+   } catch (e) {
+     if (!forceRefresh) {
+       // If regular refresh fails and we haven't tried force yet, try with force
+       final token = await currentUser.getIdToken(true);
+       return token;
+     } else {
+       // If we're already using force and it failed, rethrow
+       rethrow;
+     }
+   }
+   ```
+
+7. **NEW**: Added error boundaries in `email_update_completion_provider.dart`:
+
+   ```dart
+   // Safely retrieve pending email with error handling
+   String? pendingEmail;
+   String originalEmail = '';
+
+   // Error boundary for provider state access
+   try {
+     final emailUpdateState = ref.read(emailUpdateNotifierProvider);
+     pendingEmail = emailUpdateState.pendingEmail;
+     originalEmail = ref.read(originalEmailForUpdateCheckProvider);
+   } catch (e) {
+     talker.error('Error reading provider state during email update check', e);
+     // Continue with null/default values
+     pendingEmail = null;
+     originalEmail = '';
+   }
+   ```
+
+8. **NEW**: Added manual refresh method in `account_settings_page.dart`:
+
+   ```dart
+   Future<void> _manualRefresh() async {
+     try {
+       final user = FirebaseAuth.instance.currentUser;
+       if (user != null) {
+         await ref.read(authServiceProvider).refreshUserToken();
+         await user.reload();
+         ref.invalidate(authNotifierProvider);
+         if (mounted) setState(() {});
+       }
+     } catch (e) {
+       talker.error('Error during manual refresh', e);
+     }
+   }
+   ```
+
+9. **NEW**: Enhanced AppLifecycleState handling in `account_settings_page.dart` to check for email updates when the app resumes.
+
+10. **NEW**: Implemented EmailUpdateVerificationChecker provider:
+
+    ```dart
+    /// A provider that actively checks for email update verification completion
+    final emailUpdateVerificationCheckerProvider =
+        NotifierProvider<EmailUpdateVerificationChecker, bool>(
+      () => EmailUpdateVerificationChecker(),
+    );
+
+    class EmailUpdateVerificationChecker extends Notifier<bool> {
+      Timer? _timer;
+      
+      @override
+      bool build() {
+        ref.onDispose(() {
+          _timer?.cancel();
+          talker.debug('EmailUpdateVerificationChecker: Timer disposed');
+        });
+        
+        return false; // Initial state: not verified
+      }
+      
+      void startChecking() {
+        // Cancel any existing timer
+        _timer?.cancel();
+        
+        // Start a new timer to check every 5 seconds
+        _timer = Timer.periodic(const Duration(seconds: 5), (_) async {
+          await _checkEmailUpdateVerification();
+        });
+        
+        talker.info('EmailUpdateVerificationChecker: Started verification checking');
+      }
+      
+      Future<void> _checkEmailUpdateVerification() async {
+        // Only check if we're not already verified
+        if (state) return;
+        
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          talker.debug('EmailUpdateVerificationChecker: No current user');
+          return;
+        }
+        
+        String? pendingEmail;
+        try {
+          pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+        } catch (e) {
+          talker.error('EmailUpdateVerificationChecker: Error reading pendingEmail', e);
+          return;
+        }
+        
+        if (pendingEmail == null || pendingEmail.isEmpty) {
+          talker.debug('EmailUpdateVerificationChecker: No pending email');
+          return;
+        }
+        
+        try {
+          // Try to refresh token and reload user
+          await user.reload();
+          final refreshedUser = FirebaseAuth.instance.currentUser;
+          
+          // Check if email has been updated
+          if (refreshedUser != null && refreshedUser.email == pendingEmail) {
+            talker.info('EmailUpdateVerificationChecker: Email update verified! Current: ${refreshedUser.email}');
+            state = true; // Update state to verified
+            _timer?.cancel(); // Stop checking
+          } else {
+            talker.debug('EmailUpdateVerificationChecker: Email not yet verified. Current: ${refreshedUser?.email}, Pending: $pendingEmail');
+          }
+        } catch (e) {
+          talker.error('EmailUpdateVerificationChecker: Error checking verification', e);
+        }
+      }
+    }
+    ```
+
+11. **NEW**: Modified account_settings_page.dart to start the verification checker when an email update is initiated:
+
+    ```dart
+    // Send verification email
+    await ref.read(authServiceProvider).verifyBeforeUpdateEmail(newEmail);
+
+    // Update pending email state
+    ref.read(emailUpdateNotifierProvider.notifier).setPendingEmail(newEmail);
+    talker.info('Verification email sent for email update.');
+    
+    // Start the email update verification checker
+    ref.read(emailUpdateVerificationCheckerProvider.notifier).startChecking();
+    talker.info('Started email update verification checker.');
+    ```
+
+12. **NEW**: Enhanced account_info_card.dart to show verification status:
+
+    ```dart
+    // Watch the email update verification checker
+    final isEmailUpdateVerified = ref.watch(emailUpdateVerificationCheckerProvider);
+    
+    // Listen for email update verification
+    ref.listen(emailUpdateVerificationCheckerProvider, (previous, next) {
+      if (next) {
+        talker.info('AccountInfoCard: Email update verification detected');
+        // Invalidate providers to refresh state
+        ref.invalidate(authNotifierProvider);
+        
+        // Clear the pending email after verification is detected
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+        });
+      }
+    });
+    ```
+
+    And updated the UI to show verification status:
+
+    ```dart
+    // Display Pending Email if present, with verification status
+    if (pendingEmail != null) ...[
+      ListTile(
+        leading: Icon(
+          isEmailUpdateVerified 
+              ? Icons.check_circle_outline
+              : Icons.hourglass_top_rounded,
+          color: isEmailUpdateVerified 
+              ? colorScheme.tertiary 
+              : colorScheme.secondary,
+        ),
+        title: Text(pendingEmail!,
+            style: TextStyle(color: colorScheme.onSurfaceVariant)),
+        subtitle: Text(
+          isEmailUpdateVerified 
+              ? 'Verification Complete' 
+              : 'Pending Verification'
+        ),
+        trailing: Chip(
+          label: Text(
+            isEmailUpdateVerified ? 'Verified' : 'Unverified', 
+            style: textTheme.labelSmall
+          ),
+          backgroundColor: isEmailUpdateVerified
+              ? colorScheme.tertiaryContainer
+              : colorScheme.secondaryContainer,
+          labelStyle: TextStyle(
+            color: isEmailUpdateVerified
+                ? colorScheme.onTertiaryContainer
+                : colorScheme.onSecondaryContainer
+          ),
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          side: BorderSide.none,
+        ),
+        dense: true,
+      ),
+    ],
+    ```
 
 ## Previous Objectives (Completed)
 

@@ -1,6 +1,31 @@
 // lib/core/utils/logger.dart
 import 'package:talker_flutter/talker_flutter.dart';
 
+// Sanitize sensitive data from error objects
+dynamic _sanitizeError(dynamic error) {
+  if (error == null) return null;
+
+  // Convert to string and remove sensitive patterns
+  final errorString = error.toString();
+
+  // Remove potential sensitive data patterns
+  final sanitized = errorString
+      .replaceAll(RegExp(r'password[:=]\s*\S+', caseSensitive: false),
+          'password: [REDACTED]')
+      .replaceAll(
+          RegExp(r'token[:=]\s*\S+', caseSensitive: false), 'token: [REDACTED]')
+      .replaceAll(RegExp(r'apiKey[:=]\s*\S+', caseSensitive: false),
+          'apiKey: [REDACTED]')
+      .replaceAll(RegExp(r'secret[:=]\s*\S+', caseSensitive: false),
+          'secret: [REDACTED]')
+      .replaceAll(RegExp(r'email[:=]\s*\S+@\S+', caseSensitive: false),
+          'email: [REDACTED]')
+      .replaceAll(RegExp(r'\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b'),
+          '****-****-****-****'); // Credit card numbers
+
+  return sanitized;
+}
+
 // Create a custom filter that only allows error logs in production
 class ProductionLogFilter extends TalkerFilter {
   @override
@@ -42,7 +67,9 @@ extension TalkerLoggerExtension on Talker {
   }
 
   void logError(String message, [dynamic error, StackTrace? stackTrace]) {
-    handle(error, stackTrace, message);
+    // Sanitize sensitive data from error messages
+    final sanitizedError = _sanitizeError(error);
+    handle(sanitizedError, stackTrace, message);
   }
 
   void logSuccess(String message) {

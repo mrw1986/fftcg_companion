@@ -22,6 +22,7 @@ import 'package:fftcg_companion/shared/utils/snackbar_helper.dart';
 // Import the new provider
 import 'package:fftcg_companion/features/profile/presentation/providers/email_update_provider.dart';
 import 'package:fftcg_companion/features/profile/presentation/providers/email_update_completion_provider.dart';
+import 'package:fftcg_companion/core/providers/email_update_verification_checker.dart';
 
 // NEW: Provider to store the original email during the update process
 final originalEmailForUpdateCheckProvider = StateProvider<String>((ref) => '');
@@ -116,7 +117,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
     super.dispose();
   }
 
-  // NEW: Implement didChangeAppLifecycleState
+  // Enhanced didChangeAppLifecycleState implementation with token refresh
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     super.didChangeAppLifecycleState(state);
@@ -124,9 +125,17 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
 
     if (state == AppLifecycleState.resumed) {
       talker.debug('App resumed, checking for pending email update...');
-      // Check if an email update is pending
-      final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
-      final originalEmail = ref.read(originalEmailForUpdateCheckProvider);
+
+      // Error boundary for provider access
+      String? pendingEmail;
+      String originalEmail = '';
+      try {
+        pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+        originalEmail = ref.read(originalEmailForUpdateCheckProvider);
+      } catch (e) {
+        talker.error('Lifecycle Check: Error reading provider state', e);
+        // Continue with null/default values
+      }
 
       talker.debug(
           'Lifecycle Check: PendingEmail=$pendingEmail, OriginalEmail=$originalEmail');
@@ -140,6 +149,28 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
 
         if (user != null) {
           try {
+            // Progressive token refresh strategy
+            try {
+              talker.debug(
+                  'Lifecycle Check: Attempting token refresh without force');
+              await user.getIdToken(false);
+              talker.debug(
+                  'Lifecycle Check: Token refresh succeeded without force');
+            } catch (e) {
+              talker.debug(
+                  'Lifecycle Check: Token refresh without force failed, trying with force: $e');
+              try {
+                await user.getIdToken(true);
+                talker.debug(
+                    'Lifecycle Check: Token refresh with force succeeded');
+              } catch (tokenError) {
+                talker.error(
+                    'Lifecycle Check: Token refresh failed even with force',
+                    tokenError);
+                // Continue with reload attempt
+              }
+            }
+
             talker.debug('Lifecycle Check: Reloading user...');
             await user.reload();
             final reloadedUser = FirebaseAuth.instance.currentUser;
@@ -152,31 +183,78 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
                 currentEmail != originalEmail) {
               talker.info(
                   'Lifecycle Check: Email change detected! Original: $originalEmail, Current: $currentEmail. Invalidating auth provider.');
-              // Invalidate the main auth provider to trigger state update
-              ref.invalidate(authNotifierProvider);
-              // Reset the original email provider to prevent re-checking
-              ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
-              talker.debug(
-                  'Lifecycle Check: Reset originalEmailForUpdateCheckProvider.');
+
+              // Error boundary for provider access
+              try {
+                // Invalidate the main auth provider to trigger state update
+                ref.invalidate(authNotifierProvider);
+                // Reset the original email provider to prevent re-checking
+                ref.read(originalEmailForUpdateCheckProvider.notifier).state =
+                    '';
+                talker.debug(
+                    'Lifecycle Check: Reset originalEmailForUpdateCheckProvider.');
+
+                // Force UI update with a slight delay to allow provider changes to propagate
+                await Future.delayed(const Duration(milliseconds: 100));
+                if (mounted) {
+                  setState(() {
+                    talker.debug(
+                        'Lifecycle Check: Forced UI update after email change detection');
+                  });
+                }
+              } catch (stateError) {
+                talker.error(
+                    'Lifecycle Check: Error updating provider state after email change',
+                    stateError);
+              }
             } else {
               talker.debug(
                   'Lifecycle Check: Email has not changed or is null/empty.');
             }
           } catch (e, s) {
             talker.error('Lifecycle Check: Error reloading user', e, s);
-            // Handle specific errors like token expiration if necessary
+
+            // Handle specific errors like token expiration
             if (e is FirebaseAuthException &&
                 (e.code == 'user-token-expired' ||
                     e.code == 'user-disabled' ||
                     e.code == 'user-not-found')) {
               talker.warning(
-                  'Lifecycle Check: User token expired or user invalid during reload. Invalidating auth provider.');
-              ref.invalidate(authNotifierProvider);
-              // Reset the original email provider as the check failed
-              ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+                  'Lifecycle Check: User token expired or user invalid during reload (${e.code}). Invalidating auth provider.');
+
+              try {
+                ref.invalidate(authNotifierProvider);
+                // Reset the original email provider as the check failed
+                ref.read(originalEmailForUpdateCheckProvider.notifier).state =
+                    '';
+              } catch (stateError) {
+                talker.error(
+                    'Lifecycle Check: Error clearing provider state after auth error',
+                    stateError);
+              }
+
+              // Show error message to the user if mounted
+              if (mounted) {
+                SnackBarHelper.showErrorSnackBar(
+                    context: context,
+                    message:
+                        'Your session has expired. Please sign out and sign back in to verify your email update.');
+              }
+            } else {
+              // Generic network or other error
+              talker.debug(
+                  'Lifecycle Check: Generic error occurred during user reload: ${e.toString()}');
+
+              // Only show error message if mounted and seems like a network issue
+              if (mounted &&
+                  (e.toString().contains('network') ||
+                      e.toString().contains('connection'))) {
+                SnackBarHelper.showErrorSnackBar(
+                    context: context,
+                    message:
+                        'Unable to check email update status due to a network error. Please try again when you have a better connection.');
+              }
             }
-            // Optionally show a generic error to the user?
-            // SnackBarHelper.showErrorSnackBar(context: context, message: 'Failed to check for email update. Please try signing out and back in.');
           }
         } else {
           talker.debug('Lifecycle Check: No current user found.');
@@ -184,6 +262,214 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
       } else {
         talker.debug(
             'Lifecycle Check: No pending email update or original email not stored.');
+      }
+    }
+  }
+
+  /// Manual refresh method for forcing token refresh and user reload
+  Future<void> _manualRefresh() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    talker.debug('Manual refresh requested');
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      talker.warning('Manual refresh: No user logged in');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        SnackBarHelper.showErrorSnackBar(
+            context: context, message: 'No user is currently logged in');
+      }
+      return;
+    }
+
+    // Store critical info in case we need to re-authenticate after token expiration
+    final userEmail = user.email;
+    final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+    final originalEmail = ref.read(originalEmailForUpdateCheckProvider);
+
+    bool emailChangeDetected = false;
+
+    try {
+      // Special handling if we have a pending email update
+      if (pendingEmail != null && pendingEmail.isNotEmpty) {
+        talker.debug(
+            'Manual refresh: Pending email update detected: $pendingEmail');
+
+        // Progressive token refresh - try gently first
+        try {
+          talker
+              .debug('Manual refresh: Attempting token refresh without force');
+          await user.getIdToken(false);
+          talker.debug('Manual refresh: Token refresh succeeded without force');
+        } catch (e) {
+          // Check if this is a token expiration (likely due to email verification)
+          if (e is FirebaseAuthException &&
+              (e.code == 'user-token-expired' || e.code.contains('token'))) {
+            talker.info(
+                'Manual refresh: Token expired after email verification, attempting recovery');
+
+            try {
+              // Try force reloading the user
+              await user.reload();
+              final refreshedUser = FirebaseAuth.instance.currentUser;
+
+              if (refreshedUser != null) {
+                // Check if email was updated successfully
+                if (refreshedUser.email == pendingEmail) {
+                  talker.info(
+                      'Manual refresh: Email update confirmed! Old: $originalEmail, New: ${refreshedUser.email}');
+                  emailChangeDetected = true;
+
+                  // Update states but don't invalidate auth provider yet
+                  ref
+                      .read(emailUpdateNotifierProvider.notifier)
+                      .clearPendingEmail();
+                  ref.read(originalEmailForUpdateCheckProvider.notifier).state =
+                      '';
+                }
+
+                // Force token refresh (this may throw again but we'll catch it)
+                await refreshedUser.getIdToken(true);
+                talker.debug(
+                    'Manual refresh: Successfully refreshed token after reload');
+              }
+            } catch (innerError) {
+              talker.warning(
+                  'Manual refresh: Recovery attempt failed, will try alternative approach',
+                  innerError);
+              // Fall through to our outer catch block
+              rethrow;
+            }
+          } else {
+            talker.debug(
+                'Manual refresh: Token refresh without force failed, trying with force: $e');
+            try {
+              await user.getIdToken(true);
+              talker
+                  .debug('Manual refresh: Token refresh with force succeeded');
+            } catch (tokenError) {
+              talker.error(
+                  'Manual refresh: Token refresh failed even with force',
+                  tokenError);
+              // Continue with reload attempt
+              rethrow;
+            }
+          }
+        }
+      } else {
+        // Standard refresh process for non-email update scenarios
+        try {
+          talker.debug(
+              'Manual refresh: Standard refresh - attempting without force');
+          await user.getIdToken(false);
+        } catch (e) {
+          talker.debug(
+              'Manual refresh: Standard refresh failed without force, trying with force');
+          await user.getIdToken(true);
+        }
+      }
+
+      // Reload user to get latest data
+      talker.debug('Manual refresh: Reloading user data');
+      await user.reload();
+      final currentUser = FirebaseAuth.instance.currentUser;
+
+      // Check for email update completion if not already detected
+      if (!emailChangeDetected && currentUser != null && pendingEmail != null) {
+        if (currentUser.email == pendingEmail) {
+          talker.info(
+              'Manual refresh: Detected email update completion, clearing pending email state');
+          ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+          ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+          emailChangeDetected = true;
+        }
+      }
+
+      // Force provider refresh after all our checks
+      ref.invalidate(authNotifierProvider);
+      talker.debug('Manual refresh: Auth provider invalidated');
+
+      // Update UI with delay to allow provider changes to propagate
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        if (emailChangeDetected) {
+          SnackBarHelper.showSnackBar(
+            context: context,
+            message: 'Email address updated successfully to $pendingEmail',
+          );
+        } else {
+          SnackBarHelper.showSnackBar(
+            context: context,
+            message: 'User data refreshed successfully',
+          );
+        }
+      }
+    } catch (e) {
+      talker.error('Manual refresh: Error during refresh operation', e);
+      bool handled = false;
+
+      // Special handling for token expiration
+      if (e is FirebaseAuthException && e.code == 'user-token-expired') {
+        // This typically happens after email verification completes
+        talker.warning(
+            'Manual refresh: Detected token expiration, likely due to email verification');
+
+        // Compare pending email with current user email if possible
+        if (pendingEmail != null &&
+            userEmail != null &&
+            userEmail != pendingEmail) {
+          talker.info(
+              'Manual refresh: Email verification may have completed. Notifying user.');
+
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+
+            SnackBarHelper.showSnackBar(
+                context: context,
+                message:
+                    'Email verification may have completed. Please sign in again with your new email: $pendingEmail');
+
+            // Clear pending email since we're notifying the user
+            ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+            ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+          }
+          handled = true;
+        }
+      }
+
+      if (!handled && mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        String errorMessage = 'Failed to refresh user data';
+
+        if (e is FirebaseAuthException) {
+          if (e.code == 'user-token-expired') {
+            errorMessage =
+                'Your session expired after email change. Please sign in with your new email address.';
+          } else if (e.code == 'network-request-failed') {
+            errorMessage =
+                'Network error. Please check your connection and try again.';
+          }
+        }
+
+        SnackBarHelper.showErrorSnackBar(
+            context: context, message: errorMessage);
       }
     }
   }
@@ -269,6 +555,10 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
       // Update pending email state
       ref.read(emailUpdateNotifierProvider.notifier).setPendingEmail(newEmail);
       talker.info('Verification email sent for email update.');
+
+      // Start the email update verification checker
+      ref.read(emailUpdateVerificationCheckerProvider.notifier).startChecking();
+      talker.info('Started email update verification checker.');
 
       setState(() {
         _isLoading = false;
@@ -1355,6 +1645,14 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
               context.go('/profile');
             },
           ),
+          actions: [
+            // Add refresh button to manually refresh token and check for email updates
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh account data',
+              onPressed: _manualRefresh,
+            ),
+          ],
         ),
         backgroundColor: colorScheme.surface,
         body: _isLoading

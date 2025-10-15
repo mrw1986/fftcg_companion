@@ -626,7 +626,25 @@ class AuthService {
     }
 
     try {
+      // First attempt to refresh the token to ensure we have a valid session
+      try {
+        talker.debug('Refreshing token before sending verification email...');
+        await currentUser.getIdToken(false);
+      } catch (tokenError) {
+        talker.warning('Token refresh failed, trying with force: $tokenError');
+        try {
+          await currentUser.getIdToken(true);
+          talker.debug('Force token refresh succeeded');
+        } catch (forceError) {
+          talker.error('Force token refresh also failed', forceError);
+          // Continue anyway, the operation might still succeed
+        }
+      }
+
+      // Send the verification email without action code settings
+      // This uses the default Firebase flow and avoids domain whitelisting issues
       await currentUser.verifyBeforeUpdateEmail(newEmail).timeout(_timeout);
+
       talker.info('Verification email sent for email update.');
 
       // Note: Firebase handles the actual email update after the user clicks the link.
@@ -634,6 +652,86 @@ class AuthService {
       // No need for optimistic update here.
     } catch (e) {
       talker.error('Failed to send verification for email update: $e');
+
+      // Check for specific error conditions and provide more helpful messages
+      if (e is FirebaseAuthException) {
+        if (e.code == 'requires-recent-login') {
+          talker.warning('Email update requires recent login: ${e.code}');
+          throw AuthException(
+            code: 'requires-recent-login',
+            message:
+                'For security reasons, please sign in again before changing your email address.',
+            category: AuthErrorCategory.authentication,
+            originalException: e,
+          );
+        } else if (e.code == 'email-already-in-use') {
+          talker.warning('Email already in use: ${e.code}');
+          throw AuthException(
+            code: 'email-already-in-use',
+            message: 'This email address is already in use by another account.',
+            category: AuthErrorCategory.conflict,
+            originalException: e,
+          );
+        } else if (e.code == 'invalid-email') {
+          talker.warning('Invalid email format: ${e.code}');
+          throw AuthException(
+            code: 'invalid-email',
+            message: 'Please enter a valid email address.',
+            category: AuthErrorCategory.validation,
+            originalException: e,
+          );
+        }
+      }
+
+      // For other error types, use the generic handler
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Helper method to refresh the user's token, can be used before sensitive operations
+  Future<String> refreshUserToken({bool forceRefresh = false}) async {
+    talker.debug('Attempting to refresh user token (force=$forceRefresh)...');
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      talker.error('Token refresh failed: No user signed in.');
+      throw AuthException(
+          code: 'not-authenticated',
+          message: 'No user is currently signed in.',
+          category: AuthErrorCategory.authentication);
+    }
+
+    try {
+      // Progressive token refresh strategy
+      try {
+        // Try without force first
+        final token = await currentUser.getIdToken(forceRefresh);
+        if (token == null) {
+          throw FirebaseAuthException(
+              code: 'null-token',
+              message: 'Firebase returned a null token unexpectedly');
+        }
+        talker.debug('Token refresh successful.');
+        return token;
+      } catch (e) {
+        if (!forceRefresh) {
+          // If regular refresh fails and we haven't tried force yet, try with force
+          talker.warning('Regular token refresh failed, trying with force: $e');
+          final token = await currentUser.getIdToken(true);
+          if (token == null) {
+            throw FirebaseAuthException(
+                code: 'null-token',
+                message:
+                    'Firebase returned a null token unexpectedly even with force refresh');
+          }
+          talker.debug('Force token refresh successful.');
+          return token;
+        } else {
+          // If we're already using force and it failed, rethrow
+          rethrow;
+        }
+      }
+    } catch (e) {
+      talker.error('Failed to refresh user token: $e');
       throw _handleAuthException(e);
     }
   }

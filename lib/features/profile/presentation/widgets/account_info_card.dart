@@ -8,6 +8,7 @@ import 'package:fftcg_companion/features/profile/presentation/widgets/profile_au
 import 'package:fftcg_companion/features/profile/presentation/widgets/link_email_password_dialog.dart';
 import 'package:fftcg_companion/features/profile/presentation/providers/email_update_provider.dart';
 import 'package:fftcg_companion/features/profile/presentation/providers/email_update_completion_provider.dart';
+import 'package:fftcg_companion/core/providers/email_update_verification_checker.dart';
 
 // Convert back to ConsumerWidget
 class AccountInfoCard extends ConsumerWidget {
@@ -81,10 +82,28 @@ class AccountInfoCard extends ConsumerWidget {
     final authState = ref.watch(authNotifierProvider);
     final user = authState.user;
 
+    // Watch the email update verification checker
+    final isEmailUpdateVerified =
+        ref.watch(emailUpdateVerificationCheckerProvider);
+
     // Force rebuild when providers change
     ref.listen(emailUpdateCompletionProvider, (previous, next) {
       // The rebuild will happen automatically due to state changes
       talker.debug('AccountInfoCard: Email update completion state changed');
+    });
+
+    // Listen for email update verification
+    ref.listen(emailUpdateVerificationCheckerProvider, (previous, next) {
+      if (next) {
+        talker.info('AccountInfoCard: Email update verification detected');
+        // Invalidate providers to refresh state
+        ref.invalidate(authNotifierProvider);
+
+        // Clear the pending email after verification is detected
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+        });
+      }
     });
 
     if (user == null) return const SizedBox.shrink();
@@ -181,20 +200,33 @@ class AccountInfoCard extends ConsumerWidget {
               ],
             ),
 
-            // NEW: Display Pending Email if present
+            // Display Pending Email if present, with verification status
             if (pendingEmail != null) ...[
               ListTile(
-                leading: Icon(Icons.hourglass_top_rounded,
-                    color: colorScheme.secondary),
+                leading: Icon(
+                  isEmailUpdateVerified
+                      ? Icons.check_circle_outline
+                      : Icons.hourglass_top_rounded,
+                  color: isEmailUpdateVerified
+                      ? colorScheme.tertiary
+                      : colorScheme.secondary,
+                ),
                 title: Text(pendingEmail!,
                     style: TextStyle(color: colorScheme.onSurfaceVariant)),
-                subtitle: const Text('Pending Verification'),
+                subtitle: Text(isEmailUpdateVerified
+                    ? 'Verification Complete'
+                    : 'Pending Verification'),
                 // Use a standard Chip widget
                 trailing: Chip(
-                  label: Text('Unverified', style: textTheme.labelSmall),
-                  backgroundColor: colorScheme.secondaryContainer,
-                  labelStyle:
-                      TextStyle(color: colorScheme.onSecondaryContainer),
+                  label: Text(isEmailUpdateVerified ? 'Verified' : 'Unverified',
+                      style: textTheme.labelSmall),
+                  backgroundColor: isEmailUpdateVerified
+                      ? colorScheme.tertiaryContainer
+                      : colorScheme.secondaryContainer,
+                  labelStyle: TextStyle(
+                      color: isEmailUpdateVerified
+                          ? colorScheme.onTertiaryContainer
+                          : colorScheme.onSecondaryContainer),
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
