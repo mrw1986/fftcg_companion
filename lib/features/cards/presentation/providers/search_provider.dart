@@ -64,22 +64,34 @@ class CardSearchQueryNotifier extends AutoDisposeNotifier<String> {
 // --- End Refactor ---
 
 // Provider for the Cards page search query text controller
-// Updated to watch the NotifierProvider's state
 final cardSearchControllerProvider =
     StateProvider.autoDispose<TextEditingController>(
   (ref) {
-    // Initialize controller with the query from the NotifierProvider
-    final initialQuery = ref.watch(cardSearchQueryProvider);
-    final controller = TextEditingController(text: initialQuery);
+    // Initialize controller without watching the query to avoid recreation
+    final controller = TextEditingController();
 
-    // Update the Notifier state when the controller text changes
-    controller.addListener(() {
+    // Get initial query and set it without triggering listener
+    final initialQuery = ref.read(cardSearchQueryProvider);
+    controller.text = initialQuery;
+
+    // Define the listener function
+    void listener() {
       // Use read to avoid dependency loop and call the method on the notifier
       ref.read(cardSearchQueryProvider.notifier).setQuery(controller.text);
-    });
+    }
+
+    // Update the Notifier state when the controller text changes
+    controller.addListener(listener);
 
     // Dispose the controller when the provider is disposed
-    ref.onDispose(() => controller.dispose());
+    ref.onDispose(() {
+      // Remove the listener first to prevent issues during disposal
+      controller.removeListener(listener);
+      // Use a microtask to defer disposal to avoid race conditions
+      Future.microtask(() {
+        controller.dispose();
+      });
+    });
 
     return controller;
   },

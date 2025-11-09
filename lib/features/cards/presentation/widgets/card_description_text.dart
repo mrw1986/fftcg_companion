@@ -39,6 +39,7 @@ class CardDescriptionText extends StatelessWidget {
     // Map single letter codes to element names
     final elementMappings = {
       'R': 'fire',
+      'F': 'fire', // Add F mapping for fire element
       'I': 'ice',
       'G': 'wind',
       'Y': 'earth',
@@ -252,12 +253,13 @@ class CardDescriptionText extends StatelessWidget {
         continue;
       }
 
-      if (char == '[') {
+      // Handle both [ ] and { } brackets for element symbols
+      if (char == '[' || char == '{') {
         addCurrentText();
         inBrackets = true;
-        currentText = '[';
-      } else if (char == ']' && inBrackets) {
-        currentText += ']';
+        currentText = char;
+      } else if ((char == ']' || char == '}') && inBrackets) {
+        currentText += char;
         inBrackets = false;
 
         final content = currentText.substring(1, currentText.length - 1);
@@ -385,6 +387,15 @@ class CardDescriptionText extends StatelessWidget {
             ));
             spans.add(WidgetSpan(
               child: SizedBox(width: _iconSpacing),
+            ));
+          } else {
+            // If no element icon found, display the text as-is (for debugging)
+            spans.add(TextSpan(
+              text: currentText,
+              style: baseStyle.copyWith(
+                color: Colors.orange,
+                fontWeight: FontWeight.bold,
+              ),
             ));
           }
         }

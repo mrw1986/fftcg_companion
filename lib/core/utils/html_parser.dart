@@ -3,20 +3,32 @@ import 'package:flutter/material.dart';
 class HtmlParser {
   /// Sanitizes HTML input to prevent XSS attacks
   static String _sanitizeHtml(String html) {
-    // Remove potentially dangerous tags and attributes
+    // For card descriptions, we need minimal sanitization to avoid removing legitimate text
+    // Only remove the most dangerous patterns with very specific matching
     final dangerousPatterns = [
-      RegExp(r'<script[^>]*>.*?</script>', caseSensitive: false),
-      RegExp(r'<iframe[^>]*>.*?</iframe>', caseSensitive: false),
-      RegExp(r'<object[^>]*>.*?</object>', caseSensitive: false),
-      RegExp(r'<embed[^>]*>.*?</embed>', caseSensitive: false),
-      RegExp(r'<form[^>]*>.*?</form>', caseSensitive: false),
-      RegExp(r'<input[^>]*>', caseSensitive: false),
-      RegExp(r'<button[^>]*>.*?</button>', caseSensitive: false),
+      // Only match complete script tags with proper boundaries
+      RegExp(r'<script\b[^>]*>.*?</script\s*>',
+          caseSensitive: false, dotAll: true),
+      RegExp(r'<iframe\b[^>]*>.*?</iframe\s*>',
+          caseSensitive: false, dotAll: true),
+      RegExp(r'<object\b[^>]*>.*?</object\s*>',
+          caseSensitive: false, dotAll: true),
+      RegExp(r'<embed\b[^>]*/?>', caseSensitive: false),
+      RegExp(r'<form\b[^>]*>.*?</form\s*>', caseSensitive: false, dotAll: true),
+      RegExp(r'<input\b[^>]*/?>', caseSensitive: false),
+      RegExp(r'<button\b[^>]*>.*?</button\s*>',
+          caseSensitive: false, dotAll: true),
+      // Only match actual javascript: hrefs within proper a tags
       RegExp(
-          r'<a[^>]*href\s*=\s*["\x27][^"\x27]*javascript:[^"\x27]*["\x27][^>]*>.*?</a>',
+          r'<a\b[^>]*\bhref\s*=\s*["\x27]\s*javascript:[^"\x27]*["\x27][^>]*>.*?</a\s*>',
+          caseSensitive: false,
+          dotAll: true),
+      // Only match actual event handler attributes within HTML tags (not in text)
+      RegExp(r'<[^>]*\bon\w+\s*=\s*["\x27][^"\x27]*["\x27][^>]*>',
           caseSensitive: false),
-      RegExp(r'on\w+\s*=\s*["\x27][^"\x27]*["\x27]', caseSensitive: false),
-      RegExp(r'style\s*=\s*["\x27][^"\x27]*["\x27]', caseSensitive: false),
+      // Only match actual style attributes within HTML tags (not in text)
+      RegExp(r'<[^>]*\bstyle\s*=\s*["\x27][^"\x27]*["\x27][^>]*>',
+          caseSensitive: false),
     ];
 
     String sanitized = html;
