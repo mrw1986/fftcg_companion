@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "project_memory_id": "fftcg_companion",
+  "vault_root": "/home/mrw1986/ObsidianVaults/ClaudeMemory",
+  "project_path": "projects/fftcg_companion",
+  "scope": {
+    "allowed_paths": [
+      "projects/fftcg_companion/",
+      "global/",
+      "_indexes/global.md"
+    ],
+    "forbidden_paths": [
+      "projects/",
+      "inbox/private/"
+    ]
+  },
+  "repo_identity": {
+    "fallback_root_hint": "/home/mrw1986/Projects/fftcg_companion"
+  }
+}
