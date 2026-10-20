@@ -1,5 +1,6 @@
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// dart format off
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, unnecessary_cast, override_on_non_overriding_member
 // ignore_for_file: strict_raw_type, inference_failure_on_untyped_parameter
@@ -21,14 +22,23 @@ class LoadingStateMapper extends ClassMapperBase<LoadingState> {
   final String id = 'LoadingState';
 
   static String _$message(LoadingState v) => v.message;
-  static const Field<LoadingState, String> _f$message =
-      Field('message', _$message);
+  static const Field<LoadingState, String> _f$message = Field(
+    'message',
+    _$message,
+  );
   static double? _$progress(LoadingState v) => v.progress;
-  static const Field<LoadingState, double> _f$progress =
-      Field('progress', _$progress, opt: true);
+  static const Field<LoadingState, double> _f$progress = Field(
+    'progress',
+    _$progress,
+    opt: true,
+  );
   static bool _$isLoading(LoadingState v) => v.isLoading;
-  static const Field<LoadingState, bool> _f$isLoading =
-      Field('isLoading', _$isLoading, opt: true, def: false);
+  static const Field<LoadingState, bool> _f$isLoading = Field(
+    'isLoading',
+    _$isLoading,
+    opt: true,
+    def: false,
+  );
 
   @override
   final MappableFields<LoadingState> fields = const {
@@ -39,9 +49,10 @@ class LoadingStateMapper extends ClassMapperBase<LoadingState> {
 
   static LoadingState _instantiate(DecodingData data) {
     return LoadingState(
-        message: data.dec(_f$message),
-        progress: data.dec(_f$progress),
-        isLoading: data.dec(_f$isLoading));
+      message: data.dec(_f$message),
+      progress: data.dec(_f$progress),
+      isLoading: data.dec(_f$isLoading),
+    );
   }
 
   @override
@@ -58,34 +69,43 @@ class LoadingStateMapper extends ClassMapperBase<LoadingState> {
 
 mixin LoadingStateMappable {
   String toJson() {
-    return LoadingStateMapper.ensureInitialized()
-        .encodeJson<LoadingState>(this as LoadingState);
+    return LoadingStateMapper.ensureInitialized().encodeJson<LoadingState>(
+      this as LoadingState,
+    );
   }
 
   Map<String, dynamic> toMap() {
-    return LoadingStateMapper.ensureInitialized()
-        .encodeMap<LoadingState>(this as LoadingState);
+    return LoadingStateMapper.ensureInitialized().encodeMap<LoadingState>(
+      this as LoadingState,
+    );
   }
 
   LoadingStateCopyWith<LoadingState, LoadingState, LoadingState> get copyWith =>
       _LoadingStateCopyWithImpl<LoadingState, LoadingState>(
-          this as LoadingState, $identity, $identity);
+        this as LoadingState,
+        $identity,
+        $identity,
+      );
   @override
   String toString() {
-    return LoadingStateMapper.ensureInitialized()
-        .stringifyValue(this as LoadingState);
+    return LoadingStateMapper.ensureInitialized().stringifyValue(
+      this as LoadingState,
+    );
   }
 
   @override
   bool operator ==(Object other) {
-    return LoadingStateMapper.ensureInitialized()
-        .equalsValue(this as LoadingState, other);
+    return LoadingStateMapper.ensureInitialized().equalsValue(
+      this as LoadingState,
+      other,
+    );
   }
 
   @override
   int get hashCode {
-    return LoadingStateMapper.ensureInitialized()
-        .hashValue(this as LoadingState);
+    return LoadingStateMapper.ensureInitialized().hashValue(
+      this as LoadingState,
+    );
   }
 }
 
@@ -111,19 +131,23 @@ class _LoadingStateCopyWithImpl<$R, $Out>
       LoadingStateMapper.ensureInitialized();
   @override
   $R call({String? message, Object? progress = $none, bool? isLoading}) =>
-      $apply(FieldCopyWithData({
-        if (message != null) #message: message,
-        if (progress != $none) #progress: progress,
-        if (isLoading != null) #isLoading: isLoading
-      }));
+      $apply(
+        FieldCopyWithData({
+          if (message != null) #message: message,
+          if (progress != $none) #progress: progress,
+          if (isLoading != null) #isLoading: isLoading,
+        }),
+      );
   @override
   LoadingState $make(CopyWithData data) => LoadingState(
-      message: data.get(#message, or: $value.message),
-      progress: data.get(#progress, or: $value.progress),
-      isLoading: data.get(#isLoading, or: $value.isLoading));
+    message: data.get(#message, or: $value.message),
+    progress: data.get(#progress, or: $value.progress),
+    isLoading: data.get(#isLoading, or: $value.isLoading),
+  );
 
   @override
   LoadingStateCopyWith<$R2, LoadingState, $Out2> $chain<$R2, $Out2>(
-          Then<$Out2, $R2> t) =>
-      _LoadingStateCopyWithImpl<$R2, $Out2>($value, $cast, t);
+    Then<$Out2, $R2> t,
+  ) => _LoadingStateCopyWithImpl<$R2, $Out2>($value, $cast, t);
 }
+

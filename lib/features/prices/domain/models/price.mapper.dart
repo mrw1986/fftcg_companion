@@ -1,5 +1,6 @@
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// dart format off
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, unnecessary_cast, override_on_non_overriding_member
 // ignore_for_file: strict_raw_type, inference_failure_on_untyped_parameter
@@ -24,8 +25,10 @@ class PriceMapper extends ClassMapperBase<Price> {
   static int _$productId(Price v) => v.productId;
   static const Field<Price, int> _f$productId = Field('productId', _$productId);
   static DateTime _$lastUpdated(Price v) => v.lastUpdated;
-  static const Field<Price, DateTime> _f$lastUpdated =
-      Field('lastUpdated', _$lastUpdated);
+  static const Field<Price, DateTime> _f$lastUpdated = Field(
+    'lastUpdated',
+    _$lastUpdated,
+  );
   static PriceData _$normal(Price v) => v.normal;
   static const Field<Price, PriceData> _f$normal = Field('normal', _$normal);
   static PriceData _$foil(Price v) => v.foil;
@@ -41,10 +44,11 @@ class PriceMapper extends ClassMapperBase<Price> {
 
   static Price _instantiate(DecodingData data) {
     return Price(
-        productId: data.dec(_f$productId),
-        lastUpdated: data.dec(_f$lastUpdated),
-        normal: data.dec(_f$normal),
-        foil: data.dec(_f$foil));
+      productId: data.dec(_f$productId),
+      lastUpdated: data.dec(_f$lastUpdated),
+      normal: data.dec(_f$normal),
+      foil: data.dec(_f$foil),
+    );
   }
 
   @override
@@ -95,11 +99,12 @@ abstract class PriceCopyWith<$R, $In extends Price, $Out>
     implements ClassCopyWith<$R, $In, $Out> {
   PriceDataCopyWith<$R, PriceData, PriceData> get normal;
   PriceDataCopyWith<$R, PriceData, PriceData> get foil;
-  $R call(
-      {int? productId,
-      DateTime? lastUpdated,
-      PriceData? normal,
-      PriceData? foil});
+  $R call({
+    int? productId,
+    DateTime? lastUpdated,
+    PriceData? normal,
+    PriceData? foil,
+  });
   PriceCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
 
@@ -116,23 +121,26 @@ class _PriceCopyWithImpl<$R, $Out> extends ClassCopyWithBase<$R, Price, $Out>
   PriceDataCopyWith<$R, PriceData, PriceData> get foil =>
       $value.foil.copyWith.$chain((v) => call(foil: v));
   @override
-  $R call(
-          {int? productId,
-          DateTime? lastUpdated,
-          PriceData? normal,
-          PriceData? foil}) =>
-      $apply(FieldCopyWithData({
-        if (productId != null) #productId: productId,
-        if (lastUpdated != null) #lastUpdated: lastUpdated,
-        if (normal != null) #normal: normal,
-        if (foil != null) #foil: foil
-      }));
+  $R call({
+    int? productId,
+    DateTime? lastUpdated,
+    PriceData? normal,
+    PriceData? foil,
+  }) => $apply(
+    FieldCopyWithData({
+      if (productId != null) #productId: productId,
+      if (lastUpdated != null) #lastUpdated: lastUpdated,
+      if (normal != null) #normal: normal,
+      if (foil != null) #foil: foil,
+    }),
+  );
   @override
   Price $make(CopyWithData data) => Price(
-      productId: data.get(#productId, or: $value.productId),
-      lastUpdated: data.get(#lastUpdated, or: $value.lastUpdated),
-      normal: data.get(#normal, or: $value.normal),
-      foil: data.get(#foil, or: $value.foil));
+    productId: data.get(#productId, or: $value.productId),
+    lastUpdated: data.get(#lastUpdated, or: $value.lastUpdated),
+    normal: data.get(#normal, or: $value.normal),
+    foil: data.get(#foil, or: $value.foil),
+  );
 
   @override
   PriceCopyWith<$R2, Price, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t) =>
@@ -154,13 +162,14 @@ class PriceDataMapper extends ClassMapperBase<PriceData> {
   final String id = 'PriceData';
 
   static double? _$lowPrice(PriceData v) => v.lowPrice;
-  static const Field<PriceData, double> _f$lowPrice =
-      Field('lowPrice', _$lowPrice, opt: true);
+  static const Field<PriceData, double> _f$lowPrice = Field(
+    'lowPrice',
+    _$lowPrice,
+    opt: true,
+  );
 
   @override
-  final MappableFields<PriceData> fields = const {
-    #lowPrice: _f$lowPrice,
-  };
+  final MappableFields<PriceData> fields = const {#lowPrice: _f$lowPrice};
 
   static PriceData _instantiate(DecodingData data) {
     return PriceData(lowPrice: data.dec(_f$lowPrice));
@@ -180,28 +189,36 @@ class PriceDataMapper extends ClassMapperBase<PriceData> {
 
 mixin PriceDataMappable {
   String toJson() {
-    return PriceDataMapper.ensureInitialized()
-        .encodeJson<PriceData>(this as PriceData);
+    return PriceDataMapper.ensureInitialized().encodeJson<PriceData>(
+      this as PriceData,
+    );
   }
 
   Map<String, dynamic> toMap() {
-    return PriceDataMapper.ensureInitialized()
-        .encodeMap<PriceData>(this as PriceData);
+    return PriceDataMapper.ensureInitialized().encodeMap<PriceData>(
+      this as PriceData,
+    );
   }
 
   PriceDataCopyWith<PriceData, PriceData, PriceData> get copyWith =>
       _PriceDataCopyWithImpl<PriceData, PriceData>(
-          this as PriceData, $identity, $identity);
+        this as PriceData,
+        $identity,
+        $identity,
+      );
   @override
   String toString() {
-    return PriceDataMapper.ensureInitialized()
-        .stringifyValue(this as PriceData);
+    return PriceDataMapper.ensureInitialized().stringifyValue(
+      this as PriceData,
+    );
   }
 
   @override
   bool operator ==(Object other) {
-    return PriceDataMapper.ensureInitialized()
-        .equalsValue(this as PriceData, other);
+    return PriceDataMapper.ensureInitialized().equalsValue(
+      this as PriceData,
+      other,
+    );
   }
 
   @override
@@ -238,6 +255,7 @@ class _PriceDataCopyWithImpl<$R, $Out>
 
   @override
   PriceDataCopyWith<$R2, PriceData, $Out2> $chain<$R2, $Out2>(
-          Then<$Out2, $R2> t) =>
-      _PriceDataCopyWithImpl<$R2, $Out2>($value, $cast, t);
+    Then<$Out2, $R2> t,
+  ) => _PriceDataCopyWithImpl<$R2, $Out2>($value, $cast, t);
 }
+

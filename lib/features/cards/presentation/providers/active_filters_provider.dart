@@ -5,7 +5,7 @@ import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
 part 'active_filters_provider.g.dart';
 
 @riverpod
-int activeFilterCount(ref, CardFilters filters) {
+int activeFilterCount(Ref ref, CardFilters filters) {
   int count = 0;
 
   // Count active element filters

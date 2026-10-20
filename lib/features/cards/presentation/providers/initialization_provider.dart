@@ -8,7 +8,7 @@ import 'package:fftcg_companion/features/cards/presentation/providers/filter_opt
 part 'initialization_provider.g.dart';
 
 @Riverpod(keepAlive: true)
-Future<void> initialization(ref) async {
+Future<void> initialization(Ref ref) async {
   talker.debug('Starting app initialization...');
 
   ref.onDispose(() {
@@ -25,7 +25,7 @@ Future<void> initialization(ref) async {
 
   // Initialize cache first
   talker.debug('Initializing card cache...');
-  final cardCache = await ref.read(cardCacheNotifierProvider.future);
+  final cardCache = await ref.read(cardCacheProvider.future);
   talker.debug('Card cache initialized');
 
   // Clear filter options cache to ensure we get fresh categorization with updated set categories
@@ -45,7 +45,7 @@ Future<void> initialization(ref) async {
   try {
     talker.debug('Starting set card count preload...');
     // Get all set IDs from filter options
-    final filterOptions = await ref.read(filterOptionsNotifierProvider.future);
+    final filterOptions = await ref.read(filterOptionsProvider.future);
     final allSetIds = filterOptions.set.toList();
 
     // Initialize the persistent cache

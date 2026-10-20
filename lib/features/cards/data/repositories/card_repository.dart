@@ -21,7 +21,7 @@ class CardRepository extends _$CardRepository {
   @override
   FutureOr<List<Card>> build() async {
     try {
-      final cache = await ref.watch(cardCacheNotifierProvider.future);
+      final cache = await ref.watch(cardCacheProvider.future);
       final cachedCards = await cache.getCachedCards();
 
       // If we have cached cards, use them immediately
@@ -56,7 +56,7 @@ class CardRepository extends _$CardRepository {
   }
 
   Future<List<Card>> _fetchCardsFromFirestore() async {
-    final cache = await ref.watch(cardCacheNotifierProvider.future);
+    final cache = await ref.watch(cardCacheProvider.future);
     final firestoreService = ref.read(firestoreServiceProvider);
 
     try {
@@ -172,7 +172,7 @@ class CardRepository extends _$CardRepository {
         return;
       }
 
-      final cache = await ref.watch(cardCacheNotifierProvider.future);
+      final cache = await ref.watch(cardCacheProvider.future);
       final firestoreService = ref.read(firestoreServiceProvider);
 
       // Get local version
@@ -305,7 +305,7 @@ class CardRepository extends _$CardRepository {
   /// Search cards using local data instead of Firestore queries
   Future<List<Card>> searchCards(String searchTerm) async {
     try {
-      final cache = await ref.watch(cardCacheNotifierProvider.future);
+      final cache = await ref.watch(cardCacheProvider.future);
       final normalizedQuery = searchTerm.toLowerCase().trim();
 
       if (normalizedQuery.isEmpty) {
@@ -759,7 +759,7 @@ class CardRepository extends _$CardRepository {
       if (forceRefresh) {
         ref.invalidateSelf();
         // Only clear memory cache on force refresh
-        final cache = await ref.watch(cardCacheNotifierProvider.future);
+        final cache = await ref.watch(cardCacheProvider.future);
         await cache.clearMemoryCache();
       }
 
@@ -782,7 +782,7 @@ class CardRepository extends _$CardRepository {
     // We'll use it to ensure the repository is properly initialized
     try {
       // Clear search cache to ensure fresh results
-      final cache = await ref.read(cardCacheNotifierProvider.future);
+      final cache = await ref.read(cardCacheProvider.future);
       try {
         await cache.clearSearchCache();
         talker.info('Search cache cleared');

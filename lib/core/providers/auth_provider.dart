@@ -134,11 +134,11 @@ class AuthNotifier extends Notifier<AuthState> implements Listenable {
   Future<void> _checkInitialAuthStatus() async {
     talker.debug('AuthNotifier: Checking initial auth status...');
     // Use the stream's current value if available, otherwise get current user directly
-    final initialUser = ref.read(firebaseUserProvider).valueOrNull ??
+    final firebaseUser = ref.read(firebaseUserProvider);
+    final initialUser = (firebaseUser.hasValue ? firebaseUser.value : null) ??
         FirebaseAuth.instance.currentUser;
     // Ensure reload happens if getting current user directly
-    if (initialUser != null &&
-        ref.read(firebaseUserProvider).valueOrNull == null) {
+    if (initialUser != null && !firebaseUser.hasValue) {
       try {
         await initialUser.reload();
         talker.debug("Initial user reloaded.");
@@ -157,10 +157,10 @@ class AuthNotifier extends Notifier<AuthState> implements Listenable {
 
     // Check for email update completion first
     if (user != null) {
-      final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+      final pendingEmail = ref.read(emailUpdateProvider).pendingEmail;
       if (pendingEmail != null && user.email == pendingEmail) {
         // Email has been verified and updated, clear the pending state
-        ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+        ref.read(emailUpdateProvider.notifier).clearPendingEmail();
         ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
         talker.info(
             'Detected email verification completion in AuthNotifier, cleared pending email state.');
@@ -307,7 +307,7 @@ class AuthNotifier extends Notifier<AuthState> implements Listenable {
       // Clear pending email if applicable - with safer state access
       String? pendingEmail;
       try {
-        pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+        pendingEmail = ref.read(emailUpdateProvider).pendingEmail;
       } catch (providerError) {
         talker.error('AuthNotifier (Sync): Error reading pending email state',
             providerError);
@@ -318,7 +318,7 @@ class AuthNotifier extends Notifier<AuthState> implements Listenable {
         talker.debug(
             'AuthNotifier (Sync): Detected user email matches pending email. Clearing pending state.');
         try {
-          ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+          ref.read(emailUpdateProvider.notifier).clearPendingEmail();
           // Also clear the original email stored for the lifecycle check
           ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
           talker.debug(
@@ -381,11 +381,11 @@ class AuthNotifier extends Notifier<AuthState> implements Listenable {
 
   void _handleSignOutCleanup() {
     talker.debug('AuthNotifier (Sync): Handling sign out cleanup.');
-    final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+    final pendingEmail = ref.read(emailUpdateProvider).pendingEmail;
     if (pendingEmail != null) {
       talker.debug(
           'AuthNotifier (Sync): Clearing pending email state due to sign out.');
-      ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+      ref.read(emailUpdateProvider.notifier).clearPendingEmail();
     }
     // **NEW:** Clear the original email stored for the lifecycle check on sign out
     ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
@@ -403,7 +403,7 @@ class AuthNotifier extends Notifier<AuthState> implements Listenable {
     if (shouldReset && ref.read(emailVerificationDetectedProvider)) {
       talker.debug(
           'AuthNotifier: Resetting emailVerificationDetectedProvider to false.');
-      ref.read(emailVerificationDetectedProvider.notifier).state = false;
+      ref.read(emailVerificationDetectedProvider.notifier).set(false);
     }
   }
 
@@ -522,8 +522,17 @@ final authStatusProvider = Provider<AuthStatus>((ref) {
   return authState.status;
 }, name: 'authStatusProvider');
 
-/// StateProvider to signal immediate verification detection by the checker (Keep as is)
-final emailVerificationDetectedProvider = StateProvider<bool>((ref) => false);
+/// Provider to signal immediate verification detection by the checker
+final emailVerificationDetectedProvider = NotifierProvider<EmailVerificationDetectedNotifier, bool>(
+  EmailVerificationDetectedNotifier.new,
+);
+
+class EmailVerificationDetectedNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool value) => state = value;
+}
 
 // --- Future Providers for Auth Actions (Invalidate new notifier) ---
 

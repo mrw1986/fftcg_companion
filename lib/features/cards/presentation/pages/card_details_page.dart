@@ -54,7 +54,7 @@ class _CardDetailsPageState extends ConsumerState<CardDetailsPage> {
 
   Future<void> _initializeCardList() async {
     // Get the current filtered card list
-    final filteredCards = await ref.read(filteredSearchNotifierProvider.future);
+    final filteredCards = await ref.read(filteredSearchProvider.future);
 
     if (mounted) {
       setState(() {

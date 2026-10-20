@@ -13,6 +13,8 @@ import 'package:fftcg_companion/features/collection/presentation/providers/colle
 // Import favorite/wishlist providers
 import 'package:fftcg_companion/features/cards/presentation/providers/favorites_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/wishlist_provider.dart';
+// Import collection search provider
+import 'package:fftcg_companion/features/collection/presentation/providers/collection_search_provider.dart';
 
 /// Repository provider
 final collectionRepositoryProvider = Provider<CollectionRepository>((ref) {
@@ -204,9 +206,20 @@ class CollectionSpecificFilterNotifier extends Notifier<Map<String, dynamic>> {
 // --- End Refactor ---
 
 /// Collection sort provider
-final collectionSortProvider = StateProvider<String>((ref) {
-  return 'lastModified';
+final collectionSortProvider = NotifierProvider<CollectionSortNotifier, String>(() {
+  return CollectionSortNotifier();
 });
+
+class CollectionSortNotifier extends Notifier<String> {
+  @override
+  String build() {
+    return 'lastModified'; // Default sort
+  }
+
+  void setSort(String sortValue) {
+    state = sortValue;
+  }
+}
 
 /// Filtered collection provider
 final filteredCollectionProvider = Provider<List<CollectionItem>>((ref) {
@@ -450,15 +463,11 @@ final filteredCollectionProvider = Provider<List<CollectionItem>>((ref) {
   );
 });
 
-/// Search query provider
-final collectionSearchQueryProvider = StateProvider<String>((ref) {
-  return '';
-});
-
 /// Card cache provider for collection search
 final collectionCardCacheProvider =
     FutureProvider<List<models.Card>>((ref) async {
-  final cardCache = ref.watch(cardCacheNotifierProvider).valueOrNull;
+  final cardCacheAsync = ref.watch(cardCacheProvider);
+  final cardCache = cardCacheAsync.asData?.value;
   if (cardCache == null) {
     return [];
   }

@@ -31,7 +31,7 @@ class CardPreferencesNotifier extends AsyncNotifier<UserCardPreferences> {
   Future<void> toggleFavorite(String cardId) async {
     try {
       // Start optimistic update
-      final currentState = state.valueOrNull;
+      final currentState = state.asData?.value;
       if (currentState == null) return;
 
       // Optimistically update UI
@@ -50,7 +50,7 @@ class CardPreferencesNotifier extends AsyncNotifier<UserCardPreferences> {
   Future<void> toggleWishlist(String cardId) async {
     try {
       // Start optimistic update
-      final currentState = state.valueOrNull;
+      final currentState = state.asData?.value;
       if (currentState == null) return;
 
       // Optimistically update UI

@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
-import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/card_content_provider.dart';
-import 'package:fftcg_companion/features/cards/presentation/providers/filtered_search_provider.dart';
-import 'package:fftcg_companion/features/cards/presentation/providers/search_provider.dart';
 
 class SortBottomSheet extends ConsumerWidget {
   const SortBottomSheet({super.key});
@@ -143,17 +140,12 @@ class SortBottomSheet extends ConsumerWidget {
           isCurrentField ? !currentFilters.sortDescending : false,
         );
 
-    // Apply the filters immediately
-    ref.read(cardsNotifierProvider.notifier).applyFilters(
-          ref.read(cardFilterProvider),
-        );
+    // Reactive approach: No need to manually apply filters
+    // The filteredCardsProvider and filteredSearchProvider watch cardFilterProvider
+    // and will automatically rebuild when the sort changes
 
-    // Check if we're currently searching
-    final searchQuery = ref.read(cardSearchQueryProvider);
-    if (searchQuery.isNotEmpty) {
-      // If searching, also invalidate the filtered search provider to apply the new sort
-      ref.invalidate(filteredSearchNotifierProvider);
-    }
+    // Reactive approach means no manual invalidation needed
+    // The filteredSearchProvider watches cardFilterProvider and will rebuild automatically
 
     // Close the bottom sheet
     Navigator.pop(context);

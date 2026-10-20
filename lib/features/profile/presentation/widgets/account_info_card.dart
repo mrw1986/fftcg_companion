@@ -101,7 +101,7 @@ class AccountInfoCard extends ConsumerWidget {
 
         // Clear the pending email after verification is detected
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+          ref.read(emailUpdateProvider.notifier).clearPendingEmail();
         });
       }
     });
@@ -177,7 +177,7 @@ class AccountInfoCard extends ConsumerWidget {
 
                           // Invalidate providers
                           ref.invalidate(authNotifierProvider);
-                          ref.invalidate(emailUpdateNotifierProvider);
+                          ref.invalidate(emailUpdateProvider);
                           ref.invalidate(emailUpdateCompletionProvider);
                           talker.debug(
                               'Providers invalidated after successful reload');

@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../shared/widgets/loading_indicator.dart';
-// Hide the incorrect search provider from this import
-import '../../domain/providers/collection_providers.dart'
-    hide collectionSearchQueryProvider; // Keep for collection data
+import '../../domain/providers/collection_providers.dart';
 // Import the new collection-specific view preferences provider
 import '../providers/collection_view_preferences_provider.dart';
 // Import the new collection-specific search provider

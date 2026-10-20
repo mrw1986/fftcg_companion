@@ -1,13 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Provider that stores and manages the user's wishlist cards
-final wishlistProvider = StateNotifierProvider<WishlistNotifier, List<String>>(
-  (ref) => WishlistNotifier(),
+final wishlistProvider = NotifierProvider<WishlistNotifier, List<String>>(
+  () => WishlistNotifier(),
 );
 
 /// Notifier class that handles wishlist card operations
-class WishlistNotifier extends StateNotifier<List<String>> {
-  WishlistNotifier() : super([]);
+class WishlistNotifier extends Notifier<List<String>> {
+  @override
+  List<String> build() {
+    return [];
+  }
 
   /// Toggle a card's wishlist status
   void toggleWishlist(String cardId) {

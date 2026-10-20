@@ -2,13 +2,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Provider that stores and manages the user's favorite cards
 final favoritesProvider =
-    StateNotifierProvider<FavoritesNotifier, List<String>>(
-  (ref) => FavoritesNotifier(),
+    NotifierProvider<FavoritesNotifier, List<String>>(
+  () => FavoritesNotifier(),
 );
 
 /// Notifier class that handles favorite card operations
-class FavoritesNotifier extends StateNotifier<List<String>> {
-  FavoritesNotifier() : super([]);
+class FavoritesNotifier extends Notifier<List<String>> {
+  @override
+  List<String> build() {
+    return [];
+  }
 
   /// Toggle a card's favorite status
   void toggleFavorite(String cardId) {

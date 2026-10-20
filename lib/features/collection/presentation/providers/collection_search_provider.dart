@@ -6,11 +6,11 @@ import 'package:fftcg_companion/core/utils/logger.dart'; // Import Logger
 
 // --- Refactored to NotifierProvider ---
 final collectionSearchQueryProvider =
-    NotifierProvider.autoDispose<CollectionSearchQueryNotifier, String>(() {
+    NotifierProvider<CollectionSearchQueryNotifier, String>(() {
   return CollectionSearchQueryNotifier();
 });
 
-class CollectionSearchQueryNotifier extends AutoDisposeNotifier<String> {
+class CollectionSearchQueryNotifier extends Notifier<String> {
   static const _boxName = 'settings';
   static const _queryKey = 'collection_search_query'; // Unique key
 
@@ -68,7 +68,7 @@ class CollectionSearchQueryNotifier extends AutoDisposeNotifier<String> {
 // Provider for the collection search query text controller
 // Updated to watch the NotifierProvider's state
 final collectionSearchControllerProvider =
-    StateProvider.autoDispose<TextEditingController>(
+    Provider.autoDispose<TextEditingController>(
   (ref) {
     // Initialize controller with the query from the NotifierProvider
     final initialQuery = ref.watch(collectionSearchQueryProvider);

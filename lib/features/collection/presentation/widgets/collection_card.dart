@@ -25,7 +25,7 @@ class CollectionCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final cardCacheAsync = ref.watch(cardCacheNotifierProvider);
+    final cardCacheAsync = ref.watch(cardCacheProvider);
 
     final titleStyle = switch (viewSize) {
       ViewSize.small => const TextStyle(

@@ -27,7 +27,7 @@ class CollectionItemDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cardCacheAsync = ref.watch(cardCacheNotifierProvider);
+    final cardCacheAsync = ref.watch(cardCacheProvider);
 
     // If we don't have the initial item, fetch it
     final itemAsync = initialItem != null

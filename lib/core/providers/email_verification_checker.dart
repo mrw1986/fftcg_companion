@@ -112,7 +112,7 @@ Future<bool> _checkEmailVerification(Ref ref) async {
     talker.debug(
         'Skipping verification check: User is null or already verified.');
     // Ensure the detected flag is false if already verified or no user
-    ref.read(emailVerificationDetectedProvider.notifier).state = false;
+    ref.read(emailVerificationDetectedProvider.notifier).set(false);
     return user?.emailVerified ??
         false; // Return true if verified, false if null
   }
@@ -122,7 +122,7 @@ Future<bool> _checkEmailVerification(Ref ref) async {
     talker.debug(
         'Skipping verification check: User does not have email/password provider.');
     // Ensure the detected flag is false if not applicable
-    ref.read(emailVerificationDetectedProvider.notifier).state = false;
+    ref.read(emailVerificationDetectedProvider.notifier).set(false);
     return false; // Not applicable for verification check
   }
 
@@ -156,7 +156,7 @@ Future<bool> _checkEmailVerification(Ref ref) async {
       }
 
       // **Set the immediate detection flag:** Signal to UI to hide banner.
-      ref.read(emailVerificationDetectedProvider.notifier).state = true;
+      ref.read(emailVerificationDetectedProvider.notifier).set(true);
       talker.debug('Set emailVerificationDetectedProvider to true.');
 
       // **KEEP INVALIDATION REMOVED:** Let the stream propagate naturally.
@@ -166,14 +166,14 @@ Future<bool> _checkEmailVerification(Ref ref) async {
     } else {
       talker.debug('Email still not verified.');
       // Ensure the detected flag is false if still not verified
-      ref.read(emailVerificationDetectedProvider.notifier).state = false;
+      ref.read(emailVerificationDetectedProvider.notifier).set(false);
       return false; // Indicate still not verified
     }
   } catch (e) {
     // Handle potential errors during reload or token fetching
     talker.error('Error checking email verification status', e);
     // Ensure the detected flag is false on error
-    ref.read(emailVerificationDetectedProvider.notifier).state = false;
+    ref.read(emailVerificationDetectedProvider.notifier).set(false);
     return false; // Assume not verified on error
   }
 }

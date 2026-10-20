@@ -3,9 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/core/providers/auth_provider.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
 
-/// State provider to track if we should skip auto-auth
+/// Provider to track if we should skip auto-auth
 /// This is used to prevent creating a new anonymous user after explicit sign-out
-final skipAutoAuthProvider = StateProvider<bool>((ref) => false);
+final skipAutoAuthProvider = NotifierProvider<SkipAutoAuthNotifier, bool>(
+  SkipAutoAuthNotifier.new,
+);
+
+class SkipAutoAuthNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool value) => state = value;
+}
 
 /// Provider that automatically signs in anonymously if the user is not already signed in
 final autoAuthProvider = Provider.autoDispose<void>((ref) {

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fftcg_companion/core/utils/logger.dart';
-import 'package:fftcg_companion/features/cards/presentation/providers/cards_provider.dart';
 import 'package:fftcg_companion/features/repositories.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/view_preferences_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/providers/search_provider.dart';
+import 'package:fftcg_companion/features/cards/presentation/providers/filter_provider.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/filter_dialog.dart';
 import 'package:fftcg_companion/features/cards/presentation/widgets/sort_bottom_sheet.dart';
 import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
@@ -50,7 +50,7 @@ class _CardsPageState extends ConsumerState<CardsPage>
   }
 
   void _prefetchInitialImages() async {
-    final cards = ref.read(cardsNotifierProvider).value;
+    final cards = ref.read(cardRepositoryProvider).value;
     if (cards != null && cards.isNotEmpty) {
       await ref
           .read(cardRepositoryProvider.notifier)
@@ -66,10 +66,9 @@ class _CardsPageState extends ConsumerState<CardsPage>
     if (result != null && mounted) {
       talker.debug('Applying filters from dialog: ${result.toString()}');
 
-      // Apply filters to both the cards provider and filtered search provider
-      await ref.read(cardsNotifierProvider.notifier).applyFilters(result);
-
-      // No need to explicitly call the filtered search provider as it watches the cards provider
+      // Reactively update filters - the filtered cards provider will automatically rebuild
+      // No method calls needed - just update the filter state and watchers respond
+      ref.read(cardFilterProvider.notifier).updateFilters(result);
     }
   }
 
@@ -160,7 +159,7 @@ class _CardsPageState extends ConsumerState<CardsPage>
       loading: () => const LoadingIndicator(),
       error: (error, stack) => ErrorView(
         message: error.toString(),
-        onRetry: () => ref.refresh(filteredSearchNotifierProvider),
+        onRetry: () => ref.invalidate(filteredSearchProvider),
       ),
     );
 
@@ -202,7 +201,12 @@ class _CardsPageState extends ConsumerState<CardsPage>
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.read(cardsNotifierProvider.notifier).refresh(),
+        onRefresh: () async {
+          // Reactive approach: invalidate the repository to trigger a rebuild
+          ref.invalidate(cardRepositoryProvider);
+          // Wait for the new data to load
+          await ref.read(cardRepositoryProvider.future);
+        },
         child: cardContentWidget,
       ),
     );

@@ -28,7 +28,7 @@ class PriceNotifier extends _$PriceNotifier {
 }
 
 @riverpod
-Stream<List<HistoricalPrice>> historicalPrices(ref, String cardId) {
+Stream<List<HistoricalPrice>> historicalPrices(Ref ref, String cardId) {
   return ref
       .watch(priceRepositoryProvider.notifier)
       .watchHistoricalPrices(cardId);

@@ -25,7 +25,20 @@ import 'package:fftcg_companion/features/profile/presentation/providers/email_up
 import 'package:fftcg_companion/core/providers/email_update_verification_checker.dart';
 
 // NEW: Provider to store the original email during the update process
-final originalEmailForUpdateCheckProvider = StateProvider<String>((ref) => '');
+final originalEmailForUpdateCheckProvider = NotifierProvider<OriginalEmailNotifier, String>(() {
+  return OriginalEmailNotifier();
+});
+
+class OriginalEmailNotifier extends Notifier<String> {
+  @override
+  String build() {
+    return '';
+  }
+
+  void setEmail(String email) {
+    state = email;
+  }
+}
 
 class AccountSettingsPage extends ConsumerStatefulWidget {
   const AccountSettingsPage({super.key});
@@ -130,7 +143,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
       String? pendingEmail;
       String originalEmail = '';
       try {
-        pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+        pendingEmail = ref.read(emailUpdateProvider).pendingEmail;
         originalEmail = ref.read(originalEmailForUpdateCheckProvider);
       } catch (e) {
         talker.error('Lifecycle Check: Error reading provider state', e);
@@ -189,8 +202,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
                 // Invalidate the main auth provider to trigger state update
                 ref.invalidate(authNotifierProvider);
                 // Reset the original email provider to prevent re-checking
-                ref.read(originalEmailForUpdateCheckProvider.notifier).state =
-                    '';
+                ref.read(originalEmailForUpdateCheckProvider.notifier).setEmail('');
                 talker.debug(
                     'Lifecycle Check: Reset originalEmailForUpdateCheckProvider.');
 
@@ -225,8 +237,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
               try {
                 ref.invalidate(authNotifierProvider);
                 // Reset the original email provider as the check failed
-                ref.read(originalEmailForUpdateCheckProvider.notifier).state =
-                    '';
+                ref.read(originalEmailForUpdateCheckProvider.notifier).setEmail('');
               } catch (stateError) {
                 talker.error(
                     'Lifecycle Check: Error clearing provider state after auth error',
@@ -291,7 +302,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
 
     // Store critical info in case we need to re-authenticate after token expiration
     final userEmail = user.email;
-    final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+    final pendingEmail = ref.read(emailUpdateProvider).pendingEmail;
     final originalEmail = ref.read(originalEmailForUpdateCheckProvider);
 
     bool emailChangeDetected = false;
@@ -329,10 +340,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
 
                   // Update states but don't invalidate auth provider yet
                   ref
-                      .read(emailUpdateNotifierProvider.notifier)
+                      .read(emailUpdateProvider.notifier)
                       .clearPendingEmail();
-                  ref.read(originalEmailForUpdateCheckProvider.notifier).state =
-                      '';
+                  ref.read(originalEmailForUpdateCheckProvider.notifier).setEmail('');
                 }
 
                 // Force token refresh (this may throw again but we'll catch it)
@@ -386,8 +396,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
         if (currentUser.email == pendingEmail) {
           talker.info(
               'Manual refresh: Detected email update completion, clearing pending email state');
-          ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
-          ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+          ref.read(emailUpdateProvider.notifier).clearPendingEmail();
+          ref.read(originalEmailForUpdateCheckProvider.notifier).setEmail('');
           emailChangeDetected = true;
         }
       }
@@ -444,8 +454,8 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
                     'Email verification may have completed. Please sign in again with your new email: $pendingEmail');
 
             // Clear pending email since we're notifying the user
-            ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
-            ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+            ref.read(emailUpdateProvider.notifier).clearPendingEmail();
+            ref.read(originalEmailForUpdateCheckProvider.notifier).setEmail('');
           }
           handled = true;
         }
@@ -545,15 +555,14 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
 
     try {
       // Store original email for lifecycle check
-      ref.read(originalEmailForUpdateCheckProvider.notifier).state =
-          originalEmail;
+      ref.read(originalEmailForUpdateCheckProvider.notifier).setEmail(originalEmail);
       talker.info('Stored original email for lifecycle check: $originalEmail');
 
       // Send verification email
       await ref.read(authServiceProvider).verifyBeforeUpdateEmail(newEmail);
 
       // Update pending email state
-      ref.read(emailUpdateNotifierProvider.notifier).setPendingEmail(newEmail);
+      ref.read(emailUpdateProvider.notifier).setPendingEmail(newEmail);
       talker.info('Verification email sent for email update.');
 
       // Start the email update verification checker
@@ -660,9 +669,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
 
     try {
       // **NEW:** Clear pending email state before signing out
-      ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+      ref.read(emailUpdateProvider.notifier).clearPendingEmail();
       // **NEW:** Clear original email state before signing out
-      ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+      ref.read(originalEmailForUpdateCheckProvider.notifier).setEmail('');
       await ref.read(authServiceProvider).signOut();
       // UI will update via provider watch
 
@@ -700,9 +709,9 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
     final rootContext = ref.read(rootNavigatorKeyProvider).currentContext;
 
     // **NEW:** Clear pending email state before signing out
-    ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+    ref.read(emailUpdateProvider.notifier).clearPendingEmail();
     // **NEW:** Clear original email state before signing out
-    ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
+    ref.read(originalEmailForUpdateCheckProvider.notifier).setEmail('');
 
     // Add mounted check before showing snackbar and navigating
     if (mounted && rootContext != null) {
@@ -1077,12 +1086,11 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
               );
           // **NEW:** Update the pending email provider on success
           ref
-              .read(emailUpdateNotifierProvider.notifier)
+              .read(emailUpdateProvider.notifier)
               .setPendingEmail(newEmail);
           // **NEW:** Store the original email for the lifecycle check
           if (originalEmail != null) {
-            ref.read(originalEmailForUpdateCheckProvider.notifier).state =
-                originalEmail;
+            ref.read(originalEmailForUpdateCheckProvider.notifier).setEmail(originalEmail);
             talker.info(
                 'Stored original email for lifecycle check (after re-auth): $originalEmail');
           } else {
@@ -1545,7 +1553,7 @@ class _AccountSettingsPageState extends ConsumerState<AccountSettingsPage>
     // **NEW:** Watch the immediate verification detection provider
     final verificationDetected = ref.watch(emailVerificationDetectedProvider);
     // **NEW:** Watch the pending email update provider
-    final emailUpdateState = ref.watch(emailUpdateNotifierProvider);
+    final emailUpdateState = ref.watch(emailUpdateProvider);
     final pendingEmail = emailUpdateState.pendingEmail;
 
     // Determine the user object to use for the UI

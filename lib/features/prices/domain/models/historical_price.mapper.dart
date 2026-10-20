@@ -1,5 +1,6 @@
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// dart format off
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, unnecessary_cast, override_on_non_overriding_member
 // ignore_for_file: strict_raw_type, inference_failure_on_untyped_parameter
@@ -22,19 +23,27 @@ class HistoricalPriceMapper extends ClassMapperBase<HistoricalPrice> {
   final String id = 'HistoricalPrice';
 
   static int _$productId(HistoricalPrice v) => v.productId;
-  static const Field<HistoricalPrice, int> _f$productId =
-      Field('productId', _$productId);
+  static const Field<HistoricalPrice, int> _f$productId = Field(
+    'productId',
+    _$productId,
+  );
   static String _$groupId(HistoricalPrice v) => v.groupId;
-  static const Field<HistoricalPrice, String> _f$groupId =
-      Field('groupId', _$groupId);
+  static const Field<HistoricalPrice, String> _f$groupId = Field(
+    'groupId',
+    _$groupId,
+  );
   static DateTime _$date(HistoricalPrice v) => v.date;
   static const Field<HistoricalPrice, DateTime> _f$date = Field('date', _$date);
   static HistoricalPriceData _$normal(HistoricalPrice v) => v.normal;
-  static const Field<HistoricalPrice, HistoricalPriceData> _f$normal =
-      Field('normal', _$normal);
+  static const Field<HistoricalPrice, HistoricalPriceData> _f$normal = Field(
+    'normal',
+    _$normal,
+  );
   static HistoricalPriceData _$foil(HistoricalPrice v) => v.foil;
-  static const Field<HistoricalPrice, HistoricalPriceData> _f$foil =
-      Field('foil', _$foil);
+  static const Field<HistoricalPrice, HistoricalPriceData> _f$foil = Field(
+    'foil',
+    _$foil,
+  );
 
   @override
   final MappableFields<HistoricalPrice> fields = const {
@@ -47,11 +56,12 @@ class HistoricalPriceMapper extends ClassMapperBase<HistoricalPrice> {
 
   static HistoricalPrice _instantiate(DecodingData data) {
     return HistoricalPrice(
-        productId: data.dec(_f$productId),
-        groupId: data.dec(_f$groupId),
-        date: data.dec(_f$date),
-        normal: data.dec(_f$normal),
-        foil: data.dec(_f$foil));
+      productId: data.dec(_f$productId),
+      groupId: data.dec(_f$groupId),
+      date: data.dec(_f$date),
+      normal: data.dec(_f$normal),
+      foil: data.dec(_f$foil),
+    );
   }
 
   @override
@@ -73,30 +83,38 @@ mixin HistoricalPriceMappable {
   }
 
   Map<String, dynamic> toMap() {
-    return HistoricalPriceMapper.ensureInitialized()
-        .encodeMap<HistoricalPrice>(this as HistoricalPrice);
+    return HistoricalPriceMapper.ensureInitialized().encodeMap<HistoricalPrice>(
+      this as HistoricalPrice,
+    );
   }
 
   HistoricalPriceCopyWith<HistoricalPrice, HistoricalPrice, HistoricalPrice>
-      get copyWith =>
-          _HistoricalPriceCopyWithImpl<HistoricalPrice, HistoricalPrice>(
-              this as HistoricalPrice, $identity, $identity);
+  get copyWith =>
+      _HistoricalPriceCopyWithImpl<HistoricalPrice, HistoricalPrice>(
+        this as HistoricalPrice,
+        $identity,
+        $identity,
+      );
   @override
   String toString() {
-    return HistoricalPriceMapper.ensureInitialized()
-        .stringifyValue(this as HistoricalPrice);
+    return HistoricalPriceMapper.ensureInitialized().stringifyValue(
+      this as HistoricalPrice,
+    );
   }
 
   @override
   bool operator ==(Object other) {
-    return HistoricalPriceMapper.ensureInitialized()
-        .equalsValue(this as HistoricalPrice, other);
+    return HistoricalPriceMapper.ensureInitialized().equalsValue(
+      this as HistoricalPrice,
+      other,
+    );
   }
 
   @override
   int get hashCode {
-    return HistoricalPriceMapper.ensureInitialized()
-        .hashValue(this as HistoricalPrice);
+    return HistoricalPriceMapper.ensureInitialized().hashValue(
+      this as HistoricalPrice,
+    );
   }
 }
 
@@ -109,17 +127,19 @@ extension HistoricalPriceValueCopy<$R, $Out>
 abstract class HistoricalPriceCopyWith<$R, $In extends HistoricalPrice, $Out>
     implements ClassCopyWith<$R, $In, $Out> {
   HistoricalPriceDataCopyWith<$R, HistoricalPriceData, HistoricalPriceData>
-      get normal;
+  get normal;
   HistoricalPriceDataCopyWith<$R, HistoricalPriceData, HistoricalPriceData>
-      get foil;
-  $R call(
-      {int? productId,
-      String? groupId,
-      DateTime? date,
-      HistoricalPriceData? normal,
-      HistoricalPriceData? foil});
+  get foil;
+  $R call({
+    int? productId,
+    String? groupId,
+    DateTime? date,
+    HistoricalPriceData? normal,
+    HistoricalPriceData? foil,
+  });
   HistoricalPriceCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(
-      Then<$Out2, $R2> t);
+    Then<$Out2, $R2> t,
+  );
 }
 
 class _HistoricalPriceCopyWithImpl<$R, $Out>
@@ -132,36 +152,39 @@ class _HistoricalPriceCopyWithImpl<$R, $Out>
       HistoricalPriceMapper.ensureInitialized();
   @override
   HistoricalPriceDataCopyWith<$R, HistoricalPriceData, HistoricalPriceData>
-      get normal => $value.normal.copyWith.$chain((v) => call(normal: v));
+  get normal => $value.normal.copyWith.$chain((v) => call(normal: v));
   @override
   HistoricalPriceDataCopyWith<$R, HistoricalPriceData, HistoricalPriceData>
-      get foil => $value.foil.copyWith.$chain((v) => call(foil: v));
+  get foil => $value.foil.copyWith.$chain((v) => call(foil: v));
   @override
-  $R call(
-          {int? productId,
-          String? groupId,
-          DateTime? date,
-          HistoricalPriceData? normal,
-          HistoricalPriceData? foil}) =>
-      $apply(FieldCopyWithData({
-        if (productId != null) #productId: productId,
-        if (groupId != null) #groupId: groupId,
-        if (date != null) #date: date,
-        if (normal != null) #normal: normal,
-        if (foil != null) #foil: foil
-      }));
+  $R call({
+    int? productId,
+    String? groupId,
+    DateTime? date,
+    HistoricalPriceData? normal,
+    HistoricalPriceData? foil,
+  }) => $apply(
+    FieldCopyWithData({
+      if (productId != null) #productId: productId,
+      if (groupId != null) #groupId: groupId,
+      if (date != null) #date: date,
+      if (normal != null) #normal: normal,
+      if (foil != null) #foil: foil,
+    }),
+  );
   @override
   HistoricalPrice $make(CopyWithData data) => HistoricalPrice(
-      productId: data.get(#productId, or: $value.productId),
-      groupId: data.get(#groupId, or: $value.groupId),
-      date: data.get(#date, or: $value.date),
-      normal: data.get(#normal, or: $value.normal),
-      foil: data.get(#foil, or: $value.foil));
+    productId: data.get(#productId, or: $value.productId),
+    groupId: data.get(#groupId, or: $value.groupId),
+    date: data.get(#date, or: $value.date),
+    normal: data.get(#normal, or: $value.normal),
+    foil: data.get(#foil, or: $value.foil),
+  );
 
   @override
   HistoricalPriceCopyWith<$R2, HistoricalPrice, $Out2> $chain<$R2, $Out2>(
-          Then<$Out2, $R2> t) =>
-      _HistoricalPriceCopyWithImpl<$R2, $Out2>($value, $cast, t);
+    Then<$Out2, $R2> t,
+  ) => _HistoricalPriceCopyWithImpl<$R2, $Out2>($value, $cast, t);
 }
 
 class HistoricalPriceDataMapper extends ClassMapperBase<HistoricalPriceData> {
@@ -179,13 +202,14 @@ class HistoricalPriceDataMapper extends ClassMapperBase<HistoricalPriceData> {
   final String id = 'HistoricalPriceData';
 
   static double? _$low(HistoricalPriceData v) => v.low;
-  static const Field<HistoricalPriceData, double> _f$low =
-      Field('low', _$low, opt: true);
+  static const Field<HistoricalPriceData, double> _f$low = Field(
+    'low',
+    _$low,
+    opt: true,
+  );
 
   @override
-  final MappableFields<HistoricalPriceData> fields = const {
-    #low: _f$low,
-  };
+  final MappableFields<HistoricalPriceData> fields = const {#low: _f$low};
 
   static HistoricalPriceData _instantiate(DecodingData data) {
     return HistoricalPriceData(low: data.dec(_f$low));
@@ -214,41 +238,57 @@ mixin HistoricalPriceDataMappable {
         .encodeMap<HistoricalPriceData>(this as HistoricalPriceData);
   }
 
-  HistoricalPriceDataCopyWith<HistoricalPriceData, HistoricalPriceData,
-      HistoricalPriceData> get copyWith => _HistoricalPriceDataCopyWithImpl<
-          HistoricalPriceData, HistoricalPriceData>(
-      this as HistoricalPriceData, $identity, $identity);
+  HistoricalPriceDataCopyWith<
+    HistoricalPriceData,
+    HistoricalPriceData,
+    HistoricalPriceData
+  >
+  get copyWith =>
+      _HistoricalPriceDataCopyWithImpl<
+        HistoricalPriceData,
+        HistoricalPriceData
+      >(this as HistoricalPriceData, $identity, $identity);
   @override
   String toString() {
-    return HistoricalPriceDataMapper.ensureInitialized()
-        .stringifyValue(this as HistoricalPriceData);
+    return HistoricalPriceDataMapper.ensureInitialized().stringifyValue(
+      this as HistoricalPriceData,
+    );
   }
 
   @override
   bool operator ==(Object other) {
-    return HistoricalPriceDataMapper.ensureInitialized()
-        .equalsValue(this as HistoricalPriceData, other);
+    return HistoricalPriceDataMapper.ensureInitialized().equalsValue(
+      this as HistoricalPriceData,
+      other,
+    );
   }
 
   @override
   int get hashCode {
-    return HistoricalPriceDataMapper.ensureInitialized()
-        .hashValue(this as HistoricalPriceData);
+    return HistoricalPriceDataMapper.ensureInitialized().hashValue(
+      this as HistoricalPriceData,
+    );
   }
 }
 
 extension HistoricalPriceDataValueCopy<$R, $Out>
     on ObjectCopyWith<$R, HistoricalPriceData, $Out> {
   HistoricalPriceDataCopyWith<$R, HistoricalPriceData, $Out>
-      get $asHistoricalPriceData => $base.as(
-          (v, t, t2) => _HistoricalPriceDataCopyWithImpl<$R, $Out>(v, t, t2));
+  get $asHistoricalPriceData => $base.as(
+    (v, t, t2) => _HistoricalPriceDataCopyWithImpl<$R, $Out>(v, t, t2),
+  );
 }
 
-abstract class HistoricalPriceDataCopyWith<$R, $In extends HistoricalPriceData,
-    $Out> implements ClassCopyWith<$R, $In, $Out> {
+abstract class HistoricalPriceDataCopyWith<
+  $R,
+  $In extends HistoricalPriceData,
+  $Out
+>
+    implements ClassCopyWith<$R, $In, $Out> {
   $R call({double? low});
   HistoricalPriceDataCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(
-      Then<$Out2, $R2> t);
+    Then<$Out2, $R2> t,
+  );
 }
 
 class _HistoricalPriceDataCopyWithImpl<$R, $Out>
@@ -268,6 +308,7 @@ class _HistoricalPriceDataCopyWithImpl<$R, $Out>
 
   @override
   HistoricalPriceDataCopyWith<$R2, HistoricalPriceData, $Out2>
-      $chain<$R2, $Out2>(Then<$Out2, $R2> t) =>
-          _HistoricalPriceDataCopyWithImpl<$R2, $Out2>($value, $cast, t);
+  $chain<$R2, $Out2>(Then<$Out2, $R2> t) =>
+      _HistoricalPriceDataCopyWithImpl<$R2, $Out2>($value, $cast, t);
 }
+

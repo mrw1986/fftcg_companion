@@ -18,7 +18,7 @@ class EmailUpdateCompletionNotifier extends Notifier<bool> {
   bool build() {
     // Watch auth state and pending email
     ref.watch(authNotifierProvider);
-    ref.watch(emailUpdateNotifierProvider);
+    ref.watch(emailUpdateProvider);
 
     // Set up listener for auth state changes
     ref.listen(authNotifierProvider, (previous, next) {
@@ -40,7 +40,7 @@ class EmailUpdateCompletionNotifier extends Notifier<bool> {
     if (!wasVerified && isVerified) {
       talker.info('Email verification detected! Setting verified flag.');
       // Use the provider from auth_provider.dart
-      ref.read(emailVerificationDetectedProvider.notifier).update((_) => true);
+      ref.read(emailVerificationDetectedProvider.notifier).set(true);
     }
 
     // Safely retrieve pending email with error handling
@@ -49,7 +49,7 @@ class EmailUpdateCompletionNotifier extends Notifier<bool> {
 
     // Error boundary for provider state access
     try {
-      final emailUpdateState = ref.read(emailUpdateNotifierProvider);
+      final emailUpdateState = ref.read(emailUpdateProvider);
       pendingEmail = emailUpdateState.pendingEmail;
       originalEmail = ref.read(originalEmailForUpdateCheckProvider);
     } catch (e) {
@@ -71,7 +71,7 @@ class EmailUpdateCompletionNotifier extends Notifier<bool> {
     if (user == null && (pendingEmail != null || originalEmail.isNotEmpty)) {
       talker.info('User signed out during email update, clearing states');
       try {
-        ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+        ref.read(emailUpdateProvider.notifier).clearPendingEmail();
         ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
         state = false; // Reset completion state in our Notifier
       } catch (e) {
@@ -155,7 +155,7 @@ class EmailUpdateCompletionNotifier extends Notifier<bool> {
             // Clear states since we can't verify
             try {
               ref
-                  .read(emailUpdateNotifierProvider.notifier)
+                  .read(emailUpdateProvider.notifier)
                   .clearPendingEmail();
               ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
               state = false; // Reset completion state
@@ -183,7 +183,7 @@ class EmailUpdateCompletionNotifier extends Notifier<bool> {
             // Use the provider from auth_provider.dart
             ref
                 .read(emailVerificationDetectedProvider.notifier)
-                .update((_) => true);
+                .set(true);
           }
 
           // Check if email changed from original
@@ -224,7 +224,7 @@ class EmailUpdateCompletionNotifier extends Notifier<bool> {
               .warning('User is null after reload - session may have expired');
           // Clear states since we can't verify
           try {
-            ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+            ref.read(emailUpdateProvider.notifier).clearPendingEmail();
             ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
             state = false; // Reset completion state
           } catch (e) {
@@ -240,7 +240,7 @@ class EmailUpdateCompletionNotifier extends Notifier<bool> {
           talker.warning('User token expired during email update check');
           // Clear states since we can't verify
           try {
-            ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+            ref.read(emailUpdateProvider.notifier).clearPendingEmail();
             ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
             state = false; // Reset completion state
           } catch (stateError) {
@@ -264,7 +264,7 @@ class EmailUpdateCompletionNotifier extends Notifier<bool> {
 
     try {
       // Clear states since update is complete
-      ref.read(emailUpdateNotifierProvider.notifier).clearPendingEmail();
+      ref.read(emailUpdateProvider.notifier).clearPendingEmail();
       ref.read(originalEmailForUpdateCheckProvider.notifier).state = '';
 
       // Force auth state refresh

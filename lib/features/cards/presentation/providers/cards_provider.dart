@@ -150,7 +150,7 @@ class CardSearchNotifier extends _$CardSearchNotifier {
       state = const AsyncLoading();
 
       // Clear any existing search cache for this query to ensure fresh results
-      final cardCache = await ref.read(cardCacheNotifierProvider.future);
+      final cardCache = await ref.read(cardCacheProvider.future);
       await cardCache.clearSearchCache();
     }
 
@@ -213,7 +213,4 @@ class CardSearchNotifier extends _$CardSearchNotifier {
 }
 
 // Convenience provider that uses the notifier
-@riverpod
-Future<List<models.Card>> cardSearch(ref, String query) async {
-  return ref.watch(cardSearchNotifierProvider(query).future);
-}
+// Removed to avoid duplicate provider name - use cardSearchProvider directly instead

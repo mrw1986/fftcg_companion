@@ -26,7 +26,7 @@ class CollectionListItem extends ConsumerWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
-    final cardCacheAsync = ref.watch(cardCacheNotifierProvider);
+    final cardCacheAsync = ref.watch(cardCacheProvider);
 
     // Calculate dimensions based on view size
     final double height = switch (viewSize) {

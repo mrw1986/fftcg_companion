@@ -6,22 +6,18 @@ import 'package:fftcg_companion/core/utils/logger.dart';
 
 // Renamed provider for Collection page
 final collectionFilterProvider =
-    StateNotifierProvider<CollectionFilterNotifier, CardFilters>((ref) {
-  // Load initial state from persistence
-  return CollectionFilterNotifier._loadInitial();
+    NotifierProvider<CollectionFilterNotifier, CardFilters>(() {
+  return CollectionFilterNotifier();
 });
 
 // Renamed notifier for Collection page
-class CollectionFilterNotifier extends StateNotifier<CardFilters> {
+class CollectionFilterNotifier extends Notifier<CardFilters> {
   static const _boxName = 'settings';
   static const _filtersKey =
       'collection_filters'; // Unique key for collection filters
 
-  // Private constructor used by the factory - FIXED use_super_parameters
-  CollectionFilterNotifier._(super.initialState);
-
-  // Factory constructor to load initial state
-  factory CollectionFilterNotifier._loadInitial() {
+  @override
+  CardFilters build() {
     try {
       if (!Hive.isBoxOpen(_boxName)) {
         Hive.openBox(_boxName); // Consider async open if issues arise
@@ -32,16 +28,14 @@ class CollectionFilterNotifier extends StateNotifier<CardFilters> {
       if (savedData is Map) {
         talker.debug('Loading saved collection filters from Hive.');
         // Use dart_mappable to deserialize
-        return CollectionFilterNotifier._(
-            CardFiltersMapper.fromMap(Map<String, dynamic>.from(savedData)));
+        return CardFiltersMapper.fromMap(Map<String, dynamic>.from(savedData));
       } else {
         talker.debug('No saved collection filters found, using defaults.');
-        return CollectionFilterNotifier._(const CardFilters());
+        return const CardFilters();
       }
     } catch (e, stack) {
       talker.error('Error loading collection filters from Hive', e, stack);
-      return CollectionFilterNotifier._(
-          const CardFilters()); // Fallback to default
+      return const CardFilters(); // Fallback to default
     }
   }
 

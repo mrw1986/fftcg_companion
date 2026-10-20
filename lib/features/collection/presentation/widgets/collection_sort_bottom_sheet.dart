@@ -172,7 +172,7 @@ class _CollectionSortBottomSheetState
 
     // Update the sort provider with the new field and direction
     final sortValue = _isDescending ? '$field:desc' : field;
-    ref.read(collectionSortProvider.notifier).state = sortValue;
+    ref.read(collectionSortProvider.notifier).setSort(sortValue);
 
     // Close the bottom sheet
     Navigator.pop(context);

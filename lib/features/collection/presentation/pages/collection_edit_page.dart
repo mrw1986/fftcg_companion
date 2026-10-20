@@ -153,7 +153,7 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isEditing = widget.existingItem != null;
-    final cardCacheAsync = ref.watch(cardCacheNotifierProvider);
+    final cardCacheAsync = ref.watch(cardCacheProvider);
 
     return Scaffold(
       floatingActionButton: !_isSearching && _selectedCardId != null
@@ -227,7 +227,7 @@ class _CollectionEditPageState extends ConsumerState<CollectionEditPage> {
   }
 
   Widget _buildSearchResults() {
-    final searchResults = ref.watch(filteredSearchNotifierProvider);
+    final searchResults = ref.watch(filteredSearchProvider);
 
     return searchResults.when(
       data: (cards) {

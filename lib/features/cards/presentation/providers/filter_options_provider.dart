@@ -11,9 +11,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 part 'filter_options_provider.g.dart';
 part 'filter_options_provider.mapper.dart'; // Updated part directive
 
-// Generated provider
-final cardCacheProvider = cardCacheNotifierProvider;
-
 // Mappable Enum needs annotation
 @MappableEnum()
 enum SetCategory {

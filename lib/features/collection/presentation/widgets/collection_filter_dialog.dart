@@ -26,7 +26,7 @@ class CollectionFilterDialog extends ConsumerWidget {
     // Trigger prefetch of filter options
     ref.watch(prefetchFilterOptionsProvider);
 
-    final filterOptions = ref.watch(filterOptionsNotifierProvider);
+    final filterOptions = ref.watch(filterOptionsProvider);
     // Watch the shared card filters provider for the collection view
     final cardsFilters = ref.watch(collectionFilterProvider);
     // Watch the collection-specific filters provider
@@ -403,7 +403,7 @@ class CollectionFilterDialog extends ConsumerWidget {
     Map<String, dynamic> collectionSpecificFilters, // Use specific filters map
   ) {
     return DropdownButtonFormField<String?>(
-      value: collectionSpecificFilters['gradingCompany'],
+      initialValue: collectionSpecificFilters['gradingCompany'],
       decoration: InputDecoration(
         labelText: 'Grading Company',
         border: OutlineInputBorder(
@@ -562,7 +562,7 @@ class CollectionFilterDialog extends ConsumerWidget {
     ColorScheme colorScheme,
   ) {
     final filterOptionsNotifier =
-        ref.watch(filterOptionsNotifierProvider.notifier);
+        ref.watch(filterOptionsProvider.notifier);
     final groupedSets = filterOptionsNotifier.getGroupedSets();
 
     // Check if any sets are selected
@@ -610,7 +610,7 @@ class CollectionFilterDialog extends ConsumerWidget {
     ColorScheme colorScheme,
   ) {
     final filterOptionsNotifier =
-        ref.watch(filterOptionsNotifierProvider.notifier);
+        ref.watch(filterOptionsProvider.notifier);
 
     // Check if any sets from this category are selected
     final hasSelectedSetsInCategory =

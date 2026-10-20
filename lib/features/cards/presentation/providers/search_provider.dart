@@ -6,11 +6,11 @@ import 'package:fftcg_companion/core/utils/logger.dart'; // Import Logger
 
 // --- Refactored to NotifierProvider ---
 final cardSearchQueryProvider =
-    NotifierProvider.autoDispose<CardSearchQueryNotifier, String>(() {
+    NotifierProvider<CardSearchQueryNotifier, String>(() {
   return CardSearchQueryNotifier();
 });
 
-class CardSearchQueryNotifier extends AutoDisposeNotifier<String> {
+class CardSearchQueryNotifier extends Notifier<String> {
   static const _boxName = 'settings';
   static const _queryKey = 'card_search_query'; // Unique key
 
@@ -65,7 +65,7 @@ class CardSearchQueryNotifier extends AutoDisposeNotifier<String> {
 
 // Provider for the Cards page search query text controller
 final cardSearchControllerProvider =
-    StateProvider.autoDispose<TextEditingController>(
+    Provider.autoDispose<TextEditingController>(
   (ref) {
     // Initialize controller without watching the query to avoid recreation
     final controller = TextEditingController();

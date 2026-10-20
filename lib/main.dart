@@ -48,16 +48,16 @@ Future<void> initializeApp() async {
     // Initialize Firebase App Check
     await FirebaseAppCheck.instance.activate(
       // Web provider using reCAPTCHA v3 for web platform security
-      webProvider: ReCaptchaV3Provider(
+      providerWeb: ReCaptchaV3Provider(
         const String.fromEnvironment(
           'FIREBASE_RECAPTCHA_V3_SITE_KEY',
           defaultValue: 'YOUR_RECAPTCHA_V3_SITE_KEY', // Replace with actual key
         ),
       ),
       // Default provider for Android is Play Integrity.
-      androidProvider: AndroidProvider.playIntegrity,
-      // Default provider for Apple platforms is App Attest.
-      appleProvider: AppleProvider.appAttestWithDeviceCheckFallback,
+      providerAndroid: AndroidPlayIntegrityProvider(),
+      // Default provider for Apple platforms is App Attest with Device Check fallback.
+      providerApple: AppleAppAttestWithDeviceCheckFallbackProvider(),
     );
     talker.debug('Firebase App Check activated');
     // Initialize CachePersistence

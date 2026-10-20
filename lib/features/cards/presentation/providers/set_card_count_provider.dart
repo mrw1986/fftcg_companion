@@ -287,13 +287,13 @@ class FilteredSetCardCountCache extends _$FilteredSetCardCountCache {
 
 /// Provider to preload all set counts during app initialization
 @riverpod
-Future<void> preloadSetCounts(ref) async {
+Future<void> preloadSetCounts(Ref ref) async {
   try {
     // Initialize the persistent cache
     await SetCardCountsCache.initialize();
 
     // Get all set IDs from filter options
-    final filterOptions = await ref.watch(filterOptionsNotifierProvider.future);
+    final filterOptions = await ref.watch(filterOptionsProvider.future);
     final allSetIds = filterOptions.set.toList();
 
     // Preload counts for each set individually

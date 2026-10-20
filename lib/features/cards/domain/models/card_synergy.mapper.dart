@@ -1,5 +1,6 @@
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// dart format off
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, unnecessary_cast, override_on_non_overriding_member
 // ignore_for_file: strict_raw_type, inference_failure_on_untyped_parameter
@@ -83,20 +84,31 @@ class CardSynergyMapper extends ClassMapperBase<CardSynergy> {
   final String id = 'CardSynergy';
 
   static String _$sourceCardId(CardSynergy v) => v.sourceCardId;
-  static const Field<CardSynergy, String> _f$sourceCardId =
-      Field('sourceCardId', _$sourceCardId);
+  static const Field<CardSynergy, String> _f$sourceCardId = Field(
+    'sourceCardId',
+    _$sourceCardId,
+  );
   static String _$targetCardId(CardSynergy v) => v.targetCardId;
-  static const Field<CardSynergy, String> _f$targetCardId =
-      Field('targetCardId', _$targetCardId);
+  static const Field<CardSynergy, String> _f$targetCardId = Field(
+    'targetCardId',
+    _$targetCardId,
+  );
   static String _$synergyType(CardSynergy v) => v.synergyType;
-  static const Field<CardSynergy, String> _f$synergyType =
-      Field('synergyType', _$synergyType);
+  static const Field<CardSynergy, String> _f$synergyType = Field(
+    'synergyType',
+    _$synergyType,
+  );
   static double _$synergyStrength(CardSynergy v) => v.synergyStrength;
-  static const Field<CardSynergy, double> _f$synergyStrength =
-      Field('synergyStrength', _$synergyStrength);
+  static const Field<CardSynergy, double> _f$synergyStrength = Field(
+    'synergyStrength',
+    _$synergyStrength,
+  );
   static String? _$description(CardSynergy v) => v.description;
-  static const Field<CardSynergy, String> _f$description =
-      Field('description', _$description, opt: true);
+  static const Field<CardSynergy, String> _f$description = Field(
+    'description',
+    _$description,
+    opt: true,
+  );
 
   @override
   final MappableFields<CardSynergy> fields = const {
@@ -109,11 +121,12 @@ class CardSynergyMapper extends ClassMapperBase<CardSynergy> {
 
   static CardSynergy _instantiate(DecodingData data) {
     return CardSynergy(
-        sourceCardId: data.dec(_f$sourceCardId),
-        targetCardId: data.dec(_f$targetCardId),
-        synergyType: data.dec(_f$synergyType),
-        synergyStrength: data.dec(_f$synergyStrength),
-        description: data.dec(_f$description));
+      sourceCardId: data.dec(_f$sourceCardId),
+      targetCardId: data.dec(_f$targetCardId),
+      synergyType: data.dec(_f$synergyType),
+      synergyStrength: data.dec(_f$synergyStrength),
+      description: data.dec(_f$description),
+    );
   }
 
   @override
@@ -130,28 +143,36 @@ class CardSynergyMapper extends ClassMapperBase<CardSynergy> {
 
 mixin CardSynergyMappable {
   String toJson() {
-    return CardSynergyMapper.ensureInitialized()
-        .encodeJson<CardSynergy>(this as CardSynergy);
+    return CardSynergyMapper.ensureInitialized().encodeJson<CardSynergy>(
+      this as CardSynergy,
+    );
   }
 
   Map<String, dynamic> toMap() {
-    return CardSynergyMapper.ensureInitialized()
-        .encodeMap<CardSynergy>(this as CardSynergy);
+    return CardSynergyMapper.ensureInitialized().encodeMap<CardSynergy>(
+      this as CardSynergy,
+    );
   }
 
   CardSynergyCopyWith<CardSynergy, CardSynergy, CardSynergy> get copyWith =>
       _CardSynergyCopyWithImpl<CardSynergy, CardSynergy>(
-          this as CardSynergy, $identity, $identity);
+        this as CardSynergy,
+        $identity,
+        $identity,
+      );
   @override
   String toString() {
-    return CardSynergyMapper.ensureInitialized()
-        .stringifyValue(this as CardSynergy);
+    return CardSynergyMapper.ensureInitialized().stringifyValue(
+      this as CardSynergy,
+    );
   }
 
   @override
   bool operator ==(Object other) {
-    return CardSynergyMapper.ensureInitialized()
-        .equalsValue(this as CardSynergy, other);
+    return CardSynergyMapper.ensureInitialized().equalsValue(
+      this as CardSynergy,
+      other,
+    );
   }
 
   @override
@@ -168,12 +189,13 @@ extension CardSynergyValueCopy<$R, $Out>
 
 abstract class CardSynergyCopyWith<$R, $In extends CardSynergy, $Out>
     implements ClassCopyWith<$R, $In, $Out> {
-  $R call(
-      {String? sourceCardId,
-      String? targetCardId,
-      String? synergyType,
-      double? synergyStrength,
-      String? description});
+  $R call({
+    String? sourceCardId,
+    String? targetCardId,
+    String? synergyType,
+    double? synergyStrength,
+    String? description,
+  });
   CardSynergyCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
 
@@ -186,29 +208,33 @@ class _CardSynergyCopyWithImpl<$R, $Out>
   late final ClassMapperBase<CardSynergy> $mapper =
       CardSynergyMapper.ensureInitialized();
   @override
-  $R call(
-          {String? sourceCardId,
-          String? targetCardId,
-          String? synergyType,
-          double? synergyStrength,
-          Object? description = $none}) =>
-      $apply(FieldCopyWithData({
-        if (sourceCardId != null) #sourceCardId: sourceCardId,
-        if (targetCardId != null) #targetCardId: targetCardId,
-        if (synergyType != null) #synergyType: synergyType,
-        if (synergyStrength != null) #synergyStrength: synergyStrength,
-        if (description != $none) #description: description
-      }));
+  $R call({
+    String? sourceCardId,
+    String? targetCardId,
+    String? synergyType,
+    double? synergyStrength,
+    Object? description = $none,
+  }) => $apply(
+    FieldCopyWithData({
+      if (sourceCardId != null) #sourceCardId: sourceCardId,
+      if (targetCardId != null) #targetCardId: targetCardId,
+      if (synergyType != null) #synergyType: synergyType,
+      if (synergyStrength != null) #synergyStrength: synergyStrength,
+      if (description != $none) #description: description,
+    }),
+  );
   @override
   CardSynergy $make(CopyWithData data) => CardSynergy(
-      sourceCardId: data.get(#sourceCardId, or: $value.sourceCardId),
-      targetCardId: data.get(#targetCardId, or: $value.targetCardId),
-      synergyType: data.get(#synergyType, or: $value.synergyType),
-      synergyStrength: data.get(#synergyStrength, or: $value.synergyStrength),
-      description: data.get(#description, or: $value.description));
+    sourceCardId: data.get(#sourceCardId, or: $value.sourceCardId),
+    targetCardId: data.get(#targetCardId, or: $value.targetCardId),
+    synergyType: data.get(#synergyType, or: $value.synergyType),
+    synergyStrength: data.get(#synergyStrength, or: $value.synergyStrength),
+    description: data.get(#description, or: $value.description),
+  );
 
   @override
   CardSynergyCopyWith<$R2, CardSynergy, $Out2> $chain<$R2, $Out2>(
-          Then<$Out2, $R2> t) =>
-      _CardSynergyCopyWithImpl<$R2, $Out2>($value, $cast, t);
+    Then<$Out2, $R2> t,
+  ) => _CardSynergyCopyWithImpl<$R2, $Out2>($value, $cast, t);
 }
+

@@ -6,21 +6,17 @@ import 'package:fftcg_companion/core/utils/logger.dart';
 
 // Renamed provider for Cards page
 final cardFilterProvider =
-    StateNotifierProvider<CardFilterNotifier, CardFilters>((ref) {
-  // Load initial state from persistence
-  return CardFilterNotifier._loadInitial();
+    NotifierProvider<CardFilterNotifier, CardFilters>(() {
+  return CardFilterNotifier();
 });
 
 // Renamed notifier for Cards page
-class CardFilterNotifier extends StateNotifier<CardFilters> {
+class CardFilterNotifier extends Notifier<CardFilters> {
   static const _boxName = 'settings';
   static const _filtersKey = 'card_filters'; // Unique key for card filters
 
-  // Private constructor used by the factory - FIXED use_super_parameters
-  CardFilterNotifier._(super.initialState);
-
-  // Factory constructor to load initial state
-  factory CardFilterNotifier._loadInitial() {
+  @override
+  CardFilters build() {
     try {
       if (!Hive.isBoxOpen(_boxName)) {
         // This should ideally be opened earlier during app init,
@@ -34,15 +30,14 @@ class CardFilterNotifier extends StateNotifier<CardFilters> {
       if (savedData is Map) {
         talker.debug('Loading saved card filters from Hive.');
         // Use dart_mappable to deserialize
-        return CardFilterNotifier._(
-            CardFiltersMapper.fromMap(Map<String, dynamic>.from(savedData)));
+        return CardFiltersMapper.fromMap(Map<String, dynamic>.from(savedData));
       } else {
         talker.debug('No saved card filters found, using defaults.');
-        return CardFilterNotifier._(const CardFilters());
+        return const CardFilters();
       }
     } catch (e, stack) {
       talker.error('Error loading card filters from Hive', e, stack);
-      return CardFilterNotifier._(const CardFilters()); // Fallback to default
+      return const CardFilters(); // Fallback to default
     }
   }
 
@@ -167,6 +162,12 @@ class CardFilterNotifier extends StateNotifier<CardFilters> {
       sortField: field,
       sortDescending: descending,
     );
+    _saveFilters(); // Save state
+  }
+
+  /// Update all filters at once (used when applying from filter dialog)
+  void updateFilters(CardFilters newFilters) {
+    state = newFilters;
     _saveFilters(); // Save state
   }
 }

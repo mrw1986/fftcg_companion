@@ -32,7 +32,7 @@ class EmailUpdateVerificationChecker extends Notifier<bool> {
   void startChecking() {
     _stopChecking(); // Stop any existing timer
 
-    final pendingEmail = ref.read(emailUpdateNotifierProvider).pendingEmail;
+    final pendingEmail = ref.read(emailUpdateProvider).pendingEmail;
     if (pendingEmail == null || pendingEmail.isEmpty) {
       talker.debug(
           'EmailUpdateVerificationChecker: No pending email to check for.');

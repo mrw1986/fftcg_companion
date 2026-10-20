@@ -14,7 +14,7 @@ import 'package:fftcg_companion/features/cards/domain/models/card_filters.dart';
 /// This helps reduce the loading time when opening the filter dialog
 final prefetchFilterOptionsProvider = FutureProvider.autoDispose((ref) async {
   // Start loading filter options
-  final options = await ref.watch(filterOptionsNotifierProvider.future);
+  final options = await ref.watch(filterOptionsProvider.future);
 
   // Prefetch a few set counts to warm up the cache
   final allSetIds = options.set.toList();
@@ -36,7 +36,7 @@ class FilterDialog extends ConsumerWidget {
     // Trigger prefetch of filter options
     ref.watch(prefetchFilterOptionsProvider);
 
-    final filterOptions = ref.watch(filterOptionsNotifierProvider);
+    final filterOptions = ref.watch(filterOptionsProvider);
     final filters = ref.watch(cardFilterProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final size = MediaQuery.of(context).size;
@@ -363,7 +363,7 @@ class FilterDialog extends ConsumerWidget {
     ColorScheme colorScheme,
   ) {
     final filterOptionsNotifier =
-        ref.watch(filterOptionsNotifierProvider.notifier);
+        ref.watch(filterOptionsProvider.notifier);
     final groupedSets = filterOptionsNotifier.getGroupedSets();
 
     // Check if any sets are selected
@@ -411,7 +411,7 @@ class FilterDialog extends ConsumerWidget {
     ColorScheme colorScheme,
   ) {
     final filterOptionsNotifier =
-        ref.watch(filterOptionsNotifierProvider.notifier);
+        ref.watch(filterOptionsProvider.notifier);
 
     // Check if any sets from this category are selected
     final hasSelectedSetsInCategory =

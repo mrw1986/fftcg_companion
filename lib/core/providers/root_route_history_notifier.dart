@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class RootRouteHistoryNotifier extends StateNotifier<List<int>> {
-  RootRouteHistoryNotifier() : super([0]);
+class RootRouteHistoryNotifier extends Notifier<List<int>> {
   static const platform =
       MethodChannel('com.mrw1986.fftcg_companion/back_handler');
+
+  @override
+  List<int> build() {
+    return [0];
+  }
 
   void addHistory(int index) {
     // Only add to history if it's different from current
@@ -44,5 +48,5 @@ class RootRouteHistoryNotifier extends StateNotifier<List<int>> {
 }
 
 final rootRouteHistoryProvider =
-    StateNotifierProvider<RootRouteHistoryNotifier, List<int>>(
-        (ref) => RootRouteHistoryNotifier());
+    NotifierProvider<RootRouteHistoryNotifier, List<int>>(
+        RootRouteHistoryNotifier.new);

@@ -56,14 +56,12 @@ class RequiresManualLinkException extends AuthException {
 /// Service for handling Firebase Authentication operations, rebuilt for simplicity.
 class AuthService {
   final FirebaseAuth _auth;
-  final GoogleSignIn _googleSignIn;
   final UserRepository _userRepository; // Keep for profile updates/deletion
   final Talker talker;
   final Duration _timeout = const Duration(seconds: 30);
 
   AuthService()
       : _auth = FirebaseAuth.instance,
-        _googleSignIn = GoogleSignIn(),
         _userRepository =
             UserRepository(), // Still needed for deleteUser/updateProfile
         talker = Talker();
@@ -161,22 +159,13 @@ class AuthService {
     talker.info('Attempting Google sign-in...');
     try {
       // Start Google sign-in flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        talker.info('Google sign-in cancelled by user.');
-        throw AuthException(
-            code: 'cancelled',
-            message: 'Google sign-in was cancelled.',
-            category: AuthErrorCategory.cancelled);
-      }
+      final googleUser = await GoogleSignIn.instance.authenticate();
       talker.debug('Google user obtained: ${googleUser.email}');
       talker.debug('Google user display name: ${googleUser.displayName}');
 
       // Obtain Google auth details
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
       talker.debug('Google credential created.');
@@ -232,7 +221,7 @@ class AuthService {
             e.code == 'email-already-in-use') {
           talker.warning(
               'Google sign-in conflict (standard): Email exists with different credential. $e');
-          await _googleSignIn.signOut().catchError((_) {
+          await GoogleSignIn.instance.signOut().catchError((_) {
             return null;
           }); // Best effort sign out, return null
           throw AuthException(
@@ -248,7 +237,7 @@ class AuthService {
         else if (e.code == 'user-not-found') {
           talker.warning(
               'Google sign-in failed: Firebase reported user-not-found (unexpected). $e');
-          await _googleSignIn.signOut().catchError((_) {
+          await GoogleSignIn.instance.signOut().catchError((_) {
             return null;
           }); // Best effort sign out, return null
           throw AuthException(
@@ -264,7 +253,7 @@ class AuthService {
       talker.error('Google sign-in failed: $e');
       // Ensure Google sign out happens on failure, except for our manual link case or cancellation
       if (e is! AuthException || e.category != AuthErrorCategory.cancelled) {
-        await _googleSignIn.signOut().catchError((signOutError) {
+        await GoogleSignIn.instance.signOut().catchError((signOutError) {
           talker.error(
               'Error signing out from Google after sign-in failure: $signOutError');
           return null; // Added return null
@@ -350,23 +339,18 @@ class AuthService {
 
     try {
       // Start Google sign-in flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        talker.info('Google sign-in cancelled during linking.');
-        throw AuthException(
-            code: 'cancelled',
-            message: 'Google sign-in was cancelled.',
-            category: AuthErrorCategory.cancelled);
-      }
+      final GoogleSignInAccount googleUser = await GoogleSignIn.instance.authenticate() ??
+          (throw AuthException(
+              code: 'cancelled',
+              message: 'Google sign-in was cancelled.',
+              category: AuthErrorCategory.cancelled));
       talker.debug('Google user obtained for linking: ${googleUser.email}');
       talker.debug(
           'Google user display name for linking: ${googleUser.displayName}');
 
       // Obtain Google auth details
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
       talker.debug('Google credential created for linking.');
@@ -541,21 +525,16 @@ class AuthService {
 
     try {
       // Start Google sign-in flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        talker.info('Google sign-in cancelled during linking.');
-        throw AuthException(
-            code: 'cancelled',
-            message: 'Google sign-in was cancelled.',
-            category: AuthErrorCategory.cancelled);
-      }
+      final GoogleSignInAccount googleUser = await GoogleSignIn.instance.authenticate() ??
+          (throw AuthException(
+              code: 'cancelled',
+              message: 'Google sign-in was cancelled.',
+              category: AuthErrorCategory.cancelled));
       talker.debug('Google user obtained for linking: ${googleUser.email}');
 
       // Obtain Google auth details
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
       talker.debug('Google credential created for linking.');
@@ -772,7 +751,7 @@ class AuthService {
 
       // Always sign out from Google first if it's a provider
       if (providers.contains(GoogleAuthProvider.PROVIDER_ID)) {
-        await _googleSignIn.signOut();
+        await GoogleSignIn.instance.signOut();
         talker.debug('Signed out from Google.');
         // Add a small delay to ensure Google sign out completes
         await Future.delayed(const Duration(milliseconds: 500));
@@ -909,26 +888,17 @@ class AuthService {
 
       // **REMOVED:** Disconnect Google Sign In - let the SDK handle account selection
       // talker.debug('Disconnecting GoogleSignIn before re-auth sign-in...');
-      // await _googleSignIn.disconnect();
+      // await GoogleSignIn.instance.disconnect();
       // talker.debug('GoogleSignIn disconnected.');
 
       // Start Google sign-in flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        talker.info('Google sign-in cancelled during re-authentication.');
-        throw AuthException(
-            code: 'cancelled',
-            message: 'Google sign-in was cancelled.',
-            category: AuthErrorCategory.cancelled);
-      }
+      final googleUser = await GoogleSignIn.instance.authenticate();
       talker.debug(
           'Google user obtained for re-authentication: ${googleUser.email} (ID: ${googleUser.id})');
 
       // Obtain Google auth details
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
       talker.debug('Google credential created for re-authentication.');
@@ -978,7 +948,7 @@ class AuthService {
           (e.category != AuthErrorCategory.cancelled &&
               e.code != 'wrong-account')) {
         // Sign out the *Google* session if it's still active from the failed attempt
-        await _googleSignIn.signOut().catchError((googleSignOutError) {
+        await GoogleSignIn.instance.signOut().catchError((googleSignOutError) {
           talker.error(
               'Error signing out Google after failed re-auth: $googleSignOutError');
           return null; // Fix: Added return null for catchError

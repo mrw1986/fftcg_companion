@@ -136,7 +136,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
       // Set skip flag BEFORE await
       if (mounted) {
-        ref.read(skipAutoAuthProvider.notifier).state = true;
+        ref.read(skipAutoAuthProvider.notifier).set(true);
       }
 
       if (authState.isAnonymous) {
@@ -152,7 +152,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
       // Reset skip flag ONLY on success, if mounted
       if (mounted) {
-        ref.read(skipAutoAuthProvider.notifier).state = false;
+        ref.read(skipAutoAuthProvider.notifier).set(false);
         // REMOVED: Invalidate providers to trigger listener
         // ref.invalidate(firebaseUserProvider);
         // ref.invalidate(authNotifierProvider);
@@ -167,7 +167,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       _isSigningInWithEmail = false; // Reset flag on error
       // Reset skip flag on error only if mounted
       if (mounted) {
-        ref.read(skipAutoAuthProvider.notifier).state = false;
+        ref.read(skipAutoAuthProvider.notifier).set(false);
       }
       talker.error(
           'Caught AuthException in auth_page (Email/Password): ${e.code} - ${e.message}');
@@ -213,7 +213,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       _isSigningInWithEmail = false; // Reset flag on error
       // Reset skip flag on error only if mounted
       if (mounted) {
-        ref.read(skipAutoAuthProvider.notifier).state = false;
+        ref.read(skipAutoAuthProvider.notifier).set(false);
       }
       talker.error('Non-AuthException error in auth page (Email/Password): $e');
       if (!currentContext.mounted) return;
@@ -237,7 +237,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
     // Set skip flag BEFORE attempting sign-in
     if (mounted) {
-      skipAutoAuthNotifier.state = true; // Use captured notifier
+      skipAutoAuthNotifier.set(true); // Use captured notifier
     } else {
       _setLoading(false); // Ensure loading stops if unmounted early
       _isSigningInWithGoogle = false;
@@ -257,7 +257,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         talker.debug(
             'Auth page: Direct Google Sign-In successful (Firebase level). Waiting for listener...');
         // Reset skip flag immediately after successful Firebase operation
-        skipAutoAuthNotifier.state = false; // Use captured notifier
+        skipAutoAuthNotifier.set(false); // Use captured notifier
         talker.debug(
             'Auth page: Reset skipAutoAuthProvider=false after successful Google sign-in attempt.');
         // REMOVED: Invalidate providers AFTER successful operation to trigger state change listener
@@ -277,7 +277,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       // Reset skip flag on error only if mounted
       if (mounted) {
         // Check if mounted before accessing ref
-        skipAutoAuthNotifier.state = false; // Use captured notifier
+        skipAutoAuthNotifier.set(false); // Use captured notifier
       }
       talker.error(
           'Caught AuthException during direct Google Sign-In: ${e.code} - ${e.message}');
@@ -322,7 +322,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           'Auth page: Retrying Google sign-in to create account...');
                       // Set skip flag again before retry
                       if (mounted) {
-                        ref.read(skipAutoAuthProvider.notifier).state = true;
+                        ref.read(skipAutoAuthProvider.notifier).set(true);
                       } else {
                         return; // Exit if unmounted
                       }
@@ -334,8 +334,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                         talker.debug(
                             'Auth page: Google Sign-In successful (account created). Waiting for listener...');
                         // Reset skip flag on success inside dialog too
-                        skipAutoAuthNotifier.state =
-                            false; // Use captured notifier
+                        skipAutoAuthNotifier.set(false); // Use captured notifier
                         // REMOVED: Invalidate providers to trigger listener
                         // ref.invalidate(firebaseUserProvider);
                         // ref.invalidate(authNotifierProvider);
@@ -350,8 +349,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                       // Reset skip flag on error only if mounted
                       if (mounted) {
                         // Check if mounted before accessing ref
-                        skipAutoAuthNotifier.state =
-                            false; // Use captured notifier
+                        skipAutoAuthNotifier.set(false); // Use captured notifier
                       }
                       if (!mounted) return;
                       talker.error(
@@ -378,7 +376,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       // Reset skip flag on error only if mounted
       if (mounted) {
         // Check if mounted before accessing ref
-        skipAutoAuthNotifier.state = false; // Use captured notifier
+        skipAutoAuthNotifier.set(false); // Use captured notifier
       }
       talker.error('Non-AuthException during direct Google Sign-In: $e');
       if (initialContext.mounted) {
